@@ -1,26 +1,54 @@
 <style>
+  .tabs{ display:flex; gap:4px; border-bottom:1px solid var(--hairline); margin-bottom:20px; }
+  .tab{ padding:10px 14px; font-size:12.5px; color:var(--text-secondary); cursor:pointer; border-bottom:2px solid transparent; }
+  .tab.active{ color:var(--mint); border-color:var(--mint); }
+  .view-panel{ display:none; }
+  .view-panel.active{ display:block; }
+
   .kanban{ display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:12px; }
   .kanban-col{ background:var(--bg-surface); border:1px solid var(--hairline); border-radius:12px; padding:12px; }
   .kanban-col h4{ font-size:11px; text-transform:uppercase; color:var(--text-tertiary); font-family:var(--font-mono); margin:0 0 10px; }
   .kanban-card{ background:var(--bg-elevated); border:1px solid var(--hairline); border-radius:9px; padding:10px 12px; margin-bottom:8px; font-size:12px; cursor:pointer; }
+
   .modal-overlay{ position:fixed; inset:0; background:rgba(3,5,8,0.6); display:none; align-items:center; justify-content:center; z-index:100; padding:24px; }
   .modal-overlay.open{ display:flex; }
-  .modal-box{ background:var(--bg-surface); border:1px solid var(--hairline); border-radius:14px; width:100%; max-width:560px; max-height:88vh; overflow-y:auto; }
-  .modal-head{ display:flex; justify-content:space-between; padding:18px 22px; border-bottom:1px solid var(--hairline); }
+  .modal-box{ background:var(--bg-surface); border:1px solid var(--hairline); border-radius:14px; width:100%; max-width:760px; max-height:90vh; overflow-y:auto; }
+  .modal-head{ display:flex; justify-content:space-between; align-items:center; padding:18px 22px; border-bottom:1px solid var(--hairline); position:sticky; top:0; background:var(--bg-surface); z-index:2; }
   .modal-body{ padding:20px 22px; }
-  .modal-foot{ display:flex; justify-content:flex-end; gap:10px; padding:16px 22px; border-top:1px solid var(--hairline); }
+  .modal-foot{ display:flex; justify-content:flex-end; gap:10px; padding:16px 22px; border-top:1px solid var(--hairline); position:sticky; bottom:0; background:var(--bg-surface); }
   .ffield{ margin-bottom:14px; }
   .ffield label{ display:block; font-size:12px; color:var(--text-secondary); margin-bottom:6px; }
-  .ffield input, .ffield select, .ffield textarea{ width:100%; background:var(--bg-elevated); border:1px solid var(--hairline); color:var(--text-primary); padding:10px 12px; border-radius:8px; font-size:13px; }
+  .ffield input, .ffield select, .ffield textarea{ width:100%; background:var(--bg-elevated); border:1px solid var(--hairline); color:var(--text-primary); padding:10px 12px; border-radius:8px; font-size:13px; font-family:inherit; }
+  .ffield textarea{ min-height:70px; resize:vertical; }
   .frow2{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  .frow3{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; }
   .modal-close{ background:none; border:none; color:var(--text-tertiary); font-size:18px; cursor:pointer; }
+  .section-title{ font-family:var(--font-display); font-size:14px; font-weight:600; margin:22px 0 10px; padding-top:14px; border-top:1px solid var(--hairline); }
+  .section-title:first-child{ border-top:none; padding-top:0; margin-top:0; }
+
   .senha-tabs{ display:flex; gap:8px; margin-bottom:14px; }
   .senha-tabs button{ flex:1; padding:8px; border-radius:8px; border:1px solid var(--hairline); background:var(--bg-elevated); color:var(--text-secondary); cursor:pointer; }
   .senha-tabs button.active{ border-color:var(--mint); color:var(--mint); }
-  .pattern-grid{ display:grid; grid-template-columns:repeat(3,44px); grid-template-rows:repeat(3,44px); gap:18px; margin:10px auto; width:fit-content; }
-  .pattern-dot{ width:44px; height:44px; border-radius:50%; border:2px solid var(--hairline); background:var(--bg-elevated); cursor:pointer; position:relative; }
+  .pattern-grid{ display:grid; grid-template-columns:repeat(3,40px); grid-template-rows:repeat(3,40px); gap:16px; margin:10px auto; width:fit-content; }
+  .pattern-dot{ width:40px; height:40px; border-radius:50%; border:2px solid var(--hairline); background:var(--bg-elevated); cursor:pointer; position:relative; }
   .pattern-dot.active{ border-color:var(--mint); background:rgba(47,225,168,0.15); }
-  .pattern-dot.active::after{ content:''; position:absolute; inset:17px; border-radius:50%; background:var(--mint); }
+  .pattern-dot.active::after{ content:''; position:absolute; inset:15px; border-radius:50%; background:var(--mint); }
+
+  .diagramas-wrap{ display:flex; gap:24px; justify-content:center; flex-wrap:wrap; }
+  .diagrama-col{ text-align:center; }
+  .diagrama-col .titulo{ font-size:11.5px; color:var(--text-tertiary); font-family:var(--font-mono); margin-bottom:8px; }
+  .phone-svg{ border-radius:20px; }
+
+  .calendario{ background:var(--bg-surface); border:1px solid var(--hairline); border-radius:12px; padding:18px; }
+  .cal-header{ display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; }
+  .cal-header h3{ font-family:var(--font-display); margin:0; font-size:16px; }
+  .cal-grid{ display:grid; grid-template-columns:repeat(7,1fr); gap:6px; }
+  .cal-dia-label{ font-size:10.5px; color:var(--text-tertiary); text-align:center; font-family:var(--font-mono); padding-bottom:6px; }
+  .cal-dia{ min-height:76px; border:1px solid var(--hairline); border-radius:8px; padding:6px; font-size:11px; background:var(--bg-elevated); cursor:pointer; }
+  .cal-dia.fora-mes{ opacity:0.3; }
+  .cal-dia.hoje{ border-color:var(--mint); }
+  .cal-dia .num{ color:var(--text-secondary); font-family:var(--font-mono); }
+  .cal-dia .os-chip{ background:rgba(47,225,168,0.15); color:var(--mint); border-radius:4px; padding:2px 5px; font-size:9.5px; margin-top:4px; display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 </style>
 
 <div class="toolbar">
@@ -28,76 +56,201 @@
   <button class="btn btn-primary" id="btnNovaOS">+ Nova OS</button>
 </div>
 
-<div class="kanban" id="kanban"></div>
+<div class="tabs">
+  <div class="tab active" data-view="kanban">Quadro</div>
+  <div class="tab" data-view="calendario">Calendário de entregas</div>
+</div>
 
-<div class="modal-overlay" id="modal">
+<div id="viewKanban" class="view-panel active">
+  <div class="kanban" id="kanban"></div>
+</div>
+
+<div id="viewCalendario" class="view-panel">
+  <div class="calendario">
+    <div class="cal-header">
+      <button class="btn" id="btnMesAnterior">‹</button>
+      <h3 id="calTitulo">—</h3>
+      <button class="btn" id="btnMesSeguinte">›</button>
+    </div>
+    <div class="cal-grid" id="calGrid"></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modalNova">
   <div class="modal-box">
-    <div class="modal-head"><h3 style="font-family:var(--font-display); margin:0;">Nova Ordem de Serviço</h3><button class="modal-close" id="fecharModal">✕</button></div>
+    <div class="modal-head"><h3 style="font-family:var(--font-display); margin:0;">Nova Ordem de Serviço</h3><button class="modal-close" id="fecharModalNova">✕</button></div>
     <div class="modal-body">
+      <div class="section-title">Cliente e aparelho</div>
       <div class="frow2">
-        <div class="ffield"><label>Cliente</label><select id="fCliente"><option value="">Selecione…</option></select></div>
-        <div class="ffield"><label>Prazo</label><input id="fPrazo" type="date"></div>
+        <div class="ffield"><label>Cliente *</label><select id="fCliente"><option value="">Selecione…</option></select></div>
+        <div class="ffield"><label>Técnico responsável</label><input id="fTecnico" placeholder="Nome do técnico"></div>
       </div>
-      <div class="frow2">
+      <div class="frow3">
         <div class="ffield"><label>Marca</label><input id="fMarca"></div>
         <div class="ffield"><label>Modelo</label><input id="fModelo"></div>
+        <div class="ffield"><label>IMEI / Nº série</label><input id="fImei"></div>
       </div>
-      <div class="ffield"><label>Defeito informado *</label><textarea id="fDefeito"></textarea></div>
-      <div class="ffield">
-        <label>Desbloqueio do aparelho</label>
-        <div class="senha-tabs">
-          <button type="button" class="active" data-tipo="PIN">PIN</button>
-          <button type="button" data-tipo="TEXTO">Senha texto</button>
-          <button type="button" data-tipo="PADRAO">Padrão</button>
-        </div>
-        <div id="senhaPinWrap"><input id="fSenhaPin" placeholder="Ex.: 1234"></div>
-        <div id="senhaTextoWrap" style="display:none;"><input id="fSenhaTexto"></div>
-        <div id="senhaPadraoWrap" style="display:none; text-align:center;">
-          <div class="pattern-grid" id="patternGrid"></div>
-          <div style="font-size:11px; color:var(--text-tertiary); font-family:var(--font-mono);" id="patternSeq">—</div>
-        </div>
+      <div class="ffield"><label>Acessórios entregues junto</label><input id="fAcessorios" placeholder="Ex.: carregador, capinha, fone…"></div>
+
+      <div class="section-title">Diagnóstico e serviço</div>
+      <div class="ffield"><label>Defeito informado pelo cliente *</label><textarea id="fDefeito"></textarea></div>
+      <div class="ffield"><label>Diagnóstico técnico</label><textarea id="fDiagnostico" placeholder="Preenchido pelo técnico ao avaliar o aparelho"></textarea></div>
+      <div class="ffield"><label>Peças a repor</label><textarea id="fPecas" placeholder="Ex.: Tela original, bateria 3000mAh…"></textarea></div>
+      <div class="frow2">
+        <div class="ffield"><label>Valor do serviço (R$)</label><input id="fValor" type="number" step="0.01"></div>
+        <div class="ffield"><label>Previsão de entrega</label><input id="fPrazo" type="date"></div>
+      </div>
+
+      <div class="section-title">Desbloqueio do aparelho</div>
+      <div class="senha-tabs">
+        <button type="button" class="active" data-tipo="PIN">PIN</button>
+        <button type="button" data-tipo="TEXTO">Senha texto</button>
+        <button type="button" data-tipo="PADRAO">Padrão</button>
+      </div>
+      <div id="senhaPinWrap"><input id="fSenhaPin" placeholder="Ex.: 1234"></div>
+      <div id="senhaTextoWrap" style="display:none;"><input id="fSenhaTexto"></div>
+      <div id="senhaPadraoWrap" style="display:none; text-align:center;">
+        <div class="pattern-grid" id="patternGrid"></div>
+        <div style="font-size:11px; color:var(--text-tertiary); font-family:var(--font-mono);" id="patternSeq">—</div>
+      </div>
+
+      <div class="section-title">Estado do aparelho na entrada (marque avarias já existentes)</div>
+      <p style="color:var(--text-secondary); font-size:12px; margin:0 0 12px;">Clique no desenho pra marcar riscos, rachaduras ou manchas já existentes — protege a loja de reclamações de "isso não estava aqui antes".</p>
+      <div class="diagramas-wrap">
+        <div class="diagrama-col"><div class="titulo">FRENTE</div><div id="diagramaFrenteNova"></div></div>
+        <div class="diagrama-col"><div class="titulo">VERSO</div><div id="diagramaVersoNova"></div></div>
       </div>
     </div>
-    <div class="modal-foot"><button class="btn" id="btnCancelar">Cancelar</button><button class="btn btn-primary" id="btnSalvar">Abrir OS</button></div>
+    <div class="modal-foot">
+      <button class="btn" id="btnCancelarNova">Cancelar</button>
+      <button class="btn btn-primary" id="btnSalvarNova">Abrir OS</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modalVer">
+  <div class="modal-box">
+    <div class="modal-head"><h3 style="font-family:var(--font-display); margin:0;" id="verTitulo">OS</h3><button class="modal-close" id="fecharModalVer">✕</button></div>
+    <div class="modal-body" id="verCorpo"></div>
+    <div class="modal-foot">
+      <button class="btn" id="btnFecharVer">Fechar</button>
+      <button class="btn btn-primary" id="btnSalvarVer">Salvar alterações</button>
+    </div>
   </div>
 </div>
 
 <script>
 (async function(){
   const STATUS_COLUNAS = ['Aberta','Em diagnóstico','Aguardando peça','Em reparo','Pronto','Entregue'];
-  let ordens = [], clientes = [], senhaTipoAtual = 'PIN', sequenciaPadrao = [];
+  let ordens = [], clientes = [];
+  let senhaTipoAtual = 'PIN', sequenciaPadrao = [];
+  let defeitosFrenteNova = [], defeitosVersoNova = [];
+  let mesCalendario = new Date();
+
+  function renderDiagrama(containerId, defeitosArray, editavel){
+    const container = document.getElementById(containerId);
+    container.innerHTML = `<svg viewBox="0 0 140 280" width="120" height="240" class="phone-svg" style="background:var(--bg-elevated); cursor:${editavel?'crosshair':'default'};">
+      <rect x="4" y="4" width="132" height="272" rx="22" fill="none" stroke="var(--hairline)" stroke-width="2.5"/>
+      <rect x="16" y="18" width="108" height="244" rx="10" fill="rgba(47,225,168,0.04)" stroke="var(--hairline)" stroke-width="1"/>
+    </svg>`;
+    const svg = container.querySelector('svg');
+    defeitosArray.forEach((d) => desenharMarcador(svg, d));
+
+    if (editavel) {
+      svg.addEventListener('click', (e) => {
+        const rect = svg.getBoundingClientRect();
+        const xPct = ((e.clientX - rect.left) / rect.width) * 100;
+        const yPct = ((e.clientY - rect.top) / rect.height) * 100;
+        const nota = prompt('Descreva a avaria já existente (ex.: risco na tela, rachadura no canto):');
+        if (!nota) return;
+        const novo = { x: Number(xPct.toFixed(1)), y: Number(yPct.toFixed(1)), nota };
+        defeitosArray.push(novo);
+        desenharMarcador(svg, novo);
+      });
+    }
+  }
+
+  function desenharMarcador(svg, d){
+    const ns = 'http://www.w3.org/2000/svg';
+    const circle = document.createElementNS(ns, 'circle');
+    circle.setAttribute('cx', d.x + '%');
+    circle.setAttribute('cy', d.y + '%');
+    circle.setAttribute('r', '5');
+    circle.setAttribute('fill', '#FF5C5C');
+    circle.setAttribute('stroke', '#fff');
+    circle.setAttribute('stroke-width', '1.2');
+    circle.style.cursor = 'pointer';
+    circle.addEventListener('click', (e) => { e.stopPropagation(); alert('Avaria: ' + d.nota); });
+    svg.appendChild(circle);
+  }
 
   async function carregar(){
     try {
-      if (!(await checarPermissao('ASSISTENCIA','VISUALIZAR'))){ document.getElementById('kanban').innerHTML='Sem permissão.'; return; }
+      if (!(await checarPermissao('ASSISTENCIA','VISUALIZAR'))){ setHTML('kanban', 'Sem permissão.'); return; }
       clientes = await dbGetAll('CLIENTES');
       ordens = await dbGetAll('ASSISTENCIAS');
-      document.getElementById('fCliente').innerHTML = '<option value="">Selecione…</option>' + clientes.map(c => `<option value="${c.ID}">${c.NOME}</option>`).join('');
+      setHTML('fCliente', '<option value="">Selecione…</option>' + clientes.map(c => `<option value="${c.ID}">${c.NOME}</option>`).join(''));
       renderKanban();
+      renderCalendario();
     } catch (e) { mostrarToast('Erro: ' + e.message, 'erro'); }
   }
+
+  function nomeCliente(id){ const c = clientes.find(x => x.ID === id); return c ? c.NOME : '—'; }
 
   function renderKanban(){
-    document.getElementById('kanban').innerHTML = STATUS_COLUNAS.map(status => {
+    setHTML('kanban', STATUS_COLUNAS.map(status => {
       const doStatus = ordens.filter(o => o.STATUS === status);
       return `<div class="kanban-col"><h4>${status} (${doStatus.length})</h4>${
-        doStatus.map(o => `<div class="kanban-card" onclick="window.__mudarStatus('${o.ID}','${o.STATUS}')"><div style="color:var(--mint); font-family:var(--font-mono); font-size:11px;">${o.NUMERO_OS}</div><b>${o.MARCA} ${o.MODELO}</b><div style="color:var(--text-tertiary);">${o.DEFEITO_INFORMADO}</div></div>`).join('')
+        doStatus.map(o => `<div class="kanban-card" onclick="window.__abrirOS('${o.ID}')"><div style="color:var(--mint); font-family:var(--font-mono); font-size:11px;">${o.NUMERO_OS}</div><b>${o.MARCA||''} ${o.MODELO||''}</b><div style="color:var(--text-tertiary);">${o.DEFEITO_INFORMADO||''}</div></div>`).join('')
         || '<div style="color:var(--text-tertiary); font-size:11.5px;">Nenhuma OS.</div>'}</div>`;
-    }).join('');
+    }).join(''));
   }
 
-  window.__mudarStatus = async (id, statusAtual) => {
-    const novo = prompt('Novo status (' + STATUS_COLUNAS.join(' / ') + '):', statusAtual);
-    if (!novo || novo === statusAtual || !STATUS_COLUNAS.includes(novo)) return;
-    try {
-      if (!(await checarPermissao('ASSISTENCIA','EDITAR'))){ mostrarToast('Sem permissão.', 'erro'); return; }
-      await dbUpdate('ASSISTENCIAS', id, { STATUS: novo });
-      mostrarToast('Status atualizado.'); carregar();
-    } catch (e) { mostrarToast('Erro: ' + e.message, 'erro'); }
+  function renderCalendario(){
+    const ano = mesCalendario.getFullYear(), mes = mesCalendario.getMonth();
+    document.getElementById('calTitulo').textContent = mesCalendario.toLocaleDateString('pt-BR', { month:'long', year:'numeric' });
+
+    const primeiroDia = new Date(ano, mes, 1);
+    const inicioGrid = new Date(primeiroDia);
+    inicioGrid.setDate(inicioGrid.getDate() - ((primeiroDia.getDay() + 6) % 7));
+
+    const hojeStr = new Date().toDateString();
+    const labels = ['SEG','TER','QUA','QUI','SEX','SÁB','DOM'];
+    let html = labels.map(l => `<div class="cal-dia-label">${l}</div>`).join('');
+
+    for (let i = 0; i < 42; i++) {
+      const dia = new Date(inicioGrid); dia.setDate(dia.getDate() + i);
+      const foraMes = dia.getMonth() !== mes;
+      const ehHoje = dia.toDateString() === hojeStr;
+      const osDoDia = ordens.filter(o => o.PRAZO && new Date(o.PRAZO).toDateString() === dia.toDateString());
+
+      html += `<div class="cal-dia ${foraMes?'fora-mes':''} ${ehHoje?'hoje':''}" onclick='window.__verDiaCalendario(${JSON.stringify(osDoDia.map(o=>o.ID))})'>
+        <div class="num">${dia.getDate()}</div>
+        ${osDoDia.slice(0,3).map(o => `<span class="os-chip">${o.NUMERO_OS}</span>`).join('')}
+        ${osDoDia.length > 3 ? '<span style="font-size:9.5px; color:var(--text-tertiary);">+' + (osDoDia.length-3) + '</span>' : ''}
+      </div>`;
+    }
+    setHTML('calGrid', html);
+  }
+
+  window.__verDiaCalendario = (idsOS) => {
+    if (!idsOS.length) return;
+    if (idsOS.length === 1) { window.__abrirOS(idsOS[0]); return; }
+    const escolha = prompt('OS com entrega neste dia:\n' + idsOS.map((id,i) => (i+1)+') '+ordens.find(o=>o.ID===id).NUMERO_OS).join('\n') + '\n\nDigite o número pra abrir:');
+    const idx = Number(escolha) - 1;
+    if (idsOS[idx]) window.__abrirOS(idsOS[idx]);
   };
 
-  // ---------- grade 3x3 ----------
-  const grid = document.getElementById('patternGrid');
+  document.getElementById('btnMesAnterior').addEventListener('click', () => { mesCalendario.setMonth(mesCalendario.getMonth()-1); renderCalendario(); });
+  document.getElementById('btnMesSeguinte').addEventListener('click', () => { mesCalendario.setMonth(mesCalendario.getMonth()+1); renderCalendario(); });
+
+  document.querySelectorAll('.tab').forEach(tab => tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active')); tab.classList.add('active');
+    document.querySelectorAll('.view-panel').forEach(p=>p.classList.remove('active'));
+    document.getElementById('view' + tab.dataset.view.charAt(0).toUpperCase() + tab.dataset.view.slice(1)).classList.add('active');
+  }));
+
+  const gridNovo = document.getElementById('patternGrid');
   for (let i=1;i<=9;i++){
     const dot = document.createElement('div'); dot.className='pattern-dot';
     dot.addEventListener('click', () => {
@@ -105,7 +258,7 @@
       sequenciaPadrao.push(i); dot.classList.add('active');
       document.getElementById('patternSeq').textContent = sequenciaPadrao.join(' → ');
     });
-    grid.appendChild(dot);
+    gridNovo.appendChild(dot);
   }
   document.querySelectorAll('.senha-tabs button').forEach(btn => btn.addEventListener('click', () => {
     document.querySelectorAll('.senha-tabs button').forEach(b=>b.classList.remove('active'));
@@ -115,15 +268,22 @@
     document.getElementById('senhaPadraoWrap').style.display = senhaTipoAtual==='PADRAO'?'block':'none';
   }));
 
-  const modal = document.getElementById('modal');
-  document.getElementById('btnNovaOS').addEventListener('click', () => modal.classList.add('open'));
-  document.getElementById('fecharModal').addEventListener('click', () => modal.classList.remove('open'));
-  document.getElementById('btnCancelar').addEventListener('click', () => modal.classList.remove('open'));
+  const modalNova = document.getElementById('modalNova');
+  document.getElementById('btnNovaOS').addEventListener('click', () => {
+    defeitosFrenteNova = []; defeitosVersoNova = [];
+    ['fCliente','fTecnico','fMarca','fModelo','fImei','fAcessorios','fDefeito','fDiagnostico','fPecas','fValor','fPrazo','fSenhaPin','fSenhaTexto'].forEach(id => document.getElementById(id).value = '');
+    sequenciaPadrao = []; document.getElementById('patternSeq').textContent = '—';
+    renderDiagrama('diagramaFrenteNova', defeitosFrenteNova, true);
+    renderDiagrama('diagramaVersoNova', defeitosVersoNova, true);
+    modalNova.classList.add('open');
+  });
+  document.getElementById('fecharModalNova').addEventListener('click', () => modalNova.classList.remove('open'));
+  document.getElementById('btnCancelarNova').addEventListener('click', () => modalNova.classList.remove('open'));
 
-  document.getElementById('btnSalvar').addEventListener('click', async () => {
+  document.getElementById('btnSalvarNova').addEventListener('click', async () => {
     const cliente = document.getElementById('fCliente').value;
     const defeito = document.getElementById('fDefeito').value.trim();
-    if (!cliente || !defeito){ mostrarToast('Cliente e defeito são obrigatórios.', 'erro'); return; }
+    if (!cliente || !defeito){ mostrarToast('Cliente e defeito informado são obrigatórios.', 'erro'); return; }
 
     let senhaValor = senhaTipoAtual==='PIN' ? document.getElementById('fSenhaPin').value.trim()
       : senhaTipoAtual==='TEXTO' ? document.getElementById('fSenhaTexto').value.trim()
@@ -136,13 +296,85 @@
       const numeroOS = 'OS-' + ano + '-' + String(totalAno+1).padStart(5,'0');
 
       await dbInsert('ASSISTENCIAS', {
-        NUMERO_OS: numeroOS, CLIENTE_ID: cliente, MARCA: document.getElementById('fMarca').value.trim(),
-        MODELO: document.getElementById('fModelo').value.trim(), DEFEITO_INFORMADO: defeito,
-        SENHA_TIPO: senhaTipoAtual, SENHA_VALOR: senhaValor, PRAZO: document.getElementById('fPrazo').value,
-        STATUS: 'Aberta', DATA_ABERTURA: new Date().toISOString()
+        NUMERO_OS: numeroOS, CLIENTE_ID: cliente, TECNICO_RESPONSAVEL: document.getElementById('fTecnico').value.trim(),
+        MARCA: document.getElementById('fMarca').value.trim(), MODELO: document.getElementById('fModelo').value.trim(),
+        IMEI: document.getElementById('fImei').value.trim(), ACESSORIOS_ENTREGUES: document.getElementById('fAcessorios').value.trim(),
+        DEFEITO_INFORMADO: defeito, DIAGNOSTICO: document.getElementById('fDiagnostico').value.trim(),
+        PECAS_A_REPOR: document.getElementById('fPecas').value.trim(), VALOR_SERVICO: Number(document.getElementById('fValor').value)||0,
+        PRAZO: document.getElementById('fPrazo').value, SENHA_TIPO: senhaTipoAtual, SENHA_VALOR: senhaValor,
+        DEFEITOS_FRENTE: JSON.stringify(defeitosFrenteNova), DEFEITOS_VERSO: JSON.stringify(defeitosVersoNova),
+        STATUS: 'Aberta', DATA_ABERTURA: new Date().toISOString(), DATA_ENTREGA_REAL: ''
       });
       mostrarToast('OS ' + numeroOS + ' aberta.');
-      modal.classList.remove('open'); carregar();
+      modalNova.classList.remove('open'); carregar();
+    } catch (e) { mostrarToast('Erro: ' + e.message, 'erro'); }
+  });
+
+  const modalVer = document.getElementById('modalVer');
+  let osAtual = null;
+
+  window.__abrirOS = (id) => {
+    osAtual = ordens.find(o => o.ID === id);
+    if (!osAtual) return;
+    document.getElementById('verTitulo').textContent = osAtual.NUMERO_OS + ' — ' + nomeCliente(osAtual.CLIENTE_ID);
+
+    const defFrente = JSON.parse(osAtual.DEFEITOS_FRENTE || '[]');
+    const defVerso = JSON.parse(osAtual.DEFEITOS_VERSO || '[]');
+
+    setHTML('verCorpo', `
+      <div class="section-title">Status e prazo</div>
+      <div class="frow2">
+        <div class="ffield"><label>Status</label><select id="vStatus">${STATUS_COLUNAS.map(s => `<option value="${s}" ${s===osAtual.STATUS?'selected':''}>${s}</option>`).join('')}</select></div>
+        <div class="ffield"><label>Previsão de entrega</label><input id="vPrazo" type="date" value="${osAtual.PRAZO||''}"></div>
+      </div>
+      <div class="section-title">Aparelho</div>
+      <div class="frow3">
+        <div class="ffield"><label>Marca</label><input id="vMarca" value="${osAtual.MARCA||''}"></div>
+        <div class="ffield"><label>Modelo</label><input id="vModelo" value="${osAtual.MODELO||''}"></div>
+        <div class="ffield"><label>IMEI/série</label><input id="vImei" value="${osAtual.IMEI||''}"></div>
+      </div>
+      <div class="section-title">Diagnóstico e serviço</div>
+      <div class="ffield"><label>Defeito informado</label><textarea id="vDefeito">${osAtual.DEFEITO_INFORMADO||''}</textarea></div>
+      <div class="ffield"><label>Diagnóstico técnico</label><textarea id="vDiagnostico">${osAtual.DIAGNOSTICO||''}</textarea></div>
+      <div class="ffield"><label>Peças a repor</label><textarea id="vPecas">${osAtual.PECAS_A_REPOR||''}</textarea></div>
+      <div class="frow2">
+        <div class="ffield"><label>Valor do serviço (R$)</label><input id="vValor" type="number" step="0.01" value="${osAtual.VALOR_SERVICO||0}"></div>
+        <div class="ffield"><label>Técnico responsável</label><input id="vTecnico" value="${osAtual.TECNICO_RESPONSAVEL||''}"></div>
+      </div>
+      <div class="section-title">Estado do aparelho na entrada (registrado na abertura)</div>
+      <div class="diagramas-wrap">
+        <div class="diagrama-col"><div class="titulo">FRENTE</div><div id="diagramaFrenteVer"></div></div>
+        <div class="diagrama-col"><div class="titulo">VERSO</div><div id="diagramaVersoVer"></div></div>
+      </div>
+    `);
+
+    renderDiagrama('diagramaFrenteVer', defFrente, false);
+    renderDiagrama('diagramaVersoVer', defVerso, false);
+
+    modalVer.classList.add('open');
+  };
+
+  document.getElementById('fecharModalVer').addEventListener('click', () => modalVer.classList.remove('open'));
+  document.getElementById('btnFecharVer').addEventListener('click', () => modalVer.classList.remove('open'));
+
+  document.getElementById('btnSalvarVer').addEventListener('click', async () => {
+    if (!osAtual) return;
+    try {
+      if (!(await checarPermissao('ASSISTENCIA','EDITAR'))){ mostrarToast('Sem permissão.', 'erro'); return; }
+      const novoStatus = document.getElementById('vStatus').value;
+      const dados = {
+        STATUS: novoStatus, PRAZO: document.getElementById('vPrazo').value,
+        MARCA: document.getElementById('vMarca').value.trim(), MODELO: document.getElementById('vModelo').value.trim(),
+        IMEI: document.getElementById('vImei').value.trim(), DEFEITO_INFORMADO: document.getElementById('vDefeito').value.trim(),
+        DIAGNOSTICO: document.getElementById('vDiagnostico').value.trim(), PECAS_A_REPOR: document.getElementById('vPecas').value.trim(),
+        VALOR_SERVICO: Number(document.getElementById('vValor').value)||0, TECNICO_RESPONSAVEL: document.getElementById('vTecnico').value.trim()
+      };
+      if (novoStatus === 'Entregue' && !osAtual.DATA_ENTREGA_REAL) dados.DATA_ENTREGA_REAL = new Date().toISOString();
+
+      await dbUpdate('ASSISTENCIAS', osAtual.ID, dados);
+      mostrarToast('OS atualizada.');
+      modalVer.classList.remove('open');
+      carregar();
     } catch (e) { mostrarToast('Erro: ' + e.message, 'erro'); }
   });
 

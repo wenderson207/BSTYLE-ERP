@@ -13,6 +13,7 @@
   .badge{ display:inline-flex; padding:3px 9px; border-radius:20px; font-size:11px; font-weight:600; font-family:var(--font-mono); }
   .badge.ok{ background:rgba(47,225,168,0.12); color:var(--mint); }
   .badge.neutral{ background:var(--bg-elevated); color:var(--text-secondary); }
+  .badge.info{ background:rgba(76,141,255,0.12); color:var(--blue); }
 </style>
 
 <div class="toolbar">
@@ -21,10 +22,11 @@
 </div>
 
 <table class="dt">
-  <thead><tr><th>Nome</th><th>Cargo</th><th>Email</th><th>Status</th><th></th></tr></thead>
-  <tbody id="linhas"><tr class="empty-row"><td colspan="5">Carregando…</td></tr></tbody>
+  <thead><tr><th>Nome</th><th>Cargo</th><th>Loja</th><th>Perfil</th><th>Status</th><th></th></tr></thead>
+  <tbody id="linhas"><tr class="empty-row"><td colspan="6">Carregando…</td></tr></tbody>
 </table>
 
+<!-- Modal: novo funcionário -->
 <div class="modal-overlay" id="modal">
   <div class="modal-box">
     <div class="modal-head"><h3 style="font-family:var(--font-display); margin:0;">Novo funcionário</h3><button class="modal-close" id="fecharModal">✕</button></div>
@@ -37,7 +39,10 @@
         <div class="ffield"><label>Cargo</label><input id="fCargo"></div>
         <div class="ffield"><label>Telefone</label><input id="fTelefone"></div>
       </div>
-      <div class="ffield"><label>Perfil de acesso *</label><select id="fPerfil"><option value="">Selecione…</option></select></div>
+      <div class="frow2">
+        <div class="ffield"><label>Perfil de acesso *</label><select id="fPerfil"><option value="">Selecione…</option></select></div>
+        <div class="ffield"><label>Loja</label><select id="fEmpresa"><option value="">Todas as lojas</option></select></div>
+      </div>
       <div class="ffield"><label>Senha inicial *</label><input id="fSenha" type="text" placeholder="Mínimo 6 caracteres"></div>
     </div>
     <div class="modal-foot">
@@ -47,36 +52,74 @@
   </div>
 </div>
 
+<!-- Modal: editar funcionário -->
+<div class="modal-overlay" id="modalEditar">
+  <div class="modal-box">
+    <div class="modal-head"><h3 style="font-family:var(--font-display); margin:0;">Editar funcionário</h3><button class="modal-close" id="fecharModalEditar">✕</button></div>
+    <div class="modal-body">
+      <input type="hidden" id="eId">
+      <div class="frow2">
+        <div class="ffield"><label>Nome</label><input id="eNome"></div>
+        <div class="ffield"><label>Cargo</label><input id="eCargo"></div>
+      </div>
+      <div class="frow2">
+        <div class="ffield"><label>Telefone</label><input id="eTelefone"></div>
+        <div class="ffield"><label>Status</label><select id="eStatus"><option value="Ativo">Ativo</option><option value="Inativo">Inativo</option></select></div>
+      </div>
+      <div class="frow2">
+        <div class="ffield"><label>Perfil de acesso</label><select id="ePerfil"></select></div>
+        <div class="ffield"><label>Loja</label><select id="eEmpresa"><option value="">Todas as lojas</option></select></div>
+      </div>
+      <p style="color:var(--text-tertiary); font-size:11.5px;">Email e senha não podem ser trocados aqui — o funcionário usa "Esqueci minha senha" na tela de login se precisar redefinir.</p>
+    </div>
+    <div class="modal-foot">
+      <button class="btn" id="btnCancelarEditar">Cancelar</button>
+      <button class="btn btn-primary" id="btnSalvarEditar">Salvar alterações</button>
+    </div>
+  </div>
+</div>
+
 <script>
 (async function(){
-  let itens = [], perfis = [];
+  let itens = [], perfis = [], empresas = [];
+
+  function nomePerfil(id){ const p = perfis.find(x=>x.ID===id); return p?p.NOME:'—'; }
+  function nomeEmpresa(id){ if (!id) return 'Todas'; const e = empresas.find(x=>x.ID===id); return e?e.NOME:'—'; }
 
   function renderLinhas(lista){
-    const tbody = document.getElementById('linhas');
-    if (!lista.length){ tbody.innerHTML = '<tr class="empty-row"><td colspan="5">Nenhum funcionário cadastrado.</td></tr>'; return; }
-    tbody.innerHTML = lista.map(f => `<tr>
-      <td><b>${f.NOME}</b></td><td>${f.CARGO||'—'}</td><td class="mono">${f.EMAIL}</td>
+    if (!lista.length){ setHTML('linhas', '<tr class="empty-row"><td colspan="6">Nenhum funcionário cadastrado.</td></tr>'); return; }
+    setHTML('linhas', lista.map(f => `<tr>
+      <td><b>${f.NOME}</b></td><td>${f.CARGO||'—'}</td>
+      <td><span class="badge ${f.EMPRESA_ID?'info':'neutral'}">${nomeEmpresa(f.EMPRESA_ID)}</span></td>
+      <td>${nomePerfil(f.PERFIL_ID)}</td>
       <td><span class="badge ${f.STATUS==='Ativo'?'ok':'neutral'}">${f.STATUS}</span></td>
       <td style="display:flex; gap:6px;">
-        <button class="btn" style="padding:6px 10px; font-size:11.5px;" onclick="window.__desativar('${f.ID}', '${f.STATUS}')">${f.STATUS==='Ativo'?'Desativar':'Reativar'}</button>
-      </td></tr>`).join('');
+        <button class="btn" style="padding:6px 10px; font-size:11.5px;" onclick="window.__editar('${f.ID}')">Editar</button>
+      </td></tr>`).join(''));
   }
 
   async function carregar(){
     try {
-      if (!(await checarPermissao('FUNCIONARIOS','VISUALIZAR'))){ document.getElementById('linhas').innerHTML='<tr class="empty-row"><td colspan="5">Sem permissão.</td></tr>'; return; }
+      if (!(await checarPermissao('FUNCIONARIOS','VISUALIZAR'))){ setHTML('linhas', '<tr class="empty-row"><td colspan="6">Sem permissão.</td></tr>'); return; }
+      perfis = await dbGetAll('PERFIS');
+      empresas = await dbGetAll('EMPRESAS');
       itens = await dbGetAll('USUARIOS');
       renderLinhas(itens);
-      perfis = await dbGetAll('PERFIS');
-      document.getElementById('fPerfil').innerHTML = '<option value="">Selecione…</option>' + perfis.map(p => `<option value="${p.ID}">${p.NOME}</option>`).join('');
+
+      const opcoesPerfil = '<option value="">Selecione…</option>' + perfis.map(p => `<option value="${p.ID}">${p.NOME}</option>`).join('');
+      const opcoesEmpresa = '<option value="">Todas as lojas</option>' + empresas.map(e => `<option value="${e.ID}">${e.NOME}</option>`).join('');
+      setHTML('fPerfil', opcoesPerfil);
+      setHTML('fEmpresa', opcoesEmpresa);
+      setHTML('ePerfil', opcoesPerfil);
+      setHTML('eEmpresa', opcoesEmpresa);
     } catch (e) { mostrarToast('Erro: ' + e.message, 'erro'); }
   }
 
+  // ---------- Novo ----------
   const modal = document.getElementById('modal');
   document.getElementById('btnNovo').addEventListener('click', () => {
-    document.getElementById('fNome').value = ''; document.getElementById('fEmail').value = '';
-    document.getElementById('fCargo').value = ''; document.getElementById('fTelefone').value = '';
-    document.getElementById('fPerfil').value = ''; document.getElementById('fSenha').value = '';
+    ['fNome','fEmail','fCargo','fTelefone','fSenha'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('fPerfil').value = ''; document.getElementById('fEmpresa').value = '';
     modal.classList.add('open');
   });
   document.getElementById('fecharModal').addEventListener('click', () => modal.classList.remove('open'));
@@ -95,7 +138,8 @@
       if (!(await checarPermissao('FUNCIONARIOS','CADASTRAR'))){ mostrarToast('Sem permissão.', 'erro'); return; }
       await criarFuncionarioComLogin({
         NOME: nome, EMAIL: email, CARGO: document.getElementById('fCargo').value.trim(),
-        TELEFONE: document.getElementById('fTelefone').value.trim(), PERFIL_ID: perfilId
+        TELEFONE: document.getElementById('fTelefone').value.trim(), PERFIL_ID: perfilId,
+        EMPRESA_ID: document.getElementById('fEmpresa').value
       }, senha);
       mostrarToast('Funcionário criado com sucesso.');
       modal.classList.remove('open');
@@ -105,16 +149,37 @@
     }
   });
 
-  window.__desativar = async (id, statusAtual) => {
-    const novoStatus = statusAtual === 'Ativo' ? 'Inativo' : 'Ativo';
-    if (!confirm((novoStatus === 'Inativo' ? 'Desativar' : 'Reativar') + ' este funcionário?')) return;
+  // ---------- Editar ----------
+  const modalEditar = document.getElementById('modalEditar');
+  window.__editar = (id) => {
+    const f = itens.find(x => x.ID === id);
+    if (!f) return;
+    document.getElementById('eId').value = f.ID;
+    document.getElementById('eNome').value = f.NOME || '';
+    document.getElementById('eCargo').value = f.CARGO || '';
+    document.getElementById('eTelefone').value = f.TELEFONE || '';
+    document.getElementById('eStatus').value = f.STATUS || 'Ativo';
+    document.getElementById('ePerfil').value = f.PERFIL_ID || '';
+    document.getElementById('eEmpresa').value = f.EMPRESA_ID || '';
+    modalEditar.classList.add('open');
+  };
+  document.getElementById('fecharModalEditar').addEventListener('click', () => modalEditar.classList.remove('open'));
+  document.getElementById('btnCancelarEditar').addEventListener('click', () => modalEditar.classList.remove('open'));
+
+  document.getElementById('btnSalvarEditar').addEventListener('click', async () => {
+    const id = document.getElementById('eId').value;
     try {
       if (!(await checarPermissao('FUNCIONARIOS','EDITAR'))){ mostrarToast('Sem permissão.', 'erro'); return; }
-      await dbUpdate('USUARIOS', id, { STATUS: novoStatus });
-      mostrarToast('Status atualizado.');
+      await dbUpdate('USUARIOS', id, {
+        NOME: document.getElementById('eNome').value.trim(), CARGO: document.getElementById('eCargo').value.trim(),
+        TELEFONE: document.getElementById('eTelefone').value.trim(), STATUS: document.getElementById('eStatus').value,
+        PERFIL_ID: document.getElementById('ePerfil').value, EMPRESA_ID: document.getElementById('eEmpresa').value
+      });
+      mostrarToast('Funcionário atualizado.');
+      modalEditar.classList.remove('open');
       carregar();
     } catch (e) { mostrarToast('Erro: ' + e.message, 'erro'); }
-  };
+  });
 
   carregar();
 })();

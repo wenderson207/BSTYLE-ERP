@@ -54,7 +54,12 @@
       logEl.textContent = '';
 
       try {
-        log('1) Verificando/criando perfis padrão…');
+        log('1) Criando seu login no Firebase Authentication…');
+        const cred = await auth.createUserWithEmailAndPassword(email, senha);
+        const uid = cred.user.uid;
+        log('   ✅ Login criado e autenticado: ' + email);
+
+        log('2) Verificando/criando perfis padrão…');
         const perfisExistentes = await dbGetAll('PERFIS');
         let perfilAdmin;
         if (perfisExistentes.length === 0) {
@@ -68,7 +73,7 @@
           log('   Perfis já existiam (' + perfisExistentes.length + '). Usando Administrador: ' + perfilAdmin.ID);
         }
 
-        log('2) Gravando permissão total do Administrador em todos os módulos…');
+        log('3) Gravando permissão total do Administrador em todos os módulos…');
         for (const modulo of MODULOS_SISTEMA) {
           const idPermissao = perfilAdmin.ID + '_' + modulo; // precisa bater com a convenção do firestore.rules
           await dbInsert('PERMISSOES', {
@@ -78,14 +83,16 @@
         }
         log('   ✅ Permissões gravadas para os ' + MODULOS_SISTEMA.length + ' módulos.');
 
-        log('3) Criando seu usuário no Firebase Authentication…');
-        const cred = await auth.createUserWithEmailAndPassword(email, senha);
-        const uid = cred.user.uid;
+        log('4) Criando seu cadastro em USUARIOS…');
         await db.collection('USUARIOS').doc(uid).set({
           NOME: nome, EMAIL: email, CARGO: 'Administrador', PERFIL_ID: perfilAdmin.ID,
           STATUS: 'Ativo', DATA_CRIACAO: new Date().toISOString()
         });
-        log('   ✅ Usuário criado: ' + email);
+        log('   ✅ Usuário administrador vinculado.');
+
+        log('5) Marcando o setup como concluído…');
+        await db.collection('CONFIG').doc('setup_concluido').set({ DATA: new Date().toISOString() });
+        log('   ✅ Setup concluído registrado (protege o sistema contra rodar o seed de novo por acidente).');
 
         await auth.signOut();
 

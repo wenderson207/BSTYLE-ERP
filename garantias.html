@@ -1,0 +1,20 @@
+<div class="toolbar"><div><h1 style="font-family:var(--font-display); font-size:22px; margin:0 0 4px;">Garantias</h1>
+<p style="color:var(--text-secondary); font-size:13px; margin:0;">Emitidas automaticamente a cada venda com cliente vinculado.</p></div></div>
+
+<table class="dt">
+  <thead><tr><th>Número</th><th>Produto</th><th>Emitida em</th><th>Prazo</th><th>Status</th></tr></thead>
+  <tbody id="linhas"><tr class="empty-row"><td colspan="5">Carregando…</td></tr></tbody>
+</table>
+
+<script>
+(async function(){
+  function dataBR(v){ return v ? new Date(v).toLocaleDateString('pt-BR') : '—'; }
+  try {
+    if (!(await checarPermissao('GARANTIAS','VISUALIZAR'))){ document.getElementById('linhas').innerHTML='<tr class="empty-row"><td colspan="5">Sem permissão.</td></tr>'; return; }
+    const itens = await dbGetAll('GARANTIAS');
+    document.getElementById('linhas').innerHTML = itens.length
+      ? itens.map(g => `<tr><td class="mono">${g.NUMERO_GARANTIA}</td><td>${g.PRODUTO_DESCRICAO}</td><td>${dataBR(g.DATA_EMISSAO)}</td><td>${g.PRAZO_DIAS} dias</td><td><span class="badge ${g.STATUS==='Ativa'?'ok':'neutral'}">${g.STATUS}</span></td></tr>`).join('')
+      : '<tr class="empty-row"><td colspan="5">Nenhuma garantia emitida.</td></tr>';
+  } catch (e) { mostrarToast('Erro: ' + e.message, 'erro'); }
+})();
+</script>

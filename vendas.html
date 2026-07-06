@@ -1,0 +1,254 @@
+<style>
+  .pdv-grid{ display:grid; grid-template-columns: 1.5fr 1fr; gap:18px; align-items:start; }
+  @media (max-width: 980px){ .pdv-grid{ grid-template-columns:1fr; } }
+  .card{ background:var(--bg-surface); border:1px solid var(--hairline); border-radius:12px; padding:18px 20px; }
+  .dropdown-results{ position:absolute; top:calc(100% + 6px); left:0; right:0; background:var(--bg-elevated); border:1px solid var(--hairline);
+    border-radius:10px; max-height:240px; overflow-y:auto; z-index:15; display:none; }
+  .dropdown-results.open{ display:block; }
+  .dropdown-results .opt{ padding:10px 12px; font-size:12.5px; cursor:pointer; border-bottom:1px solid var(--hairline); }
+  .dropdown-results .opt:hover{ background:var(--bg-surface); }
+  .ffield{ margin-bottom:14px; position:relative; }
+  .ffield label{ display:block; font-size:12px; color:var(--text-secondary); margin-bottom:6px; }
+  .ffield input, .ffield select{ width:100%; background:var(--bg-elevated); border:1px solid var(--hairline); color:var(--text-primary); padding:10px 12px; border-radius:8px; font-size:13px; }
+  .summary-row{ display:flex; justify-content:space-between; font-size:12.5px; color:var(--text-secondary); padding:5px 0; }
+  .summary-row.total{ font-size:16px; color:var(--text-primary); font-weight:700; font-family:var(--font-display); border-top:1px solid var(--hairline); margin-top:8px; padding-top:12px; }
+  .selected-client{ display:flex; align-items:center; justify-content:space-between; background:var(--bg-elevated); border:1px solid var(--hairline); border-radius:8px; padding:9px 12px; font-size:12.5px; }
+  .selected-client button{ background:none; border:none; color:var(--text-tertiary); cursor:pointer; }
+</style>
+
+<div class="toolbar"><div><h1 style="font-family:var(--font-display); font-size:22px; margin:0 0 4px;">Vendas (PDV)</h1></div></div>
+
+<div class="pdv-grid">
+  <div class="card">
+    <div class="ffield">
+      <label>Buscar produto (nome ou SKU)</label>
+      <input id="buscaProduto" placeholder="Digite para buscar…" autocomplete="off">
+      <div class="dropdown-results" id="resultadosProduto"></div>
+    </div>
+    <table class="dt" style="margin-top:16px;">
+      <thead><tr><th>Item</th><th style="width:120px;">Qtd.</th><th style="width:90px;">Preço</th></tr></thead>
+      <tbody id="carrinho"><tr class="empty-row"><td colspan="3">Carrinho vazio.</td></tr></tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <div class="ffield">
+      <label>Cliente</label>
+      <div id="clienteSelecionadoWrap" style="display:none; margin-bottom:8px;">
+        <div class="selected-client"><span id="clienteSelecionadoNome"></span><button id="btnRemoverCliente">trocar</button></div>
+      </div>
+      <input id="buscaCliente" placeholder="Buscar cliente (opcional)…" autocomplete="off">
+      <div class="dropdown-results" id="resultadosCliente"></div>
+    </div>
+    <div class="ffield"><label>Forma de pagamento</label>
+      <select id="formaPagamento"><option>PIX</option><option>Cartão de Crédito</option><option>Cartão de Débito</option><option>Dinheiro</option><option>Parcelado</option></select>
+    </div>
+    <div class="ffield" id="parcelasWrap" style="display:none;"><label>Parcelas</label><input id="parcelas" type="number" min="2" max="12" value="2"></div>
+    <div class="ffield" id="dinheiroWrap" style="display:none;">
+      <label>Valor recebido do cliente (R$)</label><input id="valorRecebido" type="number" step="0.01">
+      <div id="trocoInfo" style="margin-top:8px; font-size:12.5px; font-family:var(--font-mono);"></div>
+    </div>
+    <div class="ffield"><label>Desconto geral (R$)</label><input id="desconto" type="number" step="0.01" value="0"></div>
+
+    <div class="summary-row"><span>Subtotal</span><span id="resSubtotal">R$ 0,00</span></div>
+    <div class="summary-row"><span>Desconto</span><span id="resDesconto">R$ 0,00</span></div>
+    <div class="summary-row total"><span>Total</span><span id="resTotal">R$ 0,00</span></div>
+
+    <button class="btn btn-primary" style="width:100%; margin-top:16px; justify-content:center;" id="btnFinalizar">Finalizar venda</button>
+  </div>
+</div>
+
+<script>
+(async function(){
+  let carrinho = [];
+  let clienteSelecionado = null;
+  let todosProdutos = [], todosClientes = [];
+
+  function moeda(v){ return (Number(v)||0).toLocaleString('pt-BR', { style:'currency', currency:'BRL' }); }
+
+  try {
+    todosProdutos = (await dbGetAll('PRODUTOS')).filter(p => p.STATUS !== 'Excluído');
+    todosClientes = (await dbGetAll('CLIENTES')).filter(c => c.STATUS !== 'Excluído');
+  } catch (e) { mostrarToast('Erro ao carregar dados: ' + e.message, 'erro'); }
+
+  // ---------- Busca de produto ----------
+  const inputProduto = document.getElementById('buscaProduto');
+  const resProduto = document.getElementById('resultadosProduto');
+  inputProduto.addEventListener('input', () => {
+    const termo = inputProduto.value.trim().toLowerCase();
+    if (termo.length < 2){ resProduto.classList.remove('open'); return; }
+    const lista = todosProdutos.filter(p => p.NOME.toLowerCase().includes(termo) || (p.SKU||'').toLowerCase().includes(termo)).slice(0, 20);
+    mostrarResultadosProduto(lista);
+  });
+
+  function mostrarResultadosProduto(lista){
+    if (!lista.length){ resProduto.innerHTML = '<div class="opt">Nenhum produto encontrado.</div>'; resProduto.classList.add('open'); return; }
+    resProduto.innerHTML = lista.map(p => `<div class="opt" data-id="${p.ID}"><div>${p.NOME}</div><div style="color:var(--text-tertiary); font-size:11px;">${moeda(p.PRECO_VENDA)} · estoque ${p.ESTOQUE_ATUAL}</div></div>`).join('');
+    resProduto.classList.add('open');
+    resProduto.querySelectorAll('.opt[data-id]').forEach(el => el.addEventListener('click', () => {
+      adicionarAoCarrinho(lista.find(p => p.ID === el.getAttribute('data-id')));
+      inputProduto.value = ''; resProduto.classList.remove('open');
+    }));
+  }
+
+  function adicionarAoCarrinho(produto){
+    const existente = carrinho.find(i => i.PRODUTO_ID === produto.ID);
+    if (existente) existente.QUANTIDADE += 1;
+    else carrinho.push({ PRODUTO_ID: produto.ID, NOME: produto.NOME, QUANTIDADE: 1, PRECO_UNITARIO: Number(produto.PRECO_VENDA) });
+    renderCarrinho();
+  }
+
+  function renderCarrinho(){
+    const tbody = document.getElementById('carrinho');
+    if (!carrinho.length){ tbody.innerHTML = '<tr class="empty-row"><td colspan="3">Carrinho vazio.</td></tr>'; }
+    else {
+      tbody.innerHTML = carrinho.map((i, idx) => `<tr>
+        <td>${i.NOME} <button style="background:none;border:none;color:var(--text-tertiary);cursor:pointer;" onclick="window.__removerItem(${idx})">✕</button></td>
+        <td><button onclick="window.__alterarQtd(${idx},-1)">−</button> ${i.QUANTIDADE} <button onclick="window.__alterarQtd(${idx},1)">+</button></td>
+        <td>${moeda(i.QUANTIDADE * i.PRECO_UNITARIO)}</td></tr>`).join('');
+    }
+    atualizarResumo(); atualizarTroco();
+  }
+  window.__removerItem = (idx) => { carrinho.splice(idx,1); renderCarrinho(); };
+  window.__alterarQtd = (idx, delta) => { carrinho[idx].QUANTIDADE = Math.max(1, carrinho[idx].QUANTIDADE + delta); renderCarrinho(); };
+
+  // ---------- Busca de cliente ----------
+  const inputCliente = document.getElementById('buscaCliente');
+  const resCliente = document.getElementById('resultadosCliente');
+  inputCliente.addEventListener('input', () => {
+    const termo = inputCliente.value.trim().toLowerCase();
+    if (termo.length < 2){ resCliente.classList.remove('open'); return; }
+    const lista = todosClientes.filter(c => c.NOME.toLowerCase().includes(termo) || (c.CPF||'').includes(termo)).slice(0, 20);
+    if (!lista.length){ resCliente.innerHTML = '<div class="opt">Nenhum cliente encontrado.</div>'; resCliente.classList.add('open'); return; }
+    resCliente.innerHTML = lista.map(c => `<div class="opt" data-id="${c.ID}">${c.NOME}</div>`).join('');
+    resCliente.classList.add('open');
+    resCliente.querySelectorAll('.opt[data-id]').forEach(el => el.addEventListener('click', () => {
+      clienteSelecionado = lista.find(c => c.ID === el.getAttribute('data-id'));
+      document.getElementById('clienteSelecionadoNome').textContent = clienteSelecionado.NOME;
+      document.getElementById('clienteSelecionadoWrap').style.display = 'block';
+      inputCliente.style.display = 'none'; inputCliente.value = '';
+      resCliente.classList.remove('open');
+    }));
+  });
+  document.getElementById('btnRemoverCliente').addEventListener('click', () => {
+    clienteSelecionado = null;
+    document.getElementById('clienteSelecionadoWrap').style.display = 'none';
+    inputCliente.style.display = 'block';
+  });
+
+  // ---------- Pagamento / troco ----------
+  document.getElementById('formaPagamento').addEventListener('change', e => {
+    document.getElementById('parcelasWrap').style.display = e.target.value === 'Parcelado' ? 'block' : 'none';
+    document.getElementById('dinheiroWrap').style.display = e.target.value === 'Dinheiro' ? 'block' : 'none';
+    atualizarTroco();
+  });
+  document.getElementById('desconto').addEventListener('input', () => { atualizarResumo(); atualizarTroco(); });
+  document.getElementById('valorRecebido').addEventListener('input', atualizarTroco);
+
+  function totalDaVenda(){
+    const subtotal = carrinho.reduce((s,i) => s + i.QUANTIDADE*i.PRECO_UNITARIO, 0);
+    const desconto = Number(document.getElementById('desconto').value) || 0;
+    return Math.max(subtotal - desconto, 0);
+  }
+  function atualizarResumo(){
+    const subtotal = carrinho.reduce((s,i) => s + i.QUANTIDADE*i.PRECO_UNITARIO, 0);
+    const desconto = Number(document.getElementById('desconto').value) || 0;
+    document.getElementById('resSubtotal').textContent = moeda(subtotal);
+    document.getElementById('resDesconto').textContent = moeda(desconto);
+    document.getElementById('resTotal').textContent = moeda(Math.max(subtotal-desconto,0));
+  }
+  function atualizarTroco(){
+    const info = document.getElementById('trocoInfo');
+    const recebido = Number(document.getElementById('valorRecebido').value);
+    if (!recebido && recebido !== 0){ info.textContent=''; return; }
+    const total = totalDaVenda();
+    if (recebido < total) info.innerHTML = '<span style="color:var(--amber);">Faltam ' + moeda(total-recebido) + '.</span>';
+    else info.innerHTML = 'Troco: <span style="color:var(--mint); font-weight:700;">' + moeda(recebido-total) + '</span>';
+  }
+
+  // ---------- Finalizar venda ----------
+  document.getElementById('btnFinalizar').addEventListener('click', async () => {
+    if (!carrinho.length){ mostrarToast('Adicione ao menos um item.', 'erro'); return; }
+    if (!(await checarPermissao('VENDAS','CADASTRAR'))){ mostrarToast('Sem permissão.', 'erro'); return; }
+
+    const formaPagamento = document.getElementById('formaPagamento').value;
+    let observacaoTroco = '';
+    if (formaPagamento === 'Dinheiro'){
+      const recebido = Number(document.getElementById('valorRecebido').value) || 0;
+      const total = totalDaVenda();
+      if (recebido < total){ mostrarToast('Valor recebido menor que o total.', 'erro'); return; }
+      observacaoTroco = 'Pago em dinheiro: ' + moeda(recebido) + ' | Troco: ' + moeda(recebido-total);
+    }
+
+    // Confere estoque de cada item antes de confirmar
+    for (const item of carrinho) {
+      const produto = todosProdutos.find(p => p.ID === item.PRODUTO_ID);
+      if (!produto || Number(produto.ESTOQUE_ATUAL) < item.QUANTIDADE) {
+        mostrarToast('Estoque insuficiente para "' + item.NOME + '".', 'erro'); return;
+      }
+    }
+
+    try {
+      document.getElementById('btnFinalizar').disabled = true;
+      const desconto = Number(document.getElementById('desconto').value) || 0;
+      const valorTotal = totalDaVenda();
+
+      const venda = await dbInsert('VENDAS', {
+        CLIENTE_ID: clienteSelecionado ? clienteSelecionado.ID : '', USUARIO_ID: usuarioAtual.ID,
+        DATA: new Date().toISOString(), VALOR_TOTAL: valorTotal, DESCONTO: desconto,
+        FORMA_PAGAMENTO: formaPagamento, PARCELAS: formaPagamento === 'Parcelado' ? Number(document.getElementById('parcelas').value) : 1,
+        OBSERVACOES: observacaoTroco, STATUS: 'Concluída'
+      });
+
+      for (const item of carrinho) {
+        await dbInsert('ITENS_VENDA', { VENDA_ID: venda.ID, PRODUTO_ID: item.PRODUTO_ID, QUANTIDADE: item.QUANTIDADE, PRECO_UNITARIO: item.PRECO_UNITARIO });
+
+        const produto = todosProdutos.find(p => p.ID === item.PRODUTO_ID);
+        const novoEstoque = Number(produto.ESTOQUE_ATUAL) - item.QUANTIDADE;
+        await dbUpdate('PRODUTOS', produto.ID, { ESTOQUE_ATUAL: novoEstoque });
+        produto.ESTOQUE_ATUAL = novoEstoque;
+        await dbInsert('MOVIMENTOS_ESTOQUE', { EMPRESA_ID:'', PRODUTO_ID: produto.ID, TIPO:'SAIDA_VENDA', QUANTIDADE: -item.QUANTIDADE, MOTIVO:'Venda '+venda.ID, USUARIO_ID: usuarioAtual.ID, DATA: new Date().toISOString() });
+
+        if (clienteSelecionado) {
+          await dbInsert('GARANTIAS', {
+            VENDA_ID: venda.ID, CLIENTE_ID: clienteSelecionado.ID, PRODUTO_DESCRICAO: produto.NOME,
+            NUMERO_GARANTIA: gerarId('GAR'), PRAZO_DIAS: produto.GARANTIA_PADRAO_DIAS || 90,
+            CONDICOES: 'Garantia contra defeitos de fabricação.', DATA_EMISSAO: new Date().toISOString(), STATUS: 'Ativa'
+          });
+        }
+      }
+
+      await dbInsert('FINANCEIRO', {
+        TIPO:'Receita', CATEGORIA:'Venda', DESCRICAO:'Venda '+venda.ID, VALOR: valorTotal,
+        FORMA_PAGAMENTO: formaPagamento, DATA_VENCIMENTO: new Date().toISOString(), DATA_PAGAMENTO: new Date().toISOString(), STATUS:'Pago'
+      });
+
+      if (clienteSelecionado) {
+        await dbUpdate('CLIENTES', clienteSelecionado.ID, {
+          VALOR_GASTO_TOTAL: (Number(clienteSelecionado.VALOR_GASTO_TOTAL)||0) + valorTotal,
+          DATA_ULTIMA_COMPRA: new Date().toISOString()
+        });
+      }
+
+      mostrarToast('Venda concluída com sucesso!' + (clienteSelecionado ? ' Garantia(s) emitida(s).' : ''));
+      carrinho = []; clienteSelecionado = null;
+      document.getElementById('clienteSelecionadoWrap').style.display='none';
+      document.getElementById('buscaCliente').style.display='block';
+      document.getElementById('desconto').value = 0; document.getElementById('valorRecebido').value='';
+      document.getElementById('trocoInfo').textContent='';
+      renderCarrinho();
+    } catch (e) {
+      mostrarToast('Erro ao finalizar venda: ' + e.message, 'erro');
+    } finally {
+      document.getElementById('btnFinalizar').disabled = false;
+    }
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('#buscaProduto') && !e.target.closest('#resultadosProduto')) resProduto.classList.remove('open');
+    if (!e.target.closest('#buscaCliente') && !e.target.closest('#resultadosCliente')) resCliente.classList.remove('open');
+  });
+
+  renderCarrinho();
+})();
+</script>

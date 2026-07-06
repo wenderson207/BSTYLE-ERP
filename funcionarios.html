@@ -1,0 +1,121 @@
+<style>
+  .modal-overlay{ position:fixed; inset:0; background:rgba(3,5,8,0.6); display:none; align-items:center; justify-content:center; z-index:100; padding:24px; }
+  .modal-overlay.open{ display:flex; }
+  .modal-box{ background:var(--bg-surface); border:1px solid var(--hairline); border-radius:14px; width:100%; max-width:480px; max-height:88vh; overflow-y:auto; }
+  .modal-head{ display:flex; justify-content:space-between; padding:18px 22px; border-bottom:1px solid var(--hairline); }
+  .modal-body{ padding:20px 22px; }
+  .modal-foot{ display:flex; justify-content:flex-end; gap:10px; padding:16px 22px; border-top:1px solid var(--hairline); }
+  .ffield{ margin-bottom:14px; }
+  .ffield label{ display:block; font-size:12px; color:var(--text-secondary); margin-bottom:6px; }
+  .ffield input, .ffield select{ width:100%; background:var(--bg-elevated); border:1px solid var(--hairline); color:var(--text-primary); padding:10px 12px; border-radius:8px; font-size:13px; }
+  .frow2{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  .modal-close{ background:none; border:none; color:var(--text-tertiary); font-size:18px; cursor:pointer; }
+  .badge{ display:inline-flex; padding:3px 9px; border-radius:20px; font-size:11px; font-weight:600; font-family:var(--font-mono); }
+  .badge.ok{ background:rgba(47,225,168,0.12); color:var(--mint); }
+  .badge.neutral{ background:var(--bg-elevated); color:var(--text-secondary); }
+</style>
+
+<div class="toolbar">
+  <div><h1 style="font-family:var(--font-display); font-size:22px; margin:0 0 4px;">Funcionários</h1></div>
+  <button class="btn btn-primary" id="btnNovo">+ Novo funcionário</button>
+</div>
+
+<table class="dt">
+  <thead><tr><th>Nome</th><th>Cargo</th><th>Email</th><th>Status</th><th></th></tr></thead>
+  <tbody id="linhas"><tr class="empty-row"><td colspan="5">Carregando…</td></tr></tbody>
+</table>
+
+<div class="modal-overlay" id="modal">
+  <div class="modal-box">
+    <div class="modal-head"><h3 style="font-family:var(--font-display); margin:0;">Novo funcionário</h3><button class="modal-close" id="fecharModal">✕</button></div>
+    <div class="modal-body">
+      <div class="frow2">
+        <div class="ffield"><label>Nome *</label><input id="fNome"></div>
+        <div class="ffield"><label>Email *</label><input id="fEmail" type="email"></div>
+      </div>
+      <div class="frow2">
+        <div class="ffield"><label>Cargo</label><input id="fCargo"></div>
+        <div class="ffield"><label>Telefone</label><input id="fTelefone"></div>
+      </div>
+      <div class="ffield"><label>Perfil de acesso *</label><select id="fPerfil"><option value="">Selecione…</option></select></div>
+      <div class="ffield"><label>Senha inicial *</label><input id="fSenha" type="text" placeholder="Mínimo 6 caracteres"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn" id="btnCancelar">Cancelar</button>
+      <button class="btn btn-primary" id="btnSalvar">Criar funcionário</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(async function(){
+  let itens = [], perfis = [];
+
+  function renderLinhas(lista){
+    const tbody = document.getElementById('linhas');
+    if (!lista.length){ tbody.innerHTML = '<tr class="empty-row"><td colspan="5">Nenhum funcionário cadastrado.</td></tr>'; return; }
+    tbody.innerHTML = lista.map(f => `<tr>
+      <td><b>${f.NOME}</b></td><td>${f.CARGO||'—'}</td><td class="mono">${f.EMAIL}</td>
+      <td><span class="badge ${f.STATUS==='Ativo'?'ok':'neutral'}">${f.STATUS}</span></td>
+      <td style="display:flex; gap:6px;">
+        <button class="btn" style="padding:6px 10px; font-size:11.5px;" onclick="window.__desativar('${f.ID}', '${f.STATUS}')">${f.STATUS==='Ativo'?'Desativar':'Reativar'}</button>
+      </td></tr>`).join('');
+  }
+
+  async function carregar(){
+    try {
+      if (!(await checarPermissao('FUNCIONARIOS','VISUALIZAR'))){ document.getElementById('linhas').innerHTML='<tr class="empty-row"><td colspan="5">Sem permissão.</td></tr>'; return; }
+      itens = await dbGetAll('USUARIOS');
+      renderLinhas(itens);
+      perfis = await dbGetAll('PERFIS');
+      document.getElementById('fPerfil').innerHTML = '<option value="">Selecione…</option>' + perfis.map(p => `<option value="${p.ID}">${p.NOME}</option>`).join('');
+    } catch (e) { mostrarToast('Erro: ' + e.message, 'erro'); }
+  }
+
+  const modal = document.getElementById('modal');
+  document.getElementById('btnNovo').addEventListener('click', () => {
+    document.getElementById('fNome').value = ''; document.getElementById('fEmail').value = '';
+    document.getElementById('fCargo').value = ''; document.getElementById('fTelefone').value = '';
+    document.getElementById('fPerfil').value = ''; document.getElementById('fSenha').value = '';
+    modal.classList.add('open');
+  });
+  document.getElementById('fecharModal').addEventListener('click', () => modal.classList.remove('open'));
+  document.getElementById('btnCancelar').addEventListener('click', () => modal.classList.remove('open'));
+
+  document.getElementById('btnSalvar').addEventListener('click', async () => {
+    const nome = document.getElementById('fNome').value.trim();
+    const email = document.getElementById('fEmail').value.trim();
+    const perfilId = document.getElementById('fPerfil').value;
+    const senha = document.getElementById('fSenha').value;
+
+    if (!nome || !email || !perfilId){ mostrarToast('Nome, email e perfil são obrigatórios.', 'erro'); return; }
+    if (!senha || senha.length < 6){ mostrarToast('Senha inicial precisa ter ao menos 6 caracteres.', 'erro'); return; }
+
+    try {
+      if (!(await checarPermissao('FUNCIONARIOS','CADASTRAR'))){ mostrarToast('Sem permissão.', 'erro'); return; }
+      await criarFuncionarioComLogin({
+        NOME: nome, EMAIL: email, CARGO: document.getElementById('fCargo').value.trim(),
+        TELEFONE: document.getElementById('fTelefone').value.trim(), PERFIL_ID: perfilId
+      }, senha);
+      mostrarToast('Funcionário criado com sucesso.');
+      modal.classList.remove('open');
+      carregar();
+    } catch (e) {
+      mostrarToast('Erro: ' + (e.code === 'auth/email-already-in-use' ? 'Já existe uma conta com esse email.' : e.message), 'erro');
+    }
+  });
+
+  window.__desativar = async (id, statusAtual) => {
+    const novoStatus = statusAtual === 'Ativo' ? 'Inativo' : 'Ativo';
+    if (!confirm((novoStatus === 'Inativo' ? 'Desativar' : 'Reativar') + ' este funcionário?')) return;
+    try {
+      if (!(await checarPermissao('FUNCIONARIOS','EDITAR'))){ mostrarToast('Sem permissão.', 'erro'); return; }
+      await dbUpdate('USUARIOS', id, { STATUS: novoStatus });
+      mostrarToast('Status atualizado.');
+      carregar();
+    } catch (e) { mostrarToast('Erro: ' + e.message, 'erro'); }
+  };
+
+  carregar();
+})();
+</script>

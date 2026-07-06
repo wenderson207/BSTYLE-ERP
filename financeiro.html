@@ -1,0 +1,116 @@
+<style>
+  .modal-overlay{ position:fixed; inset:0; background:rgba(3,5,8,0.6); display:none; align-items:center; justify-content:center; z-index:100; padding:24px; }
+  .modal-overlay.open{ display:flex; }
+  .modal-box{ background:var(--bg-surface); border:1px solid var(--hairline); border-radius:14px; width:100%; max-width:480px; }
+  .modal-head{ display:flex; justify-content:space-between; padding:18px 22px; border-bottom:1px solid var(--hairline); }
+  .modal-body{ padding:20px 22px; }
+  .modal-foot{ display:flex; justify-content:flex-end; gap:10px; padding:16px 22px; border-top:1px solid var(--hairline); }
+  .ffield{ margin-bottom:14px; }
+  .ffield label{ display:block; font-size:12px; color:var(--text-secondary); margin-bottom:6px; }
+  .ffield input, .ffield select{ width:100%; background:var(--bg-elevated); border:1px solid var(--hairline); color:var(--text-primary); padding:10px 12px; border-radius:8px; font-size:13px; }
+  .frow2{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  .modal-close{ background:none; border:none; color:var(--text-tertiary); font-size:18px; cursor:pointer; }
+  .tabs{ display:flex; gap:4px; border-bottom:1px solid var(--hairline); margin-bottom:20px; }
+  .tab{ padding:10px 14px; font-size:12.5px; color:var(--text-secondary); cursor:pointer; border-bottom:2px solid transparent; }
+  .tab.active{ color:var(--mint); border-color:var(--mint); }
+</style>
+
+<div class="toolbar">
+  <div><h1 style="font-family:var(--font-display); font-size:22px; margin:0 0 4px;">Financeiro</h1></div>
+  <button class="btn btn-primary" id="btnNovo">+ Novo lançamento</button>
+</div>
+
+<div class="kpi-grid">
+  <div class="kpi"><div class="lbl">Entradas</div><div class="val" id="kpiEntradas">—</div></div>
+  <div class="kpi"><div class="lbl">Saídas</div><div class="val" id="kpiSaidas">—</div></div>
+  <div class="kpi"><div class="lbl">Saldo</div><div class="val" id="kpiSaldo">—</div></div>
+</div>
+
+<div class="tabs"><div class="tab active" data-tab="pagar">Contas a pagar</div><div class="tab" data-tab="receber">Contas a receber</div></div>
+
+<table class="dt"><thead><tr><th>Descrição</th><th>Categoria</th><th>Vencimento</th><th>Valor</th><th>Status</th><th></th></tr></thead>
+  <tbody id="linhas"><tr class="empty-row"><td colspan="6">Carregando…</td></tr></tbody>
+</table>
+
+<div class="modal-overlay" id="modal">
+  <div class="modal-box">
+    <div class="modal-head"><h3 style="font-family:var(--font-display); margin:0;">Novo lançamento</h3><button class="modal-close" id="fecharModal">✕</button></div>
+    <div class="modal-body">
+      <div class="ffield"><label>Tipo</label><select id="fTipo"><option value="Receita">Receita</option><option value="Despesa">Despesa</option></select></div>
+      <div class="frow2">
+        <div class="ffield"><label>Categoria</label><input id="fCategoria"></div>
+        <div class="ffield"><label>Valor (R$) *</label><input id="fValor" type="number" step="0.01"></div>
+      </div>
+      <div class="ffield"><label>Descrição</label><input id="fDescricao"></div>
+      <div class="ffield"><label>Vencimento</label><input id="fVencimento" type="date"></div>
+    </div>
+    <div class="modal-foot"><button class="btn" id="btnCancelar">Cancelar</button><button class="btn btn-primary" id="btnSalvar">Salvar</button></div>
+  </div>
+</div>
+
+<script>
+(async function(){
+  let todos = [], abaAtual = 'pagar';
+  function moeda(v){ return (Number(v)||0).toLocaleString('pt-BR', { style:'currency', currency:'BRL' }); }
+  function dataBR(v){ return v ? new Date(v).toLocaleDateString('pt-BR') : '—'; }
+
+  async function carregar(){
+    try {
+      if (!(await checarPermissao('FINANCEIRO','VISUALIZAR'))){ document.getElementById('linhas').innerHTML='<tr class="empty-row"><td colspan="6">Sem permissão.</td></tr>'; return; }
+      todos = await dbGetAll('FINANCEIRO');
+      const pagos = todos.filter(l => l.STATUS === 'Pago');
+      const entradas = pagos.filter(l=>l.TIPO==='Receita').reduce((s,l)=>s+Number(l.VALOR),0);
+      const saidas = pagos.filter(l=>l.TIPO==='Despesa').reduce((s,l)=>s+Number(l.VALOR),0);
+      document.getElementById('kpiEntradas').textContent = moeda(entradas);
+      document.getElementById('kpiSaidas').textContent = moeda(saidas);
+      document.getElementById('kpiSaldo').textContent = moeda(entradas-saidas);
+      renderLista();
+    } catch (e) { mostrarToast('Erro: ' + e.message, 'erro'); }
+  }
+
+  function renderLista(){
+    const tipo = abaAtual === 'pagar' ? 'Despesa' : 'Receita';
+    const lista = todos.filter(l => l.TIPO === tipo && l.STATUS !== 'Pago');
+    const tbody = document.getElementById('linhas');
+    tbody.innerHTML = lista.length ? lista.map(l => `<tr>
+      <td>${l.DESCRICAO||'—'}</td><td>${l.CATEGORIA||'—'}</td><td>${dataBR(l.DATA_VENCIMENTO)}</td><td>${moeda(l.VALOR)}</td>
+      <td><span class="badge warn">Pendente</span></td>
+      <td><button class="btn" style="padding:6px 10px;font-size:11.5px;" onclick="window.__baixar('${l.ID}')">Dar baixa</button></td></tr>`).join('')
+      : '<tr class="empty-row"><td colspan="6">Nada por aqui.</td></tr>';
+  }
+
+  document.querySelectorAll('.tab').forEach(tab => tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active')); tab.classList.add('active');
+    abaAtual = tab.dataset.tab; renderLista();
+  }));
+
+  window.__baixar = async (id) => {
+    try {
+      if (!(await checarPermissao('FINANCEIRO','EDITAR'))){ mostrarToast('Sem permissão.', 'erro'); return; }
+      await dbUpdate('FINANCEIRO', id, { STATUS: 'Pago', DATA_PAGAMENTO: new Date().toISOString() });
+      mostrarToast('Baixa registrada.'); carregar();
+    } catch (e) { mostrarToast('Erro: ' + e.message, 'erro'); }
+  };
+
+  const modal = document.getElementById('modal');
+  document.getElementById('btnNovo').addEventListener('click', () => modal.classList.add('open'));
+  document.getElementById('fecharModal').addEventListener('click', () => modal.classList.remove('open'));
+  document.getElementById('btnCancelar').addEventListener('click', () => modal.classList.remove('open'));
+
+  document.getElementById('btnSalvar').addEventListener('click', async () => {
+    const valor = Number(document.getElementById('fValor').value) || 0;
+    if (!valor){ mostrarToast('Informe o valor.', 'erro'); return; }
+    try {
+      if (!(await checarPermissao('FINANCEIRO','CADASTRAR'))){ mostrarToast('Sem permissão.', 'erro'); return; }
+      await dbInsert('FINANCEIRO', {
+        TIPO: document.getElementById('fTipo').value, CATEGORIA: document.getElementById('fCategoria').value.trim(),
+        VALOR: valor, DESCRICAO: document.getElementById('fDescricao').value.trim(),
+        DATA_VENCIMENTO: document.getElementById('fVencimento').value, STATUS: 'Pendente'
+      });
+      mostrarToast('Lançamento registrado.'); modal.classList.remove('open'); carregar();
+    } catch (e) { mostrarToast('Erro: ' + e.message, 'erro'); }
+  });
+
+  carregar();
+})();
+</script>

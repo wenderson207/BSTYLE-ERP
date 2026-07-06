@@ -1,0 +1,47 @@
+<div class="toolbar"><div><h1 style="font-family:var(--font-display); font-size:22px; margin:0 0 4px;">Orçamentos</h1></div></div>
+
+<table class="dt">
+  <thead><tr><th>Cliente</th><th>Data</th><th>Valor</th><th>Status</th><th></th></tr></thead>
+  <tbody id="linhas"><tr class="empty-row"><td colspan="5">Carregando…</td></tr></tbody>
+</table>
+
+<script>
+(async function(){
+  let itens = [], clientes = [];
+  function moeda(v){ return (Number(v)||0).toLocaleString('pt-BR', { style:'currency', currency:'BRL' }); }
+  function dataBR(v){ return v ? new Date(v).toLocaleDateString('pt-BR') : '—'; }
+  function nomeCliente(id){ const c = clientes.find(x => x.ID === id); return c ? c.NOME : id || '—'; }
+  function badge(s){ const map = { Aberto:'info', Aprovado:'ok', Recusado:'danger', Expirado:'neutral' };
+    return '<span class="badge ' + (map[s]||'neutral') + '">' + s + '</span>'; }
+
+  async function carregar(){
+    try {
+      if (!(await checarPermissao('ORCAMENTOS','VISUALIZAR'))){ document.getElementById('linhas').innerHTML='<tr class="empty-row"><td colspan="5">Sem permissão.</td></tr>'; return; }
+      clientes = await dbGetAll('CLIENTES');
+      itens = await dbGetAll('ORCAMENTOS');
+      renderLinhas();
+    } catch (e) { mostrarToast('Erro: ' + e.message, 'erro'); }
+  }
+
+  function renderLinhas(){
+    const tbody = document.getElementById('linhas');
+    if (!itens.length){ tbody.innerHTML = '<tr class="empty-row"><td colspan="5">Nenhum orçamento.</td></tr>'; return; }
+    tbody.innerHTML = itens.map(o => `<tr>
+      <td>${nomeCliente(o.CLIENTE_ID)}</td><td>${dataBR(o.DATA)}</td><td>${moeda(o.VALOR_TOTAL)}</td><td>${badge(o.STATUS)}</td>
+      <td>${o.STATUS==='Aberto' ? '<button class="btn" style="padding:6px 10px;font-size:11.5px;" onclick="window.__converter(\''+o.ID+'\')">Converter em venda</button>' : ''}</td>
+      </tr>`).join('');
+  }
+
+  window.__converter = async (id) => {
+    if (!confirm('Marcar este orçamento como aprovado/convertido? (a venda em si ainda precisa ser lançada no PDV)')) return;
+    try {
+      if (!(await checarPermissao('ORCAMENTOS','EDITAR'))){ mostrarToast('Sem permissão.', 'erro'); return; }
+      await dbUpdate('ORCAMENTOS', id, { STATUS: 'Aprovado' });
+      mostrarToast('Orçamento aprovado.');
+      carregar();
+    } catch (e) { mostrarToast('Erro: ' + e.message, 'erro'); }
+  };
+
+  carregar();
+})();
+</script>

@@ -1,0 +1,48 @@
+<div class="toolbar"><div><h1 style="font-family:var(--font-display); font-size:22px; margin:0 0 4px;">Estoque</h1></div></div>
+
+<table class="dt">
+  <thead><tr><th>Produto</th><th>Estoque atual</th><th>Mínimo</th><th>Situação</th><th></th></tr></thead>
+  <tbody id="linhas"><tr class="empty-row"><td colspan="5">Carregando…</td></tr></tbody>
+</table>
+
+<script>
+(async function(){
+  let produtos = [];
+
+  async function carregar(){
+    try {
+      if (!(await checarPermissao('ESTOQUE','VISUALIZAR'))){ document.getElementById('linhas').innerHTML='<tr class="empty-row"><td colspan="5">Sem permissão.</td></tr>'; return; }
+      produtos = (await dbGetAll('PRODUTOS')).filter(p => p.STATUS === 'Ativo');
+      renderLinhas();
+    } catch (e) { mostrarToast('Erro: ' + e.message, 'erro'); }
+  }
+
+  function renderLinhas(){
+    const tbody = document.getElementById('linhas');
+    if (!produtos.length){ tbody.innerHTML = '<tr class="empty-row"><td colspan="5">Nenhum produto ativo.</td></tr>'; return; }
+    tbody.innerHTML = produtos.map(p => {
+      const baixo = Number(p.ESTOQUE_ATUAL) <= Number(p.ESTOQUE_MINIMO);
+      return `<tr><td><b>${p.NOME}</b></td><td>${p.ESTOQUE_ATUAL}</td><td>${p.ESTOQUE_MINIMO}</td>
+        <td>${baixo?'<span class="badge warn">Baixo</span>':'<span class="badge ok">OK</span>'}</td>
+        <td><button class="btn" style="padding:6px 10px;font-size:11.5px;" onclick="window.__ajustar('${p.ID}','${p.NOME.replace(/'/g,"\\'")}',${p.ESTOQUE_ATUAL})">Ajustar</button></td></tr>`;
+    }).join('');
+  }
+
+  window.__ajustar = async (id, nome, atual) => {
+    const delta = prompt('Ajuste de estoque para "' + nome + '" (atual: ' + atual + ').\nDigite a quantidade (use negativo para reduzir):', '0');
+    if (delta === null) return;
+    const motivo = prompt('Motivo do ajuste:');
+    if (!motivo){ mostrarToast('Informe o motivo.', 'erro'); return; }
+    try {
+      if (!(await checarPermissao('ESTOQUE','EDITAR'))){ mostrarToast('Sem permissão.', 'erro'); return; }
+      const novoEstoque = atual + Number(delta);
+      await dbUpdate('PRODUTOS', id, { ESTOQUE_ATUAL: novoEstoque });
+      await dbInsert('MOVIMENTOS_ESTOQUE', { PRODUTO_ID: id, TIPO:'AJUSTE_MANUAL', QUANTIDADE: Number(delta), MOTIVO: motivo, USUARIO_ID: usuarioAtual.ID, DATA: new Date().toISOString() });
+      mostrarToast('Estoque ajustado.');
+      carregar();
+    } catch (e) { mostrarToast('Erro: ' + e.message, 'erro'); }
+  };
+
+  carregar();
+})();
+</script>

@@ -16,7 +16,10 @@
   .selected-client button{ background:none; border:none; color:var(--text-tertiary); cursor:pointer; }
 </style>
 
-<div class="toolbar"><div><h1 style="font-family:var(--font-display); font-size:22px; margin:0 0 4px;">Vendas (PDV)</h1></div></div>
+<div class="toolbar">
+  <div><h1 style="font-family:var(--font-display); font-size:22px; margin:0 0 4px;">Vendas (PDV)</h1></div>
+  <div class="ffield" style="margin:0; min-width:200px;"><select id="fEmpresaVenda"><option value="">Todas as lojas (sem loja específica)</option></select></div>
+</div>
 
 <div class="pdv-grid">
   <div class="card">
@@ -43,7 +46,7 @@
     <div class="ffield"><label>Forma de pagamento</label>
       <select id="formaPagamento"><option>PIX</option><option>Cartão de Crédito</option><option>Cartão de Débito</option><option>Dinheiro</option><option>Parcelado</option></select>
     </div>
-    <div class="ffield" id="parcelasWrap" style="display:none;"><label>Parcelas</label><input id="parcelas" type="number" min="2" max="12" value="2"></div>
+    <div class="ffield" id="parcelasWrap" style="display:none;"><label>Parcelas</label><input id="parcelas" type="number" min="1" max="12" value="1"></div>
     <div class="ffield" id="dinheiroWrap" style="display:none;">
       <label>Valor recebido do cliente (R$)</label><input id="valorRecebido" type="number" step="0.01">
       <div id="trocoInfo" style="margin-top:8px; font-size:12.5px; font-family:var(--font-mono);"></div>
@@ -69,6 +72,8 @@
   try {
     todosProdutos = (await dbGetAll('PRODUTOS')).filter(p => p.STATUS !== 'Excluído');
     todosClientes = (await dbGetAll('CLIENTES')).filter(c => c.STATUS !== 'Excluído');
+    const empresas = await dbGetAll('EMPRESAS');
+    setHTML('fEmpresaVenda', '<option value="">Todas as lojas (sem loja específica)</option>' + empresas.map(e => `<option value="${e.ID}">${e.NOME}</option>`).join(''));
   } catch (e) { mostrarToast('Erro ao carregar dados: ' + e.message, 'erro'); }
 
   // ---------- Busca de produto ----------
@@ -138,7 +143,7 @@
 
   // ---------- Pagamento / troco ----------
   document.getElementById('formaPagamento').addEventListener('change', e => {
-    document.getElementById('parcelasWrap').style.display = e.target.value === 'Parcelado' ? 'block' : 'none';
+    document.getElementById('parcelasWrap').style.display = (e.target.value === 'Parcelado' || e.target.value === 'Cartão de Crédito') ? 'block' : 'none';
     document.getElementById('dinheiroWrap').style.display = e.target.value === 'Dinheiro' ? 'block' : 'none';
     atualizarTroco();
   });
@@ -195,8 +200,9 @@
 
       const venda = await dbInsert('VENDAS', {
         CLIENTE_ID: clienteSelecionado ? clienteSelecionado.ID : '', USUARIO_ID: usuarioAtual.ID,
+        EMPRESA_ID: document.getElementById('fEmpresaVenda').value,
         DATA: new Date().toISOString(), VALOR_TOTAL: valorTotal, DESCONTO: desconto,
-        FORMA_PAGAMENTO: formaPagamento, PARCELAS: formaPagamento === 'Parcelado' ? Number(document.getElementById('parcelas').value) : 1,
+        FORMA_PAGAMENTO: formaPagamento, PARCELAS: (formaPagamento === 'Parcelado' || formaPagamento === 'Cartão de Crédito') ? Number(document.getElementById('parcelas').value) : 1,
         OBSERVACOES: observacaoTroco, STATUS: 'Concluída'
       });
 

@@ -141,12 +141,26 @@ function injetarConteudo(html){
   });
 }
 
-// ---------- Recolher sidebar ----------
+// ---------- Recolher sidebar (desktop) ----------
 document.getElementById('btnCollapse').addEventListener('click', () => {
   const app = document.getElementById('app');
   app.classList.toggle('collapsed');
   document.getElementById('btnCollapse').textContent = app.classList.contains('collapsed') ? '›' : '‹ Recolher';
 });
+
+// ---------- Menu-gaveta (celular) ----------
+function abrirMenuMobile(){
+  document.querySelector('.sidebar').classList.add('aberta');
+  document.getElementById('sidebarBackdrop').classList.add('aberta');
+}
+function fecharMenuMobile(){
+  document.querySelector('.sidebar').classList.remove('aberta');
+  document.getElementById('sidebarBackdrop').classList.remove('aberta');
+}
+document.getElementById('btnHamburguer').addEventListener('click', abrirMenuMobile);
+document.getElementById('sidebarBackdrop').addEventListener('click', fecharMenuMobile);
+// Fecha o menu automaticamente ao escolher um módulo no celular
+document.querySelectorAll('.menu-item').forEach(item => item.addEventListener('click', fecharMenuMobile));
 
 // ---------- Tema claro/escuro ----------
 document.getElementById('btnTheme').addEventListener('click', () => {
@@ -164,4 +178,16 @@ window.mostrarToast = mostrarToast;
 window.recarregarModuloAtual = () => {
   const ativo = document.querySelector('.menu-item.active');
   if (ativo) carregarModulo(ativo.getAttribute('data-modulo'));
+};
+
+/**
+ * Escreve innerHTML só se o elemento realmente existir. Evita o erro
+ * "Cannot set properties of null" que acontecia quando o usuário trocava
+ * de aba antes de uma busca assíncrona terminar (o elemento da aba
+ * antiga já não existe mais quando a resposta chega).
+ */
+window.setHTML = function(id, html){
+  const el = document.getElementById(id);
+  if (el) el.innerHTML = html;
+  return el;
 };

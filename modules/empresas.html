@@ -34,6 +34,14 @@
         <div class="ffield"><label>WhatsApp</label><input id="fWhatsapp"></div>
       </div>
       <div class="frow2">
+        <div class="ffield"><label>Rua</label><input id="fRua"></div>
+        <div class="ffield"><label>Número</label><input id="fNumero"></div>
+      </div>
+      <div class="frow2">
+        <div class="ffield"><label>Bairro</label><input id="fBairro"></div>
+        <div class="ffield"><label>CEP</label><input id="fCep"></div>
+      </div>
+      <div class="frow2">
         <div class="ffield"><label>Cidade</label><input id="fCidade"></div>
         <div class="ffield"><label>Estado</label><input id="fEstado" maxlength="2"></div>
       </div>
@@ -64,7 +72,7 @@
 
   async function carregar(){
     try {
-      if (!(await checarPermissao('EMPRESAS','VISUALIZAR'))){ document.getElementById('linhas').innerHTML='<tr class="empty-row"><td colspan="5">Sem permissão.</td></tr>'; return; }
+      if (!(await checarPermissao('EMPRESAS','VISUALIZAR'))){ setHTML('linhas', '<tr class="empty-row"><td colspan="5">Sem permissão.</td></tr>'); return; }
       itens = (await dbGetAll('EMPRESAS')).filter(e => e.STATUS !== 'Excluído');
       renderLinhas(itens);
     } catch (e) { mostrarToast('Erro: ' + e.message, 'erro'); }
@@ -77,6 +85,10 @@
     document.getElementById('fNome').value = e ? e.NOME : '';
     document.getElementById('fCnpj').value = e ? e.CNPJ||'' : '';
     document.getElementById('fWhatsapp').value = e ? e.WHATSAPP||'' : '';
+    document.getElementById('fRua').value = e ? e.RUA||'' : '';
+    document.getElementById('fNumero').value = e ? e.NUMERO||'' : '';
+    document.getElementById('fBairro').value = e ? e.BAIRRO||'' : '';
+    document.getElementById('fCep').value = e ? e.CEP||'' : '';
     document.getElementById('fCidade').value = e ? e.CIDADE||'' : '';
     document.getElementById('fEstado').value = e ? e.ESTADO||'' : '';
     document.getElementById('fPix').value = e ? e.PIX||'' : '';
@@ -93,6 +105,8 @@
     if (!nome){ mostrarToast('Informe o nome da empresa.', 'erro'); return; }
     const dados = {
       NOME: nome, CNPJ: document.getElementById('fCnpj').value.trim(), WHATSAPP: document.getElementById('fWhatsapp').value.trim(),
+      RUA: document.getElementById('fRua').value.trim(), NUMERO: document.getElementById('fNumero').value.trim(),
+      BAIRRO: document.getElementById('fBairro').value.trim(), CEP: document.getElementById('fCep').value.trim(),
       CIDADE: document.getElementById('fCidade').value.trim(), ESTADO: document.getElementById('fEstado').value.trim(),
       PIX: document.getElementById('fPix').value.trim(), GARANTIA_PADRAO_DIAS: Number(document.getElementById('fGarantia').value)||90
     };

@@ -10,7 +10,7 @@
  */
 
 const NOMES_MODULO = {
-  DASHBOARD:'Dashboard', CLIENTES:'Clientes', PRODUTOS:'Produtos', FORNECEDORES:'Fornecedores',
+  DASHBOARD:'Dashboard', AGENDA:'Agenda', CLIENTES:'Clientes', PRODUTOS:'Produtos', FORNECEDORES:'Fornecedores',
   FUNCIONARIOS:'Funcionários', EMPRESAS:'Empresas', VENDAS:'Vendas (PDV)', ORCAMENTOS:'Orçamentos',
   COMPRAS:'Compras', ESTOQUE:'Estoque', ASSISTENCIA:'Assistência técnica', GARANTIAS:'Garantias',
   FINANCEIRO:'Financeiro', RELATORIOS:'Relatórios', CONFIGURACOES:'Configurações'

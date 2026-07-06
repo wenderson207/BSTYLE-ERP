@@ -1,0 +1,67 @@
+<style>
+  .chart-card{ background:var(--bg-surface); border:1px solid var(--hairline); border-radius:12px; padding:18px 20px; }
+  .mini-list{ list-style:none; margin:0; padding:0; }
+  .mini-list li{ display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid var(--hairline); font-size:12.5px; }
+  .mini-list li:last-child{ border-bottom:none; }
+  .mini-list .qty{ font-family:var(--font-mono); color:var(--mint); }
+</style>
+
+<div class="toolbar">
+  <div><h1 style="font-family:var(--font-display); font-size:22px; margin:0 0 4px;">Dashboard</h1>
+  <p style="color:var(--text-secondary); font-size:13px; margin:0;">Visão geral da loja.</p></div>
+</div>
+
+<div class="kpi-grid" id="kpiGrid">
+  <div class="kpi"><div class="lbl">Vendas (total)</div><div class="val">—</div></div>
+  <div class="kpi"><div class="lbl">Ticket médio</div><div class="val">—</div></div>
+  <div class="kpi"><div class="lbl">Clientes cadastrados</div><div class="val">—</div></div>
+  <div class="kpi"><div class="lbl">Estoque baixo</div><div class="val">—</div></div>
+</div>
+
+<div class="chart-card">
+  <h4 style="font-family:var(--font-display); font-size:14px; margin:0 0 14px;">Produtos mais vendidos</h4>
+  <ul class="mini-list" id="listaMaisVendidos"><li>Carregando…</li></ul>
+</div>
+
+<script>
+(async function(){
+  function moeda(v){ return (Number(v)||0).toLocaleString('pt-BR', { style:'currency', currency:'BRL' }); }
+
+  try {
+    const [vendas, itensVenda, clientes, produtos] = await Promise.all([
+      dbQuery('VENDAS', { STATUS: 'Concluída' }),
+      dbGetAll('ITENS_VENDA'),
+      dbGetAll('CLIENTES'),
+      dbGetAll('PRODUTOS')
+    ]);
+
+    const valorTotal = vendas.reduce((s, v) => s + Number(v.VALOR_TOTAL || 0), 0);
+    const ticketMedio = vendas.length ? valorTotal / vendas.length : 0;
+    const estoqueBaixo = produtos.filter(p => Number(p.ESTOQUE_ATUAL) <= Number(p.ESTOQUE_MINIMO)).length;
+
+    const kpis = document.querySelectorAll('#kpiGrid .kpi .val');
+    kpis[0].textContent = moeda(valorTotal);
+    kpis[1].textContent = moeda(ticketMedio);
+    kpis[2].textContent = clientes.filter(c => c.STATUS !== 'Excluído').length;
+    kpis[3].textContent = estoqueBaixo + ' itens';
+
+    const contagem = {};
+    itensVenda.forEach(item => {
+      contagem[item.PRODUTO_ID] = (contagem[item.PRODUTO_ID] || 0) + Number(item.QUANTIDADE || 0);
+    });
+    const maisVendidos = Object.entries(contagem)
+      .sort((a,b) => b[1]-a[1]).slice(0,5)
+      .map(([produtoId, qtd]) => {
+        const produto = produtos.find(p => p.ID === produtoId);
+        return { nome: produto ? produto.NOME : produtoId, qtd };
+      });
+
+    document.getElementById('listaMaisVendidos').innerHTML = maisVendidos.length
+      ? maisVendidos.map(p => `<li><span>${p.nome}</span><span class="qty">${p.qtd}x</span></li>`).join('')
+      : '<li>Nenhuma venda registrada ainda.</li>';
+
+  } catch (e) {
+    mostrarToast('Erro ao carregar dashboard: ' + e.message, 'erro');
+  }
+})();
+</script>

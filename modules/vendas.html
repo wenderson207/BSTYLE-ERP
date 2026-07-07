@@ -18,7 +18,10 @@
 
 <div class="toolbar">
   <div><h1 style="font-family:var(--font-display); font-size:22px; margin:0 0 4px;">Vendas (PDV)</h1></div>
-  <div class="ffield" style="margin:0; min-width:200px;"><select id="fEmpresaVenda"><option value="">Todas as lojas (sem loja específica)</option></select></div>
+  <div class="ffield" style="margin:0; min-width:200px;">
+    <label style="font-size:11px; color:var(--text-secondary); display:block; margin-bottom:4px;">Vendendo para a loja:</label>
+    <select id="fEmpresaVenda"><option value="">Selecione a loja…</option></select>
+  </div>
 </div>
 
 <div class="pdv-grid">
@@ -39,6 +42,7 @@
       <label>Cliente</label>
       <div id="clienteSelecionadoWrap" style="display:none; margin-bottom:8px;">
         <div class="selected-client"><span id="clienteSelecionadoNome"></span><button id="btnRemoverCliente">trocar</button></div>
+        <div id="avisoFidelidade" style="display:none; margin-top:8px; padding:8px 10px; border-radius:8px; background:rgba(47,225,168,0.1); border:1px solid rgba(47,225,168,0.3); font-size:12px;"></div>
       </div>
       <input id="buscaCliente" placeholder="Buscar cliente (opcional)…" autocomplete="off">
       <div class="dropdown-results" id="resultadosCliente"></div>
@@ -65,16 +69,36 @@
 (async function(){
   let carrinho = [];
   let clienteSelecionado = null;
-  let todosProdutos = [], todosClientes = [];
+  let produtosDaLoja = [], todosClientes = [];
+  let configFidelidade = { ATIVO: false, VALOR_MINIMO: 0, PERCENTUAL_DESCONTO: 0 };
 
   function moeda(v){ return (Number(v)||0).toLocaleString('pt-BR', { style:'currency', currency:'BRL' }); }
 
+  let todosProdutosCarregados = [];
   try {
-    todosProdutos = (await dbGetAll('PRODUTOS')).filter(p => p.STATUS !== 'Excluído');
+    todosProdutosCarregados = (await dbGetAll('PRODUTOS')).filter(p => p.STATUS !== 'Excluído');
     todosClientes = (await dbGetAll('CLIENTES')).filter(c => c.STATUS !== 'Excluído');
     const empresas = await dbGetAll('EMPRESAS');
-    setHTML('fEmpresaVenda', '<option value="">Todas as lojas (sem loja específica)</option>' + empresas.map(e => `<option value="${e.ID}">${e.NOME}</option>`).join(''));
+
+    const selEmpresa = document.getElementById('fEmpresaVenda');
+    if (window.lojaAtivaId) {
+      // Filtro geral já define uma loja específica — trava o seletor nela.
+      setHTML('fEmpresaVenda', empresas.map(e => `<option value="${e.ID}" ${e.ID===window.lojaAtivaId?'selected':''}>${e.NOME}</option>`).join(''));
+      selEmpresa.disabled = true;
+    } else {
+      setHTML('fEmpresaVenda', '<option value="">Selecione a loja…</option>' + empresas.map(e => `<option value="${e.ID}">${e.NOME}</option>`).join(''));
+    }
+    atualizarProdutosDaLoja();
+    document.getElementById('fEmpresaVenda').addEventListener('change', atualizarProdutosDaLoja);
+
+    const cfgFid = await dbGetById('CONFIG', 'desconto_fidelidade');
+    if (cfgFid) configFidelidade = cfgFid;
   } catch (e) { mostrarToast('Erro ao carregar dados: ' + e.message, 'erro'); }
+
+  function atualizarProdutosDaLoja(){
+    const lojaEscolhida = document.getElementById('fEmpresaVenda').value;
+    produtosDaLoja = lojaEscolhida ? todosProdutosCarregados.filter(p => p.EMPRESA_ID === lojaEscolhida) : [];
+  }
 
   // ---------- Busca de produto ----------
   const inputProduto = document.getElementById('buscaProduto');
@@ -82,7 +106,7 @@
   inputProduto.addEventListener('input', () => {
     const termo = inputProduto.value.trim().toLowerCase();
     if (termo.length < 2){ resProduto.classList.remove('open'); return; }
-    const lista = todosProdutos.filter(p => p.NOME.toLowerCase().includes(termo) || (p.SKU||'').toLowerCase().includes(termo)).slice(0, 20);
+    const lista = produtosDaLoja.filter(p => p.NOME.toLowerCase().includes(termo) || (p.SKU||'').toLowerCase().includes(termo)).slice(0, 20);
     mostrarResultadosProduto(lista);
   });
 
@@ -133,13 +157,33 @@
       document.getElementById('clienteSelecionadoWrap').style.display = 'block';
       inputCliente.style.display = 'none'; inputCliente.value = '';
       resCliente.classList.remove('open');
+      verificarFidelidade();
     }));
   });
   document.getElementById('btnRemoverCliente').addEventListener('click', () => {
     clienteSelecionado = null;
     document.getElementById('clienteSelecionadoWrap').style.display = 'none';
+    document.getElementById('avisoFidelidade').style.display = 'none';
     inputCliente.style.display = 'block';
   });
+
+  function verificarFidelidade(){
+    const aviso = document.getElementById('avisoFidelidade');
+    if (!configFidelidade.ATIVO || !clienteSelecionado || Number(clienteSelecionado.VALOR_GASTO_TOTAL||0) < Number(configFidelidade.VALOR_MINIMO||0)) {
+      aviso.style.display = 'none';
+      return;
+    }
+    aviso.style.display = 'block';
+    aviso.innerHTML = `🎉 Cliente fiel! Já gastou ${moeda(clienteSelecionado.VALOR_GASTO_TOTAL)} — elegível a <b>${configFidelidade.PERCENTUAL_DESCONTO}% de desconto</b>. `
+      + `<button class="btn" style="padding:4px 8px; font-size:11px; margin-left:4px;" id="btnAplicarFidelidade">Aplicar</button>`;
+    document.getElementById('btnAplicarFidelidade').addEventListener('click', () => {
+      const subtotal = carrinho.reduce((s,i) => s + i.QUANTIDADE*i.PRECO_UNITARIO, 0);
+      const descontoCalculado = subtotal * (Number(configFidelidade.PERCENTUAL_DESCONTO)/100);
+      document.getElementById('desconto').value = descontoCalculado.toFixed(2);
+      atualizarResumo(); atualizarTroco();
+      mostrarToast('Desconto de fidelidade aplicado.');
+    });
+  }
 
   // ---------- Pagamento / troco ----------
   document.getElementById('formaPagamento').addEventListener('change', e => {
@@ -174,6 +218,7 @@
   // ---------- Finalizar venda ----------
   document.getElementById('btnFinalizar').addEventListener('click', async () => {
     if (!carrinho.length){ mostrarToast('Adicione ao menos um item.', 'erro'); return; }
+    if (!document.getElementById('fEmpresaVenda').value){ mostrarToast('Selecione para qual loja é esta venda.', 'erro'); return; }
     if (!(await checarPermissao('VENDAS','CADASTRAR'))){ mostrarToast('Sem permissão.', 'erro'); return; }
 
     const formaPagamento = document.getElementById('formaPagamento').value;
@@ -187,7 +232,7 @@
 
     // Confere estoque de cada item antes de confirmar
     for (const item of carrinho) {
-      const produto = todosProdutos.find(p => p.ID === item.PRODUTO_ID);
+      const produto = produtosDaLoja.find(p => p.ID === item.PRODUTO_ID);
       if (!produto || Number(produto.ESTOQUE_ATUAL) < item.QUANTIDADE) {
         mostrarToast('Estoque insuficiente para "' + item.NOME + '".', 'erro'); return;
       }
@@ -209,7 +254,7 @@
       for (const item of carrinho) {
         await dbInsert('ITENS_VENDA', { VENDA_ID: venda.ID, PRODUTO_ID: item.PRODUTO_ID, QUANTIDADE: item.QUANTIDADE, PRECO_UNITARIO: item.PRECO_UNITARIO });
 
-        const produto = todosProdutos.find(p => p.ID === item.PRODUTO_ID);
+        const produto = produtosDaLoja.find(p => p.ID === item.PRODUTO_ID);
         const novoEstoque = Number(produto.ESTOQUE_ATUAL) - item.QUANTIDADE;
         await dbUpdate('PRODUTOS', produto.ID, { ESTOQUE_ATUAL: novoEstoque });
         produto.ESTOQUE_ATUAL = novoEstoque;
@@ -219,7 +264,9 @@
           await dbInsert('GARANTIAS', {
             VENDA_ID: venda.ID, CLIENTE_ID: clienteSelecionado.ID, PRODUTO_DESCRICAO: produto.NOME,
             NUMERO_GARANTIA: gerarId('GAR'), PRAZO_DIAS: produto.GARANTIA_PADRAO_DIAS || 90,
-            CONDICOES: 'Garantia contra defeitos de fabricação.', DATA_EMISSAO: new Date().toISOString(), STATUS: 'Ativa'
+            TIPO: 'PRODUTO_USADO', COR_CAPACIDADE: '', ESTADO_APARELHO: 'Aparelho em perfeitas condições e testes realizados com o cliente.',
+            VALOR_PAGO: item.QUANTIDADE * item.PRECO_UNITARIO, FORMA_PAGAMENTO: formaPagamento,
+            DATA_EMISSAO: new Date().toISOString(), STATUS: 'Ativa'
           });
         }
       }

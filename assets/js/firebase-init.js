@@ -20,6 +20,7 @@ firebase.initializeApp(firebaseConfig);
 
 const auth = firebase.auth();
 const db = firebase.firestore();
+const storage = firebase.storage();
 
 // Mantém o login mesmo depois de fechar/recarregar o navegador (Firebase cuida disso sozinho).
 auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);

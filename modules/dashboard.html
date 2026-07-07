@@ -48,6 +48,11 @@
   <div class="chart-card"><h4 style="font-family:var(--font-display); font-size:14px; margin:0 0 14px;">Formas de pagamento</h4><canvas id="chartPagamento" height="150"></canvas></div>
 </div>
 
+<div class="chart-card" style="margin-bottom:16px;">
+  <h4 style="font-family:var(--font-display); font-size:14px; margin:0 0 14px;">🏬 Comparação entre lojas</h4>
+  <div id="comparacaoLojas">Carregando…</div>
+</div>
+
 <script>
 (async function(){
   function moeda(v){ return (Number(v)||0).toLocaleString('pt-BR', { style:'currency', currency:'BRL' }); }
@@ -146,5 +151,33 @@
   } catch (e) {
     mostrarToast('Erro ao carregar dashboard: ' + e.message, 'erro');
   }
+
+  // ---------- Comparação entre lojas ----------
+  try {
+    const [empresas, produtosTodos, vendasTodas, financeiroTodo] = await Promise.all([
+      dbGetAll('EMPRESAS'), dbGetAll('PRODUTOS'), dbQuery('VENDAS', { STATUS: 'Concluída' }), dbGetAll('FINANCEIRO')
+    ]);
+
+    if (empresas.length < 2) {
+      setHTML('comparacaoLojas', '<p style="color:var(--text-tertiary); font-size:12.5px; margin:0;">Cadastre 2 ou mais lojas em Empresas pra ver a comparação aqui.</p>');
+    } else {
+      const linhasComparacao = empresas.map(e => {
+        const vendasLoja = vendasTodas.filter(v => v.EMPRESA_ID === e.ID);
+        const totalVendido = vendasLoja.reduce((s,v)=>s+Number(v.VALOR_TOTAL||0),0);
+        const despesas = financeiroTodo.filter(f => f.EMPRESA_ID === e.ID && f.TIPO==='Despesa' && f.STATUS==='Pago').reduce((s,f)=>s+Number(f.VALOR||0),0);
+        const produtosLoja = produtosTodos.filter(p => p.EMPRESA_ID === e.ID && p.STATUS !== 'Excluído');
+        const emEstoque = produtosLoja.filter(p => Number(p.ESTOQUE_ATUAL) > 0).length;
+        return { nome: e.NOME, vendas: vendasLoja.length, totalVendido, lucro: totalVendido - despesas, emEstoque };
+      });
+
+      setHTML('comparacaoLojas', `
+        <table class="dt"><thead><tr><th>Loja</th><th>Vendas</th><th>Total vendido</th><th>Lucro (vendas - despesas)</th><th>Itens em estoque</th></tr></thead>
+        <tbody>${linhasComparacao.map(l => `<tr>
+          <td><b>${l.nome}</b></td><td>${l.vendas}</td><td>${moeda(l.totalVendido)}</td>
+          <td style="color:${l.lucro>=0?'var(--mint)':'var(--red)'};">${moeda(l.lucro)}</td>
+          <td>${l.emEstoque}</td></tr>`).join('')}</tbody></table>
+      `);
+    }
+  } catch (e) { mostrarToast('Erro na comparação de lojas: ' + e.message, 'erro'); }
 })();
 </script>

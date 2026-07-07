@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Acompanhar Ordem de Serviço</title>
+<link rel="icon" type="image/png" href="assets/img/fav.png">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<style>
+  :root{ --mint:#2FE1A8; --blue:#4C8DFF; --amber:#F5A623; --red:#FF5C5C; }
+  *{ box-sizing:border-box; }
+  body{ margin:0; min-height:100vh; background:#0A0D12; color:#EDEFF3; font-family:Inter,sans-serif; display:flex; align-items:center; justify-content:center; padding:24px; }
+  .card{ width:100%; max-width:440px; background:#12161F; border:1px solid #232937; border-radius:16px; padding:30px 26px; }
+  .brand{ display:flex; align-items:center; gap:10px; margin-bottom:22px; }
+  .brand img{ width:34px; height:34px; object-fit:contain; }
+  .brand span{ font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:16px; }
+  h1{ font-family:'Space Grotesk',sans-serif; font-size:19px; margin:0 0 4px; }
+  .sub{ color:#8891A3; font-size:13px; margin:0 0 22px; }
+  .status-badge{ display:inline-flex; padding:6px 14px; border-radius:20px; font-size:13px; font-weight:600; margin-bottom:18px; }
+  .linha{ display:flex; justify-content:space-between; padding:10px 0; border-bottom:1px solid #232937; font-size:13.5px; }
+  .linha:last-child{ border-bottom:none; }
+  .linha .lbl{ color:#8891A3; }
+  .erro{ text-align:center; color:#FF5C5C; padding:30px 0; }
+  .carregando{ text-align:center; color:#565F72; padding:30px 0; font-family:'JetBrains Mono',monospace; font-size:12.5px; }
+  .progresso{ display:flex; justify-content:space-between; margin:20px 0 24px; position:relative; }
+  .progresso::before{ content:''; position:absolute; top:9px; left:6%; right:6%; height:2px; background:#232937; }
+  .etapa{ position:relative; z-index:1; display:flex; flex-direction:column; align-items:center; gap:6px; flex:1; }
+  .etapa .bola{ width:18px; height:18px; border-radius:50%; background:#232937; border:2px solid #232937; }
+  .etapa.ativa .bola{ background:var(--mint); border-color:var(--mint); }
+  .etapa .txt{ font-size:9.5px; color:#565F72; text-align:center; }
+  .etapa.ativa .txt{ color:#EDEFF3; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="brand"><img src="assets/img/Logo.png" onerror="this.style.display='none'"><span id="nomeLoja">Acompanhamento</span></div>
+    <div id="conteudo" class="carregando">Buscando sua ordem de serviço…</div>
+  </div>
+
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyCxWovMBgicwnEK2yzyYHm7clDeIO-m4vU",
+      authDomain: "bstyle-ab14a.firebaseapp.com",
+      projectId: "bstyle-ab14a",
+      storageBucket: "bstyle-ab14a.firebasestorage.app",
+      messagingSenderId: "1065822284388",
+      appId: "1:1065822284388:web:1a00706fd06ae4a35ccd71"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
+    const ETAPAS = ['Aberta','Em diagnóstico','Aguardando peça','Em reparo','Pronto','Entregue'];
+
+    function dataBR(v){ return v ? new Date(v).toLocaleDateString('pt-BR') : '—'; }
+
+    async function carregar(){
+      const params = new URLSearchParams(window.location.search);
+      const id = params.get('id');
+      const codigo = params.get('codigo');
+      const conteudo = document.getElementById('conteudo');
+
+      if (!id || !codigo) {
+        conteudo.className = 'erro';
+        conteudo.textContent = 'Link inválido. Confira o link enviado pela loja.';
+        return;
+      }
+
+      try {
+        const doc = await db.collection('OS_PUBLICO').doc(id).get();
+        if (!doc.exists || doc.data().CODIGO !== codigo) {
+          conteudo.className = 'erro';
+          conteudo.textContent = 'Não encontramos essa ordem de serviço. Confira o link enviado pela loja.';
+          return;
+        }
+
+        const os = doc.data();
+        document.getElementById('nomeLoja').textContent = os.NOME_LOJA || 'Acompanhamento';
+
+        const idxAtual = ETAPAS.indexOf(os.STATUS);
+        const corStatus = os.STATUS === 'Entregue' ? 'background:rgba(47,225,168,0.15); color:#2FE1A8;'
+          : os.STATUS === 'Pronto' ? 'background:rgba(76,141,255,0.15); color:#4C8DFF;'
+          : 'background:rgba(245,166,35,0.15); color:#F5A623;';
+
+        conteudo.className = '';
+        conteudo.innerHTML = `
+          <h1>${os.MARCA||''} ${os.MODELO||''}</h1>
+          <p class="sub">OS ${os.NUMERO_OS}</p>
+          <span class="status-badge" style="${corStatus}">${os.STATUS}</span>
+
+          <div class="progresso">
+            ${ETAPAS.map((e,i) => `<div class="etapa ${i<=idxAtual?'ativa':''}"><div class="bola"></div><div class="txt">${e}</div></div>`).join('')}
+          </div>
+
+          <div class="linha"><span class="lbl">Cliente</span><span>${os.CLIENTE_NOME||'—'}</span></div>
+          <div class="linha"><span class="lbl">Entrada</span><span>${dataBR(os.DATA_ABERTURA)}</span></div>
+          <div class="linha"><span class="lbl">Previsão de entrega</span><span>${dataBR(os.PRAZO)}</span></div>
+        `;
+      } catch (e) {
+        conteudo.className = 'erro';
+        conteudo.textContent = 'Não foi possível carregar as informações agora. Tente novamente em instantes.';
+      }
+    }
+
+    carregar();
+  </script>
+</body>
+</html>

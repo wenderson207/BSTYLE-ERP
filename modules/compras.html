@@ -17,14 +17,15 @@
   <button class="btn btn-primary" id="btnNovo">+ Nova compra</button>
 </div>
 
-<table class="dt"><thead><tr><th>Data</th><th>Fornecedor</th><th>Valor total</th><th>Status</th></tr></thead>
-  <tbody id="linhas"><tr class="empty-row"><td colspan="4">Carregando…</td></tr></tbody>
+<table class="dt"><thead><tr><th>Data</th><th>Loja</th><th>Fornecedor</th><th>Valor total</th><th>Status</th></tr></thead>
+  <tbody id="linhas"><tr class="empty-row"><td colspan="5">Carregando…</td></tr></tbody>
 </table>
 
 <div class="modal-overlay" id="modal">
   <div class="modal-box">
     <div class="modal-head"><h3 style="font-family:var(--font-display); margin:0;">Nova compra</h3><button class="modal-close" id="fecharModal">✕</button></div>
     <div class="modal-body">
+      <div class="ffield"><label>Loja *</label><select id="fLojaCompra"><option value="">Selecione…</option></select></div>
       <div class="ffield"><label>Fornecedor</label><select id="fFornecedor"><option value="">Selecione…</option></select></div>
       <div id="itensCompra"></div>
       <button class="btn" id="btnAddItem" style="margin-top:6px;">+ item</button>
@@ -35,33 +36,55 @@
 
 <script>
 (async function(){
-  let compras = [], fornecedores = [], produtos = [];
+  let compras = [], fornecedores = [], produtos = [], empresas = [], produtosDaLojaCompra = [];
 
   function moeda(v){ return (Number(v)||0).toLocaleString('pt-BR', { style:'currency', currency:'BRL' }); }
   function dataBR(v){ return v ? new Date(v).toLocaleDateString('pt-BR') : '—'; }
   function nomeFornecedor(id){ const f = fornecedores.find(x=>x.ID===id); return f?f.NOME:'—'; }
+  function nomeLoja(id){ if (!id) return '—'; const e = empresas.find(x=>x.ID===id); return e?e.NOME:'—'; }
 
   async function carregar(){
     try {
-      if (!(await checarPermissao('COMPRAS','VISUALIZAR'))){ document.getElementById('linhas').innerHTML='<tr class="empty-row"><td colspan="4">Sem permissão.</td></tr>'; return; }
+      if (!(await checarPermissao('COMPRAS','VISUALIZAR'))){ setHTML('linhas', '<tr class="empty-row"><td colspan="5">Sem permissão.</td></tr>'); return; }
+      empresas = await dbGetAll('EMPRESAS');
       fornecedores = await dbGetAll('FORNECEDORES');
       produtos = await dbGetAll('PRODUTOS');
-      compras = await dbGetAll('COMPRAS');
-      document.getElementById('linhas').innerHTML = compras.length
-        ? compras.map(c => `<tr><td>${dataBR(c.DATA)}</td><td>${nomeFornecedor(c.FORNECEDOR_ID)}</td><td>${moeda(c.VALOR_TOTAL)}</td><td><span class="badge ok">${c.STATUS}</span></td></tr>`).join('')
-        : '<tr class="empty-row"><td colspan="4">Nenhuma compra registrada.</td></tr>';
-      document.getElementById('fFornecedor').innerHTML = '<option value="">Selecione…</option>' + fornecedores.map(f => `<option value="${f.ID}">${f.NOME}</option>`).join('');
+      let todasCompras = await dbGetAll('COMPRAS');
+      compras = window.lojaAtivaId ? todasCompras.filter(c => c.EMPRESA_ID === window.lojaAtivaId) : todasCompras;
+      setHTML('linhas', compras.length
+        ? compras.map(c => `<tr><td>${dataBR(c.DATA)}</td><td>${nomeLoja(c.EMPRESA_ID)}</td><td>${nomeFornecedor(c.FORNECEDOR_ID)}</td><td>${moeda(c.VALOR_TOTAL)}</td><td><span class="badge ok">${c.STATUS}</span></td></tr>`).join('')
+        : '<tr class="empty-row"><td colspan="5">Nenhuma compra registrada.</td></tr>');
+      setHTML('fFornecedor', '<option value="">Selecione…</option>' + fornecedores.map(f => `<option value="${f.ID}">${f.NOME}</option>`).join(''));
+
+      const selLoja = document.getElementById('fLojaCompra');
+      if (window.lojaAtivaId) {
+        setHTML('fLojaCompra', empresas.map(e => `<option value="${e.ID}" ${e.ID===window.lojaAtivaId?'selected':''}>${e.NOME}</option>`).join(''));
+        selLoja.disabled = true;
+      } else {
+        setHTML('fLojaCompra', '<option value="">Selecione…</option>' + empresas.map(e => `<option value="${e.ID}">${e.NOME}</option>`).join(''));
+        selLoja.disabled = false;
+      }
     } catch (e) { mostrarToast('Erro: ' + e.message, 'erro'); }
+  }
+
+  function atualizarProdutosDaLojaCompra(){
+    const lojaId = document.getElementById('fLojaCompra').value;
+    produtosDaLojaCompra = lojaId ? produtos.filter(p => p.EMPRESA_ID === lojaId) : [];
   }
 
   const modal = document.getElementById('modal');
   function linhaItemHtml(){
-    const opcoes = produtos.map(p => `<option value="${p.ID}">${p.NOME}</option>`).join('');
+    const opcoes = produtosDaLojaCompra.map(p => `<option value="${p.ID}">${p.NOME}</option>`).join('') || '<option value="">Selecione a loja primeiro</option>';
     return `<div class="item-linha"><select class="item-produto">${opcoes}</select><input class="item-qtd" type="number" placeholder="Qtd" value="1"><input class="item-preco" type="number" step="0.01" placeholder="Preço unit."><button class="btn" onclick="this.parentElement.remove()">✕</button></div>`;
   }
   document.getElementById('btnNovo').addEventListener('click', () => {
-    document.getElementById('itensCompra').innerHTML = linhaItemHtml();
+    atualizarProdutosDaLojaCompra();
+    setHTML('itensCompra', linhaItemHtml());
     modal.classList.add('open');
+  });
+  document.getElementById('fLojaCompra').addEventListener('change', () => {
+    atualizarProdutosDaLojaCompra();
+    setHTML('itensCompra', linhaItemHtml());
   });
   document.getElementById('btnAddItem').addEventListener('click', () => {
     document.getElementById('itensCompra').insertAdjacentHTML('beforeend', linhaItemHtml());
@@ -70,6 +93,9 @@
   document.getElementById('btnCancelar').addEventListener('click', () => modal.classList.remove('open'));
 
   document.getElementById('btnSalvar').addEventListener('click', async () => {
+    const lojaId = document.getElementById('fLojaCompra').value;
+    if (!lojaId){ mostrarToast('Selecione a loja desta compra.', 'erro'); return; }
+
     const linhas = [...document.querySelectorAll('#itensCompra .item-linha')].map(l => ({
       PRODUTO_ID: l.querySelector('.item-produto').value,
       QUANTIDADE: Number(l.querySelector('.item-qtd').value)||0,
@@ -81,16 +107,16 @@
     try {
       if (!(await checarPermissao('COMPRAS','CADASTRAR'))){ mostrarToast('Sem permissão.', 'erro'); return; }
       const valorTotal = linhas.reduce((s,i) => s + i.QUANTIDADE*i.PRECO_UNITARIO, 0);
-      const compra = await dbInsert('COMPRAS', { FORNECEDOR_ID: document.getElementById('fFornecedor').value, DATA: new Date().toISOString(), VALOR_TOTAL: valorTotal, STATUS: 'Concluída' });
+      const compra = await dbInsert('COMPRAS', { EMPRESA_ID: lojaId, FORNECEDOR_ID: document.getElementById('fFornecedor').value, DATA: new Date().toISOString(), VALOR_TOTAL: valorTotal, STATUS: 'Concluída' });
 
       for (const item of linhas) {
         await dbInsert('ITENS_COMPRA', Object.assign({ COMPRA_ID: compra.ID }, item));
         const produto = produtos.find(p => p.ID === item.PRODUTO_ID);
         const novoEstoque = (Number(produto.ESTOQUE_ATUAL)||0) + item.QUANTIDADE;
         await dbUpdate('PRODUTOS', produto.ID, { ESTOQUE_ATUAL: novoEstoque });
-        await dbInsert('MOVIMENTOS_ESTOQUE', { PRODUTO_ID: produto.ID, TIPO:'ENTRADA_COMPRA', QUANTIDADE: item.QUANTIDADE, MOTIVO:'Compra '+compra.ID, USUARIO_ID: usuarioAtual.ID, DATA: new Date().toISOString() });
+        await dbInsert('MOVIMENTOS_ESTOQUE', { EMPRESA_ID: lojaId, PRODUTO_ID: produto.ID, TIPO:'ENTRADA_COMPRA', QUANTIDADE: item.QUANTIDADE, MOTIVO:'Compra '+compra.ID, USUARIO_ID: usuarioAtual.ID, DATA: new Date().toISOString() });
       }
-      await dbInsert('FINANCEIRO', { TIPO:'Despesa', CATEGORIA:'Compra de mercadoria', DESCRICAO:'Compra '+compra.ID, VALOR: valorTotal, DATA_VENCIMENTO: new Date().toISOString(), DATA_PAGAMENTO: new Date().toISOString(), STATUS:'Pago' });
+      await dbInsert('FINANCEIRO', { EMPRESA_ID: lojaId, TIPO:'Despesa', CATEGORIA:'Compra de mercadoria', DESCRICAO:'Compra '+compra.ID, VALOR: valorTotal, DATA_VENCIMENTO: new Date().toISOString(), DATA_PAGAMENTO: new Date().toISOString(), STATUS:'Pago' });
 
       mostrarToast('Compra registrada e estoque atualizado.');
       modal.classList.remove('open'); carregar();

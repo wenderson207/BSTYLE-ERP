@@ -134,7 +134,11 @@
     <div class="modal-body" id="verCorpo"></div>
     <div class="modal-foot">
       <button class="btn" id="btnFecharVer">Fechar</button>
+      <button class="btn" id="btnExcluirOS" style="color:var(--red);">Excluir OS</button>
+      <button class="btn" id="btnGerarGarantiaOS">Gerar garantia</button>
+      <button class="btn" id="btnImprimirOS">🖨️ Imprimir (2 vias)</button>
       <button class="btn btn-primary" id="btnSalvarVer">Salvar alterações</button>
+      <button class="btn btn-primary" id="btnPdfOS">⬇️ PDF (2 vias)</button>
     </div>
   </div>
 </div>
@@ -142,7 +146,7 @@
 <script>
 (async function(){
   const STATUS_COLUNAS = ['Aberta','Em diagnóstico','Aguardando peça','Em reparo','Pronto','Entregue'];
-  let ordens = [], clientes = [];
+  let ordens = [], clientes = [], empresas = [];
   let senhaTipoAtual = 'PIN', sequenciaPadrao = [];
   let defeitosFrenteNova = [], defeitosVersoNova = [];
   let mesCalendario = new Date();
@@ -188,6 +192,7 @@
     try {
       if (!(await checarPermissao('ASSISTENCIA','VISUALIZAR'))){ setHTML('kanban', 'Sem permissão.'); return; }
       clientes = await dbGetAll('CLIENTES');
+      empresas = await dbGetAll('EMPRESAS');
       ordens = await dbGetAll('ASSISTENCIAS');
       setHTML('fCliente', '<option value="">Selecione…</option>' + clientes.map(c => `<option value="${c.ID}">${c.NOME}</option>`).join(''));
       renderKanban();
@@ -222,7 +227,7 @@
       const dia = new Date(inicioGrid); dia.setDate(dia.getDate() + i);
       const foraMes = dia.getMonth() !== mes;
       const ehHoje = dia.toDateString() === hojeStr;
-      const osDoDia = ordens.filter(o => o.PRAZO && new Date(o.PRAZO).toDateString() === dia.toDateString());
+      const osDoDia = ordens.filter(o => o.PRAZO && parseDataLocal(o.PRAZO).toDateString() === dia.toDateString());
 
       html += `<div class="cal-dia ${foraMes?'fora-mes':''} ${ehHoje?'hoje':''}" onclick='window.__verDiaCalendario(${JSON.stringify(osDoDia.map(o=>o.ID))})'>
         <div class="num">${dia.getDate()}</div>
@@ -373,6 +378,123 @@
 
       await dbUpdate('ASSISTENCIAS', osAtual.ID, dados);
       mostrarToast('OS atualizada.');
+      modalVer.classList.remove('open');
+      carregar();
+    } catch (e) { mostrarToast('Erro: ' + e.message, 'erro'); }
+  });
+
+  // ---------- Texto da OS (usado no PDF e na impressão) ----------
+  function textoOS(){
+    const cliente = clientes.find(c => c.ID === osAtual.CLIENTE_ID) || {};
+    return `ORDEM DE SERVIÇO Nº ${osAtual.NUMERO_OS}
+
+CLIENTE: ${cliente.NOME||''}
+CPF: ${cliente.CPF||''}      TELEFONE: ${cliente.TELEFONE||''}
+
+APARELHO: ${osAtual.MARCA||''} ${osAtual.MODELO||''}      IMEI/SÉRIE: ${osAtual.IMEI||''}
+ACESSÓRIOS ENTREGUES: ${osAtual.ACESSORIOS_ENTREGUES||'—'}
+
+DEFEITO INFORMADO PELO CLIENTE:
+${osAtual.DEFEITO_INFORMADO||'—'}
+
+DIAGNÓSTICO TÉCNICO:
+${osAtual.DIAGNOSTICO||'—'}
+
+TRABALHO A SER REALIZADO / PEÇAS A REPOR:
+${osAtual.PECAS_A_REPOR||'—'}
+
+TÉCNICO RESPONSÁVEL: ${osAtual.TECNICO_RESPONSAVEL||'—'}
+PREVISÃO DE ENTREGA: ${osAtual.PRAZO ? parseDataLocal(osAtual.PRAZO).toLocaleDateString('pt-BR') : '—'}
+STATUS ATUAL: ${osAtual.STATUS}
+
+VALOR DA NOTA: ${(Number(osAtual.VALOR_SERVICO)||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}
+
+Ao assinar, o cliente declara estar ciente do serviço a ser realizado e do valor acima informado.`;
+  }
+
+  function cabecalhoLojasTexto(){
+    return empresas.map(e => {
+      const endereco = [e.RUA, e.NUMERO].filter(Boolean).join(', ') + (e.BAIRRO ? ' - '+e.BAIRRO : '');
+      return `${e.NOME} — ${endereco} ${e.WHATSAPP ? '· '+e.WHATSAPP : ''}`;
+    }).join(' | ');
+  }
+
+  // ---------- Imprimir ----------
+  document.getElementById('btnImprimirOS').addEventListener('click', () => {
+    if (!osAtual) return;
+    const texto = textoOS();
+    const bloco = (via) => `<div style="padding:30px; font-family:Arial,sans-serif; color:#111; page-break-after:always;">
+      <div style="font-size:11px; color:#555;">${cabecalhoLojasTexto()}</div>
+      <hr><div style="text-align:right; font-size:10px; color:#888;">${via}</div>
+      <pre style="white-space:pre-wrap; font-family:Arial,sans-serif; font-size:12.5px; line-height:1.6;">${texto.replace(/</g,'&lt;')}</pre>
+      <div style="margin-top:50px; display:flex; justify-content:space-between;">
+        <div>___________________________<br>Assinatura do Cliente</div>
+        <div>___________________________<br>Assinatura da Loja</div>
+      </div></div>`;
+    const janela = window.open('', '_blank');
+    janela.document.write(`<html><head><title>${osAtual.NUMERO_OS}</title></head><body>${bloco('1ª VIA — LOJA')}${bloco('2ª VIA — CLIENTE')}</body></html>`);
+    janela.document.close(); janela.focus();
+    setTimeout(() => janela.print(), 400);
+  });
+
+  // ---------- Salvar PDF ----------
+  document.getElementById('btnPdfOS').addEventListener('click', () => {
+    if (!osAtual) return;
+    try {
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+      const texto = textoOS();
+
+      [['1ª VIA — LOJA'], ['2ª VIA — CLIENTE']].forEach(([rotulo], idx) => {
+        if (idx > 0) doc.addPage();
+        let y = 18;
+        doc.setFontSize(8.5); doc.setTextColor(90);
+        empresas.forEach(e => {
+          const endereco = [e.RUA, e.NUMERO].filter(Boolean).join(', ') + (e.BAIRRO ? ' - '+e.BAIRRO : '');
+          doc.text(`${e.NOME} — ${endereco} ${e.WHATSAPP ? '· '+e.WHATSAPP : ''}`, 20, y);
+          y += 5;
+        });
+        doc.setDrawColor(200); doc.line(20, y+1, 190, y+1); y += 8;
+        doc.setFontSize(9); doc.setTextColor(150); doc.text(rotulo, 170, y, { align: 'right' }); y += 6;
+
+        doc.setTextColor(20); doc.setFontSize(10);
+        const linhas = doc.splitTextToSize(texto, 170);
+        doc.text(linhas, 20, y);
+        y += linhas.length * 5 + 20;
+        if (y > 260) { doc.addPage(); y = 20; }
+        doc.line(20, y, 90, y); doc.text('Assinatura do Cliente', 20, y+5);
+        doc.line(120, y, 190, y); doc.text('Assinatura da Loja', 120, y+5);
+      });
+
+      doc.save('OS_' + osAtual.NUMERO_OS + '.pdf');
+      mostrarToast('PDF da OS salvo (2 vias).');
+    } catch (e) { mostrarToast('Erro ao gerar PDF: ' + e.message, 'erro'); }
+  });
+
+  // ---------- Gerar garantia a partir da OS ----------
+  document.getElementById('btnGerarGarantiaOS').addEventListener('click', async () => {
+    if (!osAtual) return;
+    try {
+      if (!(await checarPermissao('GARANTIAS','CADASTRAR'))){ mostrarToast('Sem permissão.', 'erro'); return; }
+      await dbInsert('GARANTIAS', {
+        ASSISTENCIA_ID: osAtual.ID, CLIENTE_ID: osAtual.CLIENTE_ID, PRODUTO_DESCRICAO: (osAtual.MARCA||'')+' '+(osAtual.MODELO||''),
+        NUMERO_GARANTIA: gerarId('GAR'), PRAZO_DIAS: 90, TIPO: 'MANUTENCAO',
+        VALOR_SERVICO: osAtual.VALOR_SERVICO||0, DATA_CONCLUSAO: osAtual.DATA_ENTREGA_REAL || new Date().toISOString(),
+        SERVICO_DESCRICAO: osAtual.PECAS_A_REPOR || osAtual.DIAGNOSTICO || 'manutenção',
+        DATA_EMISSAO: new Date().toISOString(), STATUS: 'Ativa'
+      });
+      mostrarToast('Garantia gerada! Veja na aba Garantias.');
+    } catch (e) { mostrarToast('Erro: ' + e.message, 'erro'); }
+  });
+
+  // ---------- Excluir OS ----------
+  document.getElementById('btnExcluirOS').addEventListener('click', async () => {
+    if (!osAtual) return;
+    if (!confirm('Excluir esta OS? Essa ação não pode ser desfeita.')) return;
+    try {
+      if (!(await checarPermissao('ASSISTENCIA','EXCLUIR'))){ mostrarToast('Sem permissão.', 'erro'); return; }
+      await dbDelete('ASSISTENCIAS', osAtual.ID);
+      mostrarToast('OS excluída.');
       modalVer.classList.remove('open');
       carregar();
     } catch (e) { mostrarToast('Erro: ' + e.message, 'erro'); }

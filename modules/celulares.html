@@ -1,0 +1,222 @@
+<style>
+  .modal-overlay{ position:fixed; inset:0; background:rgba(3,5,8,0.6); display:none; align-items:center; justify-content:center; z-index:100; padding:24px; }
+  .modal-overlay.open{ display:flex; }
+  .modal-box{ background:var(--bg-surface); border:1px solid var(--hairline); border-radius:14px; width:100%; max-width:560px; max-height:90vh; overflow-y:auto; }
+  .modal-head{ display:flex; justify-content:space-between; padding:18px 22px; border-bottom:1px solid var(--hairline); position:sticky; top:0; background:var(--bg-surface); }
+  .modal-body{ padding:20px 22px; }
+  .modal-foot{ display:flex; justify-content:flex-end; gap:10px; padding:16px 22px; border-top:1px solid var(--hairline); flex-wrap:wrap; }
+  .ffield{ margin-bottom:14px; }
+  .ffield label{ display:block; font-size:12px; color:var(--text-secondary); margin-bottom:6px; }
+  .ffield input, .ffield select, .ffield textarea{ width:100%; background:var(--bg-elevated); border:1px solid var(--hairline); color:var(--text-primary); padding:10px 12px; border-radius:8px; font-size:13px; font-family:inherit; }
+  .frow2{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  .frow3{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; }
+  .modal-close{ background:none; border:none; color:var(--text-tertiary); font-size:18px; cursor:pointer; }
+  .badge{ display:inline-flex; padding:3px 9px; border-radius:20px; font-size:11px; font-weight:600; font-family:var(--font-mono); }
+  .badge.ok{ background:rgba(47,225,168,0.12); color:var(--mint); }
+  .badge.info{ background:rgba(76,141,255,0.12); color:var(--blue); }
+  .badge.warn{ background:rgba(245,166,35,0.12); color:var(--amber); }
+</style>
+
+<div class="toolbar">
+  <div><h1 style="font-family:var(--font-display); font-size:22px; margin:0 0 4px;">Celulares</h1>
+  <p style="color:var(--text-secondary); font-size:13px; margin:0;">Entrada e saída de aparelhos (novos e usados) — cada um vira estoque automaticamente.</p></div>
+  <button class="btn btn-primary" id="btnNovo">+ Novo aparelho</button>
+</div>
+
+<div style="margin-bottom:14px;">
+  <input id="busca" placeholder="Buscar por marca, modelo ou IMEI…" style="width:100%; max-width:340px; background:var(--bg-surface); border:1px solid var(--hairline); color:var(--text-primary); padding:9px 12px; border-radius:8px; font-size:12.5px;">
+</div>
+
+<table class="dt">
+  <thead><tr><th>Marca/Modelo</th><th>Cor/Memória</th><th>Tipo</th><th>IMEI</th><th>Compra</th><th>Venda</th><th>Estoque</th><th></th></tr></thead>
+  <tbody id="linhas"><tr class="empty-row"><td colspan="8">Carregando…</td></tr></tbody>
+</table>
+
+<div class="modal-overlay" id="modal">
+  <div class="modal-box">
+    <div class="modal-head"><h3 id="modalTitulo" style="font-family:var(--font-display); margin:0;">Novo aparelho</h3><button class="modal-close" id="fecharModal">✕</button></div>
+    <div class="modal-body">
+      <input type="hidden" id="fId">
+      <div class="frow2">
+        <div class="ffield"><label>Marca *</label><input id="fMarca"></div>
+        <div class="ffield"><label>Modelo *</label><input id="fModelo"></div>
+      </div>
+      <div class="frow3">
+        <div class="ffield"><label>Cor</label><input id="fCor"></div>
+        <div class="ffield"><label>Memória (GB)</label><input id="fMemoria" placeholder="Ex.: 128"></div>
+        <div class="ffield"><label>Tipo</label><select id="fTipo"><option>Novo</option><option>Usado</option><option>Seminovo</option></select></div>
+      </div>
+      <div class="frow2">
+        <div class="ffield"><label>IMEI</label><input id="fImei"></div>
+        <div class="ffield"><label>Número de série</label><input id="fSerie"></div>
+      </div>
+      <div class="frow2">
+        <div class="ffield"><label>Bateria (%) — se usado</label><input id="fBateria" type="number" min="0" max="100"></div>
+        <div class="ffield"><label>Garantia padrão (dias)</label><input id="fGarantia" type="number" value="90"></div>
+      </div>
+      <div class="frow2">
+        <div class="ffield"><label>Preço de compra (R$) *</label><input id="fPrecoCompra" type="number" step="0.01"></div>
+        <div class="ffield"><label>Preço de venda (R$) *</label><input id="fPrecoVenda" type="number" step="0.01"></div>
+      </div>
+      <div class="ffield"><label>Acessórios inclusos</label><input id="fAcessorios" placeholder="Ex.: carregador, caixa, fone…"></div>
+      <div class="ffield"><label>Estado do aparelho / observações</label><textarea id="fEstado" placeholder="Ex.: aparelho em perfeitas condições, testado com o cliente."></textarea></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn" id="btnCancelar">Cancelar</button>
+      <button class="btn" id="btnSalvarPdf">⬇️ Salvar ficha em PDF</button>
+      <button class="btn btn-primary" id="btnSalvar">Salvar e gerar estoque</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(async function(){
+  let aparelhos = [], empresas = [];
+  function moeda(v){ return (Number(v)||0).toLocaleString('pt-BR', { style:'currency', currency:'BRL' }); }
+  function nomeLoja(id){ if (!id) return '—'; const e = empresas.find(x=>x.ID===id); return e?e.NOME:'—'; }
+
+  function renderLinhas(lista){
+    if (!lista.length){ setHTML('linhas', '<tr class="empty-row"><td colspan="8">Nenhum aparelho cadastrado.</td></tr>'); return; }
+    setHTML('linhas', lista.map(a => `<tr>
+      <td><b>${a.MARCA} ${a.MODELO}</b><div style="color:var(--text-tertiary); font-size:11px;">${nomeLoja(a.EMPRESA_ID)}</div></td>
+      <td>${a.COR||'—'} ${a.MEMORIA?'/ '+a.MEMORIA+'GB':''}</td>
+      <td><span class="badge ${a.TIPO_APARELHO==='Novo'?'info':'warn'}">${a.TIPO_APARELHO||'—'}</span></td>
+      <td class="mono">${a.IMEI||'—'}</td>
+      <td>${moeda(a.PRECO_CUSTO)}</td><td>${moeda(a.PRECO_VENDA)}</td>
+      <td>${Number(a.ESTOQUE_ATUAL) > 0 ? '<span class="badge ok">'+a.ESTOQUE_ATUAL+'</span>' : '<span class="badge warn">Vendido</span>'}</td>
+      <td style="display:flex; gap:6px;">
+        <button class="btn" style="padding:6px 10px; font-size:11.5px;" onclick="window.__editarAparelho('${a.ID}')">Editar</button>
+        <button class="btn" style="padding:6px 10px; font-size:11.5px; color:var(--red);" onclick="window.__excluirAparelho('${a.ID}')">Excluir</button>
+      </td></tr>`).join(''));
+  }
+
+  async function carregar(){
+    try {
+      if (!(await checarPermissao('PRODUTOS','VISUALIZAR'))){ setHTML('linhas', '<tr class="empty-row"><td colspan="8">Sem permissão.</td></tr>'); return; }
+      empresas = await dbGetAll('EMPRESAS');
+      let todos = (await dbGetAll('PRODUTOS')).filter(p => p.CATEGORIA === 'Celular' && p.STATUS !== 'Excluído');
+      aparelhos = window.lojaAtivaId ? todos.filter(p => p.EMPRESA_ID === window.lojaAtivaId) : todos;
+      renderLinhas(aparelhos);
+    } catch (e) { mostrarToast('Erro: ' + e.message, 'erro'); }
+  }
+
+  document.getElementById('busca').addEventListener('input', e => {
+    const t = e.target.value.toLowerCase();
+    renderLinhas(aparelhos.filter(a => (a.MARCA||'').toLowerCase().includes(t) || (a.MODELO||'').toLowerCase().includes(t) || (a.IMEI||'').includes(t)));
+  });
+
+  const modal = document.getElementById('modal');
+  function abrirModal(a){
+    document.getElementById('modalTitulo').textContent = a ? 'Editar aparelho' : 'Novo aparelho';
+    document.getElementById('fId').value = a ? a.ID : '';
+    document.getElementById('fMarca').value = a ? a.MARCA||'' : '';
+    document.getElementById('fModelo').value = a ? a.MODELO||'' : '';
+    document.getElementById('fCor').value = a ? a.COR||'' : '';
+    document.getElementById('fMemoria').value = a ? a.MEMORIA||'' : '';
+    document.getElementById('fTipo').value = a ? a.TIPO_APARELHO||'Novo' : 'Novo';
+    document.getElementById('fImei').value = a ? a.IMEI||'' : '';
+    document.getElementById('fSerie').value = a ? a.NUMERO_SERIE||'' : '';
+    document.getElementById('fBateria').value = a ? a.BATERIA_PERCENTUAL||'' : '';
+    document.getElementById('fGarantia').value = a ? a.GARANTIA_PADRAO_DIAS||90 : 90;
+    document.getElementById('fPrecoCompra').value = a ? a.PRECO_CUSTO||'' : '';
+    document.getElementById('fPrecoVenda').value = a ? a.PRECO_VENDA||'' : '';
+    document.getElementById('fAcessorios').value = a ? a.ACESSORIOS_INCLUSOS||'' : '';
+    document.getElementById('fEstado').value = a ? a.ESTADO_APARELHO||'' : '';
+    modal.classList.add('open');
+  }
+  document.getElementById('btnNovo').addEventListener('click', () => abrirModal(null));
+  document.getElementById('fecharModal').addEventListener('click', () => modal.classList.remove('open'));
+  document.getElementById('btnCancelar').addEventListener('click', () => modal.classList.remove('open'));
+
+  function coletarDados(){
+    return {
+      MARCA: document.getElementById('fMarca').value.trim(), MODELO: document.getElementById('fModelo').value.trim(),
+      COR: document.getElementById('fCor').value.trim(), MEMORIA: document.getElementById('fMemoria').value.trim(),
+      TIPO_APARELHO: document.getElementById('fTipo').value, IMEI: document.getElementById('fImei').value.trim(),
+      NUMERO_SERIE: document.getElementById('fSerie').value.trim(), BATERIA_PERCENTUAL: document.getElementById('fBateria').value,
+      GARANTIA_PADRAO_DIAS: Number(document.getElementById('fGarantia').value)||90,
+      PRECO_CUSTO: Number(document.getElementById('fPrecoCompra').value)||0, PRECO_VENDA: Number(document.getElementById('fPrecoVenda').value)||0,
+      ACESSORIOS_INCLUSOS: document.getElementById('fAcessorios').value.trim(), ESTADO_APARELHO: document.getElementById('fEstado').value.trim()
+    };
+  }
+
+  document.getElementById('btnSalvar').addEventListener('click', async () => {
+    const id = document.getElementById('fId').value;
+    const dados = coletarDados();
+    if (!dados.MARCA || !dados.MODELO){ mostrarToast('Informe marca e modelo.', 'erro'); return; }
+    if (!dados.PRECO_CUSTO || !dados.PRECO_VENDA){ mostrarToast('Informe preço de compra e de venda.', 'erro'); return; }
+
+    try {
+      if (id) {
+        if (!(await checarPermissao('PRODUTOS','EDITAR'))){ mostrarToast('Sem permissão.', 'erro'); return; }
+        await dbUpdate('PRODUTOS', id, dados);
+        mostrarToast('Aparelho atualizado.');
+      } else {
+        if (!(await checarPermissao('PRODUTOS','CADASTRAR'))){ mostrarToast('Sem permissão.', 'erro'); return; }
+        const empresaId = await obterLojaParaAcao('Para qual loja é este aparelho?');
+        if (!empresaId) { mostrarToast('Cadastro cancelado — é preciso escolher a loja.', 'erro'); return; }
+        await dbInsert('PRODUTOS', Object.assign({
+          NOME: dados.MARCA + ' ' + dados.MODELO + (dados.MEMORIA ? ' ' + dados.MEMORIA + 'GB' : '') + (dados.COR ? ' ' + dados.COR : ''),
+          CATEGORIA: 'Celular', EMPRESA_ID: empresaId, ESTOQUE_ATUAL: 1, ESTOQUE_MINIMO: 0,
+          STATUS: 'Ativo', DATA_CRIACAO: new Date().toISOString()
+        }, dados));
+        mostrarToast('Aparelho cadastrado e estoque gerado.');
+      }
+      modal.classList.remove('open');
+      carregar();
+    } catch (e) { mostrarToast('Erro: ' + e.message, 'erro'); }
+  });
+
+  window.__editarAparelho = (id) => { const a = aparelhos.find(x => x.ID === id); if (a) abrirModal(a); };
+  window.__excluirAparelho = async (id) => {
+    if (!confirm('Excluir este aparelho do estoque?')) return;
+    try {
+      if (!(await checarPermissao('PRODUTOS','EXCLUIR'))){ mostrarToast('Sem permissão.', 'erro'); return; }
+      await dbExcluirLogico('PRODUTOS', id);
+      mostrarToast('Aparelho excluído.');
+      carregar();
+    } catch (e) { mostrarToast('Erro: ' + e.message, 'erro'); }
+  };
+
+  // ---------- Salvar ficha em PDF (registro de entrada do aparelho) ----------
+  document.getElementById('btnSalvarPdf').addEventListener('click', async () => {
+    const dados = coletarDados();
+    if (!dados.MARCA || !dados.MODELO){ mostrarToast('Preencha ao menos marca e modelo antes de gerar o PDF.', 'erro'); return; }
+
+    try {
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+      let y = await desenharCabecalhoLoja(doc, empresas);
+
+      doc.setFontSize(13); doc.setFont(undefined,'bold'); doc.text('FICHA DE ENTRADA — APARELHO', 20, y); y += 10;
+      doc.setFontSize(10.5); doc.setFont(undefined,'normal');
+
+      const linhas = [
+        ['Marca / Modelo', dados.MARCA + ' ' + dados.MODELO],
+        ['Cor / Memória', (dados.COR||'—') + ' / ' + (dados.MEMORIA||'—') + 'GB'],
+        ['Tipo', dados.TIPO_APARELHO],
+        ['IMEI', dados.IMEI||'—'],
+        ['Número de série', dados.NUMERO_SERIE||'—'],
+        ['Bateria', (dados.BATERIA_PERCENTUAL||'—') + (dados.BATERIA_PERCENTUAL ? '%' : '')],
+        ['Garantia padrão', dados.GARANTIA_PADRAO_DIAS + ' dias'],
+        ['Preço de compra', moeda(dados.PRECO_CUSTO)],
+        ['Preço de venda', moeda(dados.PRECO_VENDA)],
+        ['Acessórios inclusos', dados.ACESSORIOS_INCLUSOS||'—'],
+        ['Estado / observações', dados.ESTADO_APARELHO||'—']
+      ];
+      linhas.forEach(([rotulo, valor]) => {
+        doc.setFont(undefined,'bold'); doc.text(rotulo + ':', 20, y);
+        doc.setFont(undefined,'normal');
+        const texto = doc.splitTextToSize(String(valor), 110);
+        doc.text(texto, 75, y);
+        y += Math.max(6, texto.length*5);
+      });
+
+      doc.save('Ficha_' + dados.MARCA + '_' + dados.MODELO + '.pdf');
+      mostrarToast('Ficha em PDF salva no seu computador.');
+    } catch (e) { mostrarToast('Erro ao gerar PDF: ' + e.message, 'erro'); }
+  });
+
+  carregar();
+})();
+</script>

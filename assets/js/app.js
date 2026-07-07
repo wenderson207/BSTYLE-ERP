@@ -26,6 +26,69 @@ function mostrarToast(mensagem, tipo){
   setTimeout(() => el.remove(), 4200);
 }
 
+// ---------- Loja ativa (filtro global) ----------
+window.lojaAtivaId = sessionStorage.getItem('bstyle_loja_ativa') || '';
+
+async function popularSeletorLoja(){
+  const sel = document.getElementById('seletorLojaGlobal');
+  try {
+    const empresas = await dbGetAll('EMPRESAS');
+    sel.innerHTML = '<option value="">Todas as lojas</option>' + empresas.map(e => `<option value="${e.ID}">${e.NOME}</option>`).join('');
+    sel.value = window.lojaAtivaId || '';
+  } catch (e) { /* silencioso — se falhar, o filtro só fica em "Todas as lojas" */ }
+
+  if (!window.__seletorLojaWired) {
+    window.__seletorLojaWired = true;
+    sel.addEventListener('change', () => {
+      window.lojaAtivaId = sel.value;
+      sessionStorage.setItem('bstyle_loja_ativa', sel.value);
+      mostrarToast(sel.value ? 'Mostrando dados de: ' + sel.options[sel.selectedIndex].text : 'Mostrando todas as lojas');
+      window.recarregarModuloAtual();
+    });
+  }
+}
+
+/**
+ * Mostra um seletor de loja obrigatório (usado quando o filtro geral está
+ * em "Todas as lojas" mas a ação precisa saber pra qual loja específica é
+ * — ex.: registrar uma venda, uma compra, ou cadastrar um produto novo).
+ * Retorna o ID da empresa escolhida, ou null se o usuário cancelar.
+ */
+window.escolherLoja = function(titulo){
+  return new Promise(async (resolve) => {
+    let empresas = [];
+    try { empresas = await dbGetAll('EMPRESAS'); } catch (e) {}
+    if (!empresas.length) { mostrarToast('Cadastre uma loja em Empresas primeiro.', 'erro'); resolve(null); return; }
+
+    const overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed; inset:0; background:rgba(3,5,8,0.7); display:flex; align-items:center; justify-content:center; z-index:500; padding:20px;';
+    overlay.innerHTML = `<div style="background:var(--bg-surface); border:1px solid var(--hairline); border-radius:14px; padding:24px; min-width:280px; max-width:360px;">
+      <h3 style="font-family:var(--font-display); margin:0 0 6px; font-size:16px;">${titulo || 'Para qual loja?'}</h3>
+      <p style="color:var(--text-secondary); font-size:12px; margin:0 0 14px;">O filtro está em "Todas as lojas" — escolha uma loja específica para esta ação.</p>
+      <div id="listaLojasEscolha"></div>
+      <button class="btn" id="btnCancelarEscolhaLoja" style="width:100%; margin-top:8px;">Cancelar</button>
+    </div>`;
+    document.body.appendChild(overlay);
+
+    const lista = overlay.querySelector('#listaLojasEscolha');
+    empresas.forEach(e => {
+      const btn = document.createElement('button');
+      btn.className = 'btn btn-primary';
+      btn.style.cssText = 'display:block; width:100%; margin-bottom:8px; text-align:left;';
+      btn.textContent = e.NOME;
+      btn.addEventListener('click', () => { document.body.removeChild(overlay); resolve(e.ID); });
+      lista.appendChild(btn);
+    });
+    overlay.querySelector('#btnCancelarEscolhaLoja').addEventListener('click', () => { document.body.removeChild(overlay); resolve(null); });
+  });
+};
+
+/** Retorna a loja ativa do filtro global, ou pede pra escolher se estiver em "Todas". */
+window.obterLojaParaAcao = async function(titulo){
+  if (window.lojaAtivaId) return window.lojaAtivaId;
+  return await window.escolherLoja(titulo);
+};
+
 // ---------- Alterna login <-> painel conforme o Firebase Auth ----------
 auth.onAuthStateChanged(async (user) => {
   const telaLogin = document.getElementById('tela-login');
@@ -47,6 +110,7 @@ auth.onAuthStateChanged(async (user) => {
     document.getElementById('avatarBtn').textContent = (usuarioAtual.NOME || usuarioAtual.EMAIL || '?').substring(0,1).toUpperCase();
     telaLogin.style.display = 'none';
     telaApp.classList.add('ativo');
+    await popularSeletorLoja();
     carregarModulo('DASHBOARD');
   } catch (e) {
     mostrarToast('Erro ao carregar seu usuário: ' + e.message, 'erro');
@@ -190,4 +254,18 @@ window.setHTML = function(id, html){
   const el = document.getElementById(id);
   if (el) el.innerHTML = html;
   return el;
+};
+
+/**
+ * Converte uma data-string "YYYY-MM-DD" (vinda de <input type="date">) pro
+ * dia LOCAL correto. Sem isso, new Date("2026-07-06") é lido como meia-noite
+ * em UTC, e no fuso do Brasil (UTC-3) isso vira 21h do dia ANTERIOR — fazendo
+ * qualquer calendário/prazo aparecer um dia adiantado. Use esta função
+ * sempre que comparar ou exibir um campo de data-só (sem hora).
+ */
+window.parseDataLocal = function(str){
+  if (!str) return null;
+  const m = String(str).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return new Date(str);
+  return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
 };

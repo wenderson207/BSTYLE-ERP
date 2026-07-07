@@ -1,31 +1,33 @@
 <div class="toolbar"><div><h1 style="font-family:var(--font-display); font-size:22px; margin:0 0 4px;">Estoque</h1></div></div>
 
 <table class="dt">
-  <thead><tr><th>Produto</th><th>Estoque atual</th><th>Mínimo</th><th>Situação</th><th></th></tr></thead>
-  <tbody id="linhas"><tr class="empty-row"><td colspan="5">Carregando…</td></tr></tbody>
+  <thead><tr><th>Produto</th><th>Loja</th><th>Estoque atual</th><th>Mínimo</th><th>Situação</th><th></th></tr></thead>
+  <tbody id="linhas"><tr class="empty-row"><td colspan="6">Carregando…</td></tr></tbody>
 </table>
 
 <script>
 (async function(){
-  let produtos = [];
+  let produtos = [], empresas = [];
+  function nomeLoja(id){ if (!id) return '—'; const e = empresas.find(x=>x.ID===id); return e?e.NOME:'—'; }
 
   async function carregar(){
     try {
-      if (!(await checarPermissao('ESTOQUE','VISUALIZAR'))){ document.getElementById('linhas').innerHTML='<tr class="empty-row"><td colspan="5">Sem permissão.</td></tr>'; return; }
-      produtos = (await dbGetAll('PRODUTOS')).filter(p => p.STATUS === 'Ativo');
+      if (!(await checarPermissao('ESTOQUE','VISUALIZAR'))){ setHTML('linhas', '<tr class="empty-row"><td colspan="6">Sem permissão.</td></tr>'); return; }
+      empresas = await dbGetAll('EMPRESAS');
+      let todos = (await dbGetAll('PRODUTOS')).filter(p => p.STATUS === 'Ativo');
+      produtos = window.lojaAtivaId ? todos.filter(p => p.EMPRESA_ID === window.lojaAtivaId) : todos;
       renderLinhas();
     } catch (e) { mostrarToast('Erro: ' + e.message, 'erro'); }
   }
 
   function renderLinhas(){
-    const tbody = document.getElementById('linhas');
-    if (!produtos.length){ tbody.innerHTML = '<tr class="empty-row"><td colspan="5">Nenhum produto ativo.</td></tr>'; return; }
-    tbody.innerHTML = produtos.map(p => {
+    if (!produtos.length){ setHTML('linhas', '<tr class="empty-row"><td colspan="6">Nenhum produto ativo.</td></tr>'); return; }
+    setHTML('linhas', produtos.map(p => {
       const baixo = Number(p.ESTOQUE_ATUAL) <= Number(p.ESTOQUE_MINIMO);
-      return `<tr><td><b>${p.NOME}</b></td><td>${p.ESTOQUE_ATUAL}</td><td>${p.ESTOQUE_MINIMO}</td>
+      return `<tr><td><b>${p.NOME}</b></td><td>${nomeLoja(p.EMPRESA_ID)}</td><td>${p.ESTOQUE_ATUAL}</td><td>${p.ESTOQUE_MINIMO}</td>
         <td>${baixo?'<span class="badge warn">Baixo</span>':'<span class="badge ok">OK</span>'}</td>
         <td><button class="btn" style="padding:6px 10px;font-size:11.5px;" onclick="window.__ajustar('${p.ID}','${p.NOME.replace(/'/g,"\\'")}',${p.ESTOQUE_ATUAL})">Ajustar</button></td></tr>`;
-    }).join('');
+    }).join(''));
   }
 
   window.__ajustar = async (id, nome, atual) => {

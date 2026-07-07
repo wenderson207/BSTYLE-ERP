@@ -5,7 +5,7 @@
   .modal-head{ display:flex; justify-content:space-between; padding:18px 22px; border-bottom:1px solid var(--hairline); position:sticky; top:0; background:var(--bg-surface); }
   .modal-body{ padding:20px 22px; }
   .modal-foot{ display:flex; justify-content:flex-end; gap:10px; padding:16px 22px; border-top:1px solid var(--hairline); flex-wrap:wrap; }
-  .ffield{ margin-bottom:14px; }
+  .ffield{ margin-bottom:14px; position:relative; }
   .ffield label{ display:block; font-size:12px; color:var(--text-secondary); margin-bottom:6px; }
   .ffield input, .ffield select, .ffield textarea{ width:100%; background:var(--bg-elevated); border:1px solid var(--hairline); color:var(--text-primary); padding:10px 12px; border-radius:8px; font-size:13px; font-family:inherit; }
   .frow2{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
@@ -15,22 +15,92 @@
   .badge.ok{ background:rgba(47,225,168,0.12); color:var(--mint); }
   .badge.info{ background:rgba(76,141,255,0.12); color:var(--blue); }
   .badge.warn{ background:rgba(245,166,35,0.12); color:var(--amber); }
+
+  .tabs{ display:flex; gap:4px; border-bottom:1px solid var(--hairline); margin-bottom:20px; }
+  .tab{ padding:10px 14px; font-size:12.5px; color:var(--text-secondary); cursor:pointer; border-bottom:2px solid transparent; }
+  .tab.active{ color:var(--mint); border-color:var(--mint); }
+  .tab-panel{ display:none; }
+  .tab-panel.active{ display:block; }
+
+  .pdv-grid{ display:grid; grid-template-columns: 1.5fr 1fr; gap:18px; align-items:start; }
+  @media (max-width: 980px){ .pdv-grid{ grid-template-columns:1fr; } }
+  .card{ background:var(--bg-surface); border:1px solid var(--hairline); border-radius:12px; padding:18px 20px; }
+  .dropdown-results{ position:absolute; top:calc(100% + 6px); left:0; right:0; background:var(--bg-elevated); border:1px solid var(--hairline);
+    border-radius:10px; max-height:240px; overflow-y:auto; z-index:15; display:none; }
+  .dropdown-results.open{ display:block; }
+  .dropdown-results .opt{ padding:10px 12px; font-size:12.5px; cursor:pointer; border-bottom:1px solid var(--hairline); }
+  .dropdown-results .opt:hover{ background:var(--bg-surface); }
+  .summary-row{ display:flex; justify-content:space-between; font-size:12.5px; color:var(--text-secondary); padding:5px 0; }
+  .summary-row.total{ font-size:16px; color:var(--text-primary); font-weight:700; font-family:var(--font-display); border-top:1px solid var(--hairline); margin-top:8px; padding-top:12px; }
+  .selected-client{ display:flex; align-items:center; justify-content:space-between; background:var(--bg-elevated); border:1px solid var(--hairline); border-radius:8px; padding:9px 12px; font-size:12.5px; }
+  .selected-client button{ background:none; border:none; color:var(--text-tertiary); cursor:pointer; }
 </style>
 
 <div class="toolbar">
   <div><h1 style="font-family:var(--font-display); font-size:22px; margin:0 0 4px;">Celulares</h1>
-  <p style="color:var(--text-secondary); font-size:13px; margin:0;">Entrada e saída de aparelhos (novos e usados) — cada um vira estoque automaticamente.</p></div>
+  <p style="color:var(--text-secondary); font-size:13px; margin:0;">Cadastro, estoque e venda de aparelhos (novos e usados).</p></div>
   <button class="btn btn-primary" id="btnNovo">+ Novo aparelho</button>
 </div>
 
-<div style="margin-bottom:14px;">
-  <input id="busca" placeholder="Buscar por marca, modelo ou IMEI…" style="width:100%; max-width:340px; background:var(--bg-surface); border:1px solid var(--hairline); color:var(--text-primary); padding:9px 12px; border-radius:8px; font-size:12.5px;">
+<div class="tabs">
+  <div class="tab active" data-tab="estoque">Estoque de celulares</div>
+  <div class="tab" data-tab="vender">Vender celular</div>
 </div>
 
-<table class="dt">
-  <thead><tr><th>Marca/Modelo</th><th>Cor/Memória</th><th>Tipo</th><th>IMEI</th><th>Compra</th><th>Venda</th><th>Estoque</th><th></th></tr></thead>
-  <tbody id="linhas"><tr class="empty-row"><td colspan="8">Carregando…</td></tr></tbody>
-</table>
+<!-- ===================== ABA: ESTOQUE / CADASTRO ===================== -->
+<div id="painelEstoque" class="tab-panel active">
+  <div style="margin-bottom:14px;">
+    <input id="busca" placeholder="Buscar por marca, modelo ou IMEI…" style="width:100%; max-width:340px; background:var(--bg-surface); border:1px solid var(--hairline); color:var(--text-primary); padding:9px 12px; border-radius:8px; font-size:12.5px;">
+  </div>
+  <table class="dt">
+    <thead><tr><th>Marca/Modelo</th><th>Cor/Memória</th><th>Tipo</th><th>IMEI</th><th>Compra</th><th>Venda</th><th>Estoque</th><th></th></tr></thead>
+    <tbody id="linhas"><tr class="empty-row"><td colspan="8">Carregando…</td></tr></tbody>
+  </table>
+</div>
+
+<!-- ===================== ABA: VENDER ===================== -->
+<div id="painelVender" class="tab-panel">
+  <div class="pdv-grid">
+    <div class="card">
+      <div class="ffield">
+        <label>Buscar aparelho em estoque (marca, modelo ou IMEI)</label>
+        <input id="buscaAparelhoVenda" placeholder="Digite para buscar…" autocomplete="off">
+        <div class="dropdown-results" id="resultadosAparelho"></div>
+      </div>
+      <table class="dt" style="margin-top:16px;">
+        <thead><tr><th>Aparelho</th><th style="width:90px;">Preço</th><th></th></tr></thead>
+        <tbody id="carrinhoVenda"><tr class="empty-row"><td colspan="3">Nenhum aparelho selecionado.</td></tr></tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <div class="ffield">
+        <label>Cliente *</label>
+        <div id="clienteSelecionadoWrap" style="display:none; margin-bottom:8px;">
+          <div class="selected-client"><span id="clienteSelecionadoNome"></span><button id="btnRemoverClienteVenda">trocar</button></div>
+          <div id="avisoFidelidadeVenda" style="display:none; margin-top:8px; padding:8px 10px; border-radius:8px; background:rgba(47,225,168,0.1); border:1px solid rgba(47,225,168,0.3); font-size:12px;"></div>
+        </div>
+        <input id="buscaClienteVenda" placeholder="Buscar cliente… (obrigatório p/ gerar garantia)" autocomplete="off">
+        <div class="dropdown-results" id="resultadosClienteVenda"></div>
+      </div>
+      <div class="ffield"><label>Forma de pagamento</label>
+        <select id="formaPagamentoVenda"><option>PIX</option><option>Cartão de Crédito</option><option>Cartão de Débito</option><option>Dinheiro</option><option>Parcelado</option></select>
+      </div>
+      <div class="ffield" id="parcelasWrapVenda" style="display:none;"><label>Parcelas</label><input id="parcelasVenda" type="number" min="1" max="12" value="1"></div>
+      <div class="ffield" id="dinheiroWrapVenda" style="display:none;">
+        <label>Valor recebido do cliente (R$)</label><input id="valorRecebidoVenda" type="number" step="0.01">
+        <div id="trocoInfoVenda" style="margin-top:8px; font-size:12.5px; font-family:var(--font-mono);"></div>
+      </div>
+      <div class="ffield"><label>Desconto (R$)</label><input id="descontoVenda" type="number" step="0.01" value="0"></div>
+
+      <div class="summary-row"><span>Subtotal</span><span id="resSubtotalVenda">R$ 0,00</span></div>
+      <div class="summary-row"><span>Desconto</span><span id="resDescontoVenda">R$ 0,00</span></div>
+      <div class="summary-row total"><span>Total</span><span id="resTotalVenda">R$ 0,00</span></div>
+
+      <button class="btn btn-primary" style="width:100%; margin-top:16px; justify-content:center;" id="btnFinalizarVenda">Finalizar venda e gerar garantia</button>
+    </div>
+  </div>
+</div>
 
 <div class="modal-overlay" id="modal">
   <div class="modal-box">
@@ -71,10 +141,21 @@
 
 <script>
 (async function(){
-  let aparelhos = [], empresas = [];
+  let aparelhos = [], empresas = [], clientes = [];
+  let configFidelidade = { ATIVO: false, VALOR_MINIMO: 0, PERCENTUAL_DESCONTO: 0 };
+  let carrinhoVenda = [], clienteSelecionadoVenda = null;
+
   function moeda(v){ return (Number(v)||0).toLocaleString('pt-BR', { style:'currency', currency:'BRL' }); }
   function nomeLoja(id){ if (!id) return '—'; const e = empresas.find(x=>x.ID===id); return e?e.NOME:'—'; }
 
+  // ---------- Abas ----------
+  document.querySelectorAll('.tab').forEach(tab => tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active')); tab.classList.add('active');
+    document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+    document.getElementById('painel' + tab.dataset.tab.charAt(0).toUpperCase() + tab.dataset.tab.slice(1)).classList.add('active');
+  }));
+
+  // ---------- Estoque / cadastro ----------
   function renderLinhas(lista){
     if (!lista.length){ setHTML('linhas', '<tr class="empty-row"><td colspan="8">Nenhum aparelho cadastrado.</td></tr>'); return; }
     setHTML('linhas', lista.map(a => `<tr>
@@ -94,9 +175,13 @@
     try {
       if (!(await checarPermissao('PRODUTOS','VISUALIZAR'))){ setHTML('linhas', '<tr class="empty-row"><td colspan="8">Sem permissão.</td></tr>'); return; }
       empresas = await dbGetAll('EMPRESAS');
+      clientes = await dbGetAll('CLIENTES');
       let todos = (await dbGetAll('PRODUTOS')).filter(p => p.CATEGORIA === 'Celular' && p.STATUS !== 'Excluído');
       aparelhos = window.lojaAtivaId ? todos.filter(p => p.EMPRESA_ID === window.lojaAtivaId) : todos;
       renderLinhas(aparelhos);
+
+      const cfgFid = await dbGetById('CONFIG', 'desconto_fidelidade');
+      if (cfgFid) configFidelidade = cfgFid;
     } catch (e) { mostrarToast('Erro: ' + e.message, 'erro'); }
   }
 
@@ -182,7 +267,6 @@
   document.getElementById('btnSalvarPdf').addEventListener('click', async () => {
     const dados = coletarDados();
     if (!dados.MARCA || !dados.MODELO){ mostrarToast('Preencha ao menos marca e modelo antes de gerar o PDF.', 'erro'); return; }
-
     try {
       const { jsPDF } = window.jspdf;
       const doc = new jsPDF({ unit: 'mm', format: 'a4' });
@@ -217,6 +301,189 @@
     } catch (e) { mostrarToast('Erro ao gerar PDF: ' + e.message, 'erro'); }
   });
 
-  carregar();
+  // =====================================================================
+  // ABA VENDER — mesma lógica do PDV normal, só que restrita a celulares
+  // =====================================================================
+  function aparelhosDisponiveis(){
+    return aparelhos.filter(a => Number(a.ESTOQUE_ATUAL) > 0 && !carrinhoVenda.some(c => c.PRODUTO_ID === a.ID));
+  }
+
+  const inputBuscaAparelho = document.getElementById('buscaAparelhoVenda');
+  const resAparelho = document.getElementById('resultadosAparelho');
+  inputBuscaAparelho.addEventListener('input', () => {
+    const termo = inputBuscaAparelho.value.trim().toLowerCase();
+    if (termo.length < 1){ resAparelho.classList.remove('open'); return; }
+    const lista = aparelhosDisponiveis().filter(a =>
+      (a.MARCA+' '+a.MODELO).toLowerCase().includes(termo) || (a.IMEI||'').toLowerCase().includes(termo)
+    ).slice(0, 20);
+    mostrarResultadosAparelho(lista);
+  });
+
+  function mostrarResultadosAparelho(lista){
+    if (!lista.length){ setHTML('resultadosAparelho', '<div class="opt">Nenhum aparelho disponível encontrado.</div>'); resAparelho.classList.add('open'); return; }
+    setHTML('resultadosAparelho', lista.map(a => `<div class="opt" data-id="${a.ID}"><div>${a.MARCA} ${a.MODELO} ${a.COR?'- '+a.COR:''}</div><div style="color:var(--text-tertiary); font-size:11px;">${moeda(a.PRECO_VENDA)} · IMEI ${a.IMEI||'—'}</div></div>`).join(''));
+    resAparelho.classList.add('open');
+    resAparelho.querySelectorAll('.opt[data-id]').forEach(el => el.addEventListener('click', () => {
+      const aparelho = lista.find(a => a.ID === el.getAttribute('data-id'));
+      carrinhoVenda.push({ PRODUTO_ID: aparelho.ID, NOME: aparelho.MARCA+' '+aparelho.MODELO, PRECO_UNITARIO: Number(aparelho.PRECO_VENDA) });
+      renderCarrinhoVenda();
+      inputBuscaAparelho.value = ''; resAparelho.classList.remove('open');
+    }));
+  }
+
+  function renderCarrinhoVenda(){
+    if (!carrinhoVenda.length){ setHTML('carrinhoVenda', '<tr class="empty-row"><td colspan="3">Nenhum aparelho selecionado.</td></tr>'); }
+    else {
+      setHTML('carrinhoVenda', carrinhoVenda.map((i, idx) => `<tr>
+        <td>${i.NOME}</td><td>${moeda(i.PRECO_UNITARIO)}</td>
+        <td><button style="background:none;border:none;color:var(--text-tertiary);cursor:pointer;" onclick="window.__removerAparelhoVenda(${idx})">✕</button></td>
+        </tr>`).join(''));
+    }
+    atualizarResumoVenda(); atualizarTrocoVenda();
+  }
+  window.__removerAparelhoVenda = (idx) => { carrinhoVenda.splice(idx,1); renderCarrinhoVenda(); };
+
+  const inputClienteVenda = document.getElementById('buscaClienteVenda');
+  const resClienteVenda = document.getElementById('resultadosClienteVenda');
+  inputClienteVenda.addEventListener('input', () => {
+    const termo = inputClienteVenda.value.trim().toLowerCase();
+    if (termo.length < 2){ resClienteVenda.classList.remove('open'); return; }
+    const lista = clientes.filter(c => c.NOME.toLowerCase().includes(termo) || (c.CPF||'').includes(termo)).slice(0, 20);
+    if (!lista.length){ setHTML('resultadosClienteVenda', '<div class="opt">Nenhum cliente encontrado.</div>'); resClienteVenda.classList.add('open'); return; }
+    setHTML('resultadosClienteVenda', lista.map(c => `<div class="opt" data-id="${c.ID}">${c.NOME}</div>`).join(''));
+    resClienteVenda.classList.add('open');
+    resClienteVenda.querySelectorAll('.opt[data-id]').forEach(el => el.addEventListener('click', () => {
+      clienteSelecionadoVenda = lista.find(c => c.ID === el.getAttribute('data-id'));
+      document.getElementById('clienteSelecionadoNome').textContent = clienteSelecionadoVenda.NOME;
+      document.getElementById('clienteSelecionadoWrap').style.display = 'block';
+      inputClienteVenda.style.display = 'none'; inputClienteVenda.value = '';
+      resClienteVenda.classList.remove('open');
+      verificarFidelidadeVenda();
+    }));
+  });
+  document.getElementById('btnRemoverClienteVenda').addEventListener('click', () => {
+    clienteSelecionadoVenda = null;
+    document.getElementById('clienteSelecionadoWrap').style.display = 'none';
+    document.getElementById('avisoFidelidadeVenda').style.display = 'none';
+    inputClienteVenda.style.display = 'block';
+  });
+
+  function verificarFidelidadeVenda(){
+    const aviso = document.getElementById('avisoFidelidadeVenda');
+    if (!configFidelidade.ATIVO || !clienteSelecionadoVenda || Number(clienteSelecionadoVenda.VALOR_GASTO_TOTAL||0) < Number(configFidelidade.VALOR_MINIMO||0)) {
+      aviso.style.display = 'none'; return;
+    }
+    aviso.style.display = 'block';
+    aviso.innerHTML = `🎉 Cliente fiel! Elegível a <b>${configFidelidade.PERCENTUAL_DESCONTO}% de desconto</b>. <button class="btn" style="padding:4px 8px; font-size:11px; margin-left:4px;" id="btnAplicarFidelidadeVenda">Aplicar</button>`;
+    document.getElementById('btnAplicarFidelidadeVenda').addEventListener('click', () => {
+      const subtotal = carrinhoVenda.reduce((s,i) => s + i.PRECO_UNITARIO, 0);
+      document.getElementById('descontoVenda').value = (subtotal * (Number(configFidelidade.PERCENTUAL_DESCONTO)/100)).toFixed(2);
+      atualizarResumoVenda(); atualizarTrocoVenda();
+      mostrarToast('Desconto de fidelidade aplicado.');
+    });
+  }
+
+  document.getElementById('formaPagamentoVenda').addEventListener('change', e => {
+    document.getElementById('parcelasWrapVenda').style.display = (e.target.value==='Parcelado'||e.target.value==='Cartão de Crédito') ? 'block' : 'none';
+    document.getElementById('dinheiroWrapVenda').style.display = e.target.value==='Dinheiro' ? 'block' : 'none';
+    atualizarTrocoVenda();
+  });
+  document.getElementById('descontoVenda').addEventListener('input', () => { atualizarResumoVenda(); atualizarTrocoVenda(); });
+  document.getElementById('valorRecebidoVenda').addEventListener('input', atualizarTrocoVenda);
+
+  function totalDaVendaAparelho(){
+    const subtotal = carrinhoVenda.reduce((s,i) => s + i.PRECO_UNITARIO, 0);
+    const desconto = Number(document.getElementById('descontoVenda').value) || 0;
+    return Math.max(subtotal - desconto, 0);
+  }
+  function atualizarResumoVenda(){
+    const subtotal = carrinhoVenda.reduce((s,i) => s + i.PRECO_UNITARIO, 0);
+    const desconto = Number(document.getElementById('descontoVenda').value) || 0;
+    document.getElementById('resSubtotalVenda').textContent = moeda(subtotal);
+    document.getElementById('resDescontoVenda').textContent = moeda(desconto);
+    document.getElementById('resTotalVenda').textContent = moeda(Math.max(subtotal-desconto,0));
+  }
+  function atualizarTrocoVenda(){
+    const info = document.getElementById('trocoInfoVenda');
+    const recebido = Number(document.getElementById('valorRecebidoVenda').value);
+    if (!recebido && recebido !== 0){ info.textContent=''; return; }
+    const total = totalDaVendaAparelho();
+    if (recebido < total) info.innerHTML = '<span style="color:var(--amber);">Faltam ' + moeda(total-recebido) + '.</span>';
+    else info.innerHTML = 'Troco: <span style="color:var(--mint); font-weight:700;">' + moeda(recebido-total) + '</span>';
+  }
+
+  document.getElementById('btnFinalizarVenda').addEventListener('click', async () => {
+    if (!carrinhoVenda.length){ mostrarToast('Selecione ao menos um aparelho.', 'erro'); return; }
+    if (!clienteSelecionadoVenda){ mostrarToast('Selecione o cliente — é necessário para gerar a garantia.', 'erro'); return; }
+    if (!(await checarPermissao('VENDAS','CADASTRAR'))){ mostrarToast('Sem permissão.', 'erro'); return; }
+
+    const formaPagamento = document.getElementById('formaPagamentoVenda').value;
+    let observacaoTroco = '';
+    const totalVenda = totalDaVendaAparelho();
+    if (formaPagamento === 'Dinheiro'){
+      const recebido = Number(document.getElementById('valorRecebidoVenda').value) || 0;
+      if (recebido < totalVenda){ mostrarToast('Valor recebido menor que o total.', 'erro'); return; }
+      observacaoTroco = 'Pago em dinheiro: ' + moeda(recebido) + ' | Troco: ' + moeda(recebido-totalVenda);
+    }
+
+    try {
+      document.getElementById('btnFinalizarVenda').disabled = true;
+      const desconto = Number(document.getElementById('descontoVenda').value) || 0;
+      const empresaVendaId = carrinhoVenda.length ? aparelhos.find(a => a.ID === carrinhoVenda[0].PRODUTO_ID)?.EMPRESA_ID || '' : '';
+
+      const venda = await dbInsert('VENDAS', {
+        CLIENTE_ID: clienteSelecionadoVenda.ID, USUARIO_ID: usuarioAtual.ID, EMPRESA_ID: empresaVendaId,
+        DATA: new Date().toISOString(), VALOR_TOTAL: totalVenda, DESCONTO: desconto,
+        FORMA_PAGAMENTO: formaPagamento, PARCELAS: (formaPagamento==='Parcelado'||formaPagamento==='Cartão de Crédito') ? Number(document.getElementById('parcelasVenda').value) : 1,
+        OBSERVACOES: observacaoTroco, STATUS: 'Concluída'
+      });
+
+      for (const item of carrinhoVenda) {
+        const aparelho = aparelhos.find(a => a.ID === item.PRODUTO_ID);
+        await dbInsert('ITENS_VENDA', { VENDA_ID: venda.ID, PRODUTO_ID: item.PRODUTO_ID, QUANTIDADE: 1, PRECO_UNITARIO: item.PRECO_UNITARIO });
+        await dbUpdate('PRODUTOS', aparelho.ID, { ESTOQUE_ATUAL: 0 });
+        await dbInsert('MOVIMENTOS_ESTOQUE', { EMPRESA_ID: aparelho.EMPRESA_ID||'', PRODUTO_ID: aparelho.ID, TIPO:'SAIDA_VENDA', QUANTIDADE: -1, MOTIVO:'Venda '+venda.ID, USUARIO_ID: usuarioAtual.ID, DATA: new Date().toISOString() });
+
+        await dbInsert('GARANTIAS', {
+          VENDA_ID: venda.ID, CLIENTE_ID: clienteSelecionadoVenda.ID, PRODUTO_DESCRICAO: aparelho.MARCA + ' ' + aparelho.MODELO,
+          NUMERO_GARANTIA: gerarId('GAR'), PRAZO_DIAS: aparelho.GARANTIA_PADRAO_DIAS || 90, TIPO: 'PRODUTO_USADO',
+          COR_CAPACIDADE: [aparelho.COR, aparelho.MEMORIA ? aparelho.MEMORIA+'GB' : ''].filter(Boolean).join(' / '),
+          ESTADO_APARELHO: aparelho.ESTADO_APARELHO || 'Aparelho testado com o cliente.',
+          VALOR_PAGO: item.PRECO_UNITARIO, FORMA_PAGAMENTO: formaPagamento,
+          DATA_EMISSAO: new Date().toISOString(), STATUS: 'Ativa'
+        });
+      }
+
+      await dbInsert('FINANCEIRO', {
+        EMPRESA_ID: empresaVendaId, TIPO:'Receita', CATEGORIA:'Venda de celular', DESCRICAO:'Venda '+venda.ID, VALOR: totalVenda,
+        FORMA_PAGAMENTO: formaPagamento, DATA_VENCIMENTO: new Date().toISOString(), DATA_PAGAMENTO: new Date().toISOString(), STATUS:'Pago'
+      });
+
+      await dbUpdate('CLIENTES', clienteSelecionadoVenda.ID, {
+        VALOR_GASTO_TOTAL: (Number(clienteSelecionadoVenda.VALOR_GASTO_TOTAL)||0) + totalVenda, DATA_ULTIMA_COMPRA: new Date().toISOString()
+      });
+
+      mostrarToast('Venda concluída! Garantia(s) gerada(s) — veja na aba Garantias.');
+      carrinhoVenda = []; clienteSelecionadoVenda = null;
+      document.getElementById('clienteSelecionadoWrap').style.display='none';
+      document.getElementById('buscaClienteVenda').style.display='block';
+      document.getElementById('descontoVenda').value = 0; document.getElementById('valorRecebidoVenda').value='';
+      document.getElementById('trocoInfoVenda').textContent='';
+      renderCarrinhoVenda();
+      carregar();
+    } catch (e) {
+      mostrarToast('Erro ao finalizar venda: ' + e.message, 'erro');
+    } finally {
+      document.getElementById('btnFinalizarVenda').disabled = false;
+    }
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('#buscaAparelhoVenda') && !e.target.closest('#resultadosAparelho')) resAparelho.classList.remove('open');
+    if (!e.target.closest('#buscaClienteVenda') && !e.target.closest('#resultadosClienteVenda')) resClienteVenda.classList.remove('open');
+  });
+
+  await carregar();
+  renderCarrinhoVenda();
 })();
 </script>

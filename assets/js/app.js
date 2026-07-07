@@ -13,7 +13,7 @@ const NOMES_MODULO = {
   DASHBOARD:'Dashboard', AGENDA:'Agenda', CLIENTES:'Clientes', PRODUTOS:'Produtos', FORNECEDORES:'Fornecedores',
   FUNCIONARIOS:'Funcionários', EMPRESAS:'Empresas', VENDAS:'Vendas (PDV)', ORCAMENTOS:'Orçamentos',
   COMPRAS:'Compras', ESTOQUE:'Estoque', ASSISTENCIA:'Assistência técnica', GARANTIAS:'Garantias',
-  FINANCEIRO:'Financeiro', RELATORIOS:'Relatórios', CONFIGURACOES:'Configurações'
+  FINANCEIRO:'Financeiro', RELATORIOS:'Relatórios', CONFIGURACOES:'Configurações', CELULARES:'Celulares'
 };
 
 // ---------- Toast global ----------
@@ -250,6 +250,62 @@ window.recarregarModuloAtual = () => {
  * de aba antes de uma busca assíncrona terminar (o elemento da aba
  * antiga já não existe mais quando a resposta chega).
  */
+/**
+ * Carrega assets/img/Logo.png como data URL (necessário pro jsPDF.addImage).
+ * Se a logo não existir/falhar, resolve null — quem chamar deve seguir sem logo.
+ */
+function carregarLogoComoDataUrl(){
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      try {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width; canvas.height = img.height;
+        canvas.getContext('2d').drawImage(img, 0, 0);
+        resolve(canvas.toDataURL('image/png'));
+      } catch (e) { resolve(null); }
+    };
+    img.onerror = () => resolve(null);
+    img.src = 'assets/img/Logo.png';
+  });
+}
+
+/**
+ * Desenha o cabeçalho padrão dos documentos (logo + nome da loja + CNPJ +
+ * endereço + telefone/email), igual ao modelo de OS impressa da loja.
+ * Usa a loja ativa do filtro global, ou a primeira loja cadastrada.
+ * Retorna a posição Y (em mm) onde o conteúdo do documento pode continuar.
+ */
+window.desenharCabecalhoLoja = async function(doc, empresasList){
+  const empresa = (window.lojaAtivaId && empresasList.find(e => e.ID === window.lojaAtivaId)) || empresasList[0] || {};
+  const endereco = [empresa.RUA, empresa.NUMERO].filter(Boolean).join(', ')
+    + (empresa.BAIRRO ? ' - ' + empresa.BAIRRO : '')
+    + (empresa.CIDADE ? ', ' + empresa.CIDADE : '')
+    + (empresa.ESTADO ? '/' + empresa.ESTADO : '')
+    + (empresa.CEP ? ' - CEP: ' + empresa.CEP : '');
+
+  doc.setDrawColor(30); doc.setLineWidth(0.4);
+  doc.rect(15, 12, 180, 28);
+
+  let logoOk = false;
+  try {
+    const dataUrl = await carregarLogoComoDataUrl();
+    if (dataUrl) { doc.addImage(dataUrl, 'PNG', 18, 15, 22, 22); logoOk = true; }
+  } catch (e) { /* segue sem logo, não trava a geração do PDF */ }
+
+  const xTexto = logoOk ? 44 : 20;
+  doc.setFontSize(13); doc.setFont(undefined, 'bold'); doc.setTextColor(20);
+  doc.text(empresa.NOME || 'Loja', xTexto, 20);
+  doc.setFontSize(8.5); doc.setFont(undefined, 'normal'); doc.setTextColor(70);
+  doc.text('Assistência técnica de eletrônicos e celulares' + (empresa.CNPJ ? ' - CNPJ ' + empresa.CNPJ : ''), xTexto, 25);
+  doc.text(endereco || 'Endereço não cadastrado', xTexto, 29.5);
+  doc.text([empresa.WHATSAPP, empresa.EMAIL].filter(Boolean).join('   ') || ' ', xTexto, 34);
+
+  doc.setTextColor(20);
+  return 48;
+};
+
 window.setHTML = function(id, html){
   const el = document.getElementById(id);
   if (el) el.innerHTML = html;

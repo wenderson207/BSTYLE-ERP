@@ -35,9 +35,21 @@
       <div class="ffield"><label>Nome completo *</label><input id="fNome"></div>
       <div class="frow2">
         <div class="ffield"><label>CPF</label><input id="fCpf"></div>
-        <div class="ffield"><label>Telefone</label><input id="fTelefone"></div>
+        <div class="ffield"><label>Telefone / WhatsApp</label><input id="fTelefone"></div>
       </div>
       <div class="ffield"><label>Email</label><input id="fEmail"></div>
+      <div class="frow2">
+        <div class="ffield"><label>Rua</label><input id="fRua"></div>
+        <div class="ffield"><label>Número</label><input id="fNumero"></div>
+      </div>
+      <div class="frow2">
+        <div class="ffield"><label>Bairro</label><input id="fBairro"></div>
+        <div class="ffield"><label>CEP</label><input id="fCep"></div>
+      </div>
+      <div class="frow2">
+        <div class="ffield"><label>Cidade</label><input id="fCidade"></div>
+        <div class="ffield"><label>Estado</label><input id="fEstado" maxlength="2"></div>
+      </div>
     </div>
     <div class="modal-foot">
       <button class="btn" id="btnCancelar">Cancelar</button>
@@ -66,7 +78,7 @@
   async function carregar(){
     try {
       const podeVer = await checarPermissao('CLIENTES', 'VISUALIZAR');
-      if (!podeVer) { document.getElementById('linhas').innerHTML = '<tr class="empty-row"><td colspan="5">Sem permissão para ver clientes.</td></tr>'; return; }
+      if (!podeVer) { setHTML('linhas', '<tr class="empty-row"><td colspan="5">Sem permissão para ver clientes.</td></tr>'); return; }
       clientes = (await dbGetAll('CLIENTES')).filter(c => c.STATUS !== 'Excluído');
       renderLinhas(clientes);
     } catch (e) {
@@ -87,6 +99,12 @@
     document.getElementById('fCpf').value = c ? c.CPF||'' : '';
     document.getElementById('fTelefone').value = c ? c.TELEFONE||'' : '';
     document.getElementById('fEmail').value = c ? c.EMAIL||'' : '';
+    document.getElementById('fRua').value = c ? c.RUA||'' : '';
+    document.getElementById('fNumero').value = c ? c.NUMERO||'' : '';
+    document.getElementById('fBairro').value = c ? c.BAIRRO||'' : '';
+    document.getElementById('fCep').value = c ? c.CEP||'' : '';
+    document.getElementById('fCidade').value = c ? c.CIDADE||'' : '';
+    document.getElementById('fEstado').value = c ? c.ESTADO||'' : '';
     modal.classList.add('open');
   }
   document.getElementById('btnNovo').addEventListener('click', () => abrirModal(null));
@@ -100,7 +118,10 @@
 
     const dados = {
       NOME: nome, CPF: document.getElementById('fCpf').value.trim(),
-      TELEFONE: document.getElementById('fTelefone').value.trim(), EMAIL: document.getElementById('fEmail').value.trim()
+      TELEFONE: document.getElementById('fTelefone').value.trim(), EMAIL: document.getElementById('fEmail').value.trim(),
+      RUA: document.getElementById('fRua').value.trim(), NUMERO: document.getElementById('fNumero').value.trim(),
+      BAIRRO: document.getElementById('fBairro').value.trim(), CEP: document.getElementById('fCep').value.trim(),
+      CIDADE: document.getElementById('fCidade').value.trim(), ESTADO: document.getElementById('fEstado').value.trim()
     };
 
     try {

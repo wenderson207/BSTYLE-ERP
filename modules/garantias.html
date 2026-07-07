@@ -8,114 +8,173 @@
   .ffield{ margin-bottom:14px; }
   .ffield label{ display:block; font-size:12px; color:var(--text-secondary); margin-bottom:6px; }
   .ffield input, .ffield textarea{ width:100%; background:var(--bg-elevated); border:1px solid var(--hairline); color:var(--text-primary); padding:10px 12px; border-radius:8px; font-size:13px; font-family:inherit; }
-  .ffield textarea{ min-height:160px; resize:vertical; line-height:1.5; }
+  .ffield textarea{ min-height:70px; resize:vertical; line-height:1.5; }
   .frow2{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
   .modal-close{ background:none; border:none; color:var(--text-tertiary); font-size:18px; cursor:pointer; }
   .badge{ display:inline-flex; padding:3px 9px; border-radius:20px; font-size:11px; font-weight:600; font-family:var(--font-mono); }
   .badge.ok{ background:rgba(47,225,168,0.12); color:var(--mint); }
   .badge.neutral{ background:var(--bg-elevated); color:var(--text-secondary); }
   .badge.info{ background:rgba(76,141,255,0.12); color:var(--blue); }
+  .badge.warn{ background:rgba(245,166,35,0.12); color:var(--amber); }
+  .section-title{ font-family:var(--font-display); font-size:13px; font-weight:600; margin:18px 0 10px; padding-top:12px; border-top:1px solid var(--hairline); }
+  .section-title:first-child{ border-top:none; padding-top:0; margin-top:0; }
 </style>
 
 <div class="toolbar"><div><h1 style="font-family:var(--font-display); font-size:22px; margin:0 0 4px;">Garantias</h1>
-<p style="color:var(--text-secondary); font-size:13px; margin:0;">Emitidas automaticamente a cada venda com cliente vinculado. Edite o termo, gere o PDF, imprima ou baixe.</p></div></div>
+<p style="color:var(--text-secondary); font-size:13px; margin:0;">Termo de garantia de manutenção (assistência técnica) ou de produto usado (venda). Edite, gere o PDF (via loja + via cliente), imprima ou exclua.</p></div></div>
 
 <table class="dt">
-  <thead><tr><th>Número</th><th>Produto</th><th>Cliente</th><th>Emitida em</th><th>Prazo</th><th>PDF</th><th></th></tr></thead>
+  <thead><tr><th>Número</th><th>Tipo</th><th>Cliente</th><th>Emitida em</th><th>Prazo</th><th>PDF</th><th></th></tr></thead>
   <tbody id="linhas"><tr class="empty-row"><td colspan="7">Carregando…</td></tr></tbody>
 </table>
 
 <div class="modal-overlay" id="modal">
   <div class="modal-box">
     <div class="modal-head"><h3 style="font-family:var(--font-display); margin:0;" id="modalTitulo">Termo de garantia</h3><button class="modal-close" id="fecharModal">✕</button></div>
-    <div class="modal-body">
-      <input type="hidden" id="fId">
-      <div class="frow2">
-        <div class="ffield"><label>Cliente</label><input id="fClienteNome" disabled></div>
-        <div class="ffield"><label>Prazo (dias)</label><input id="fPrazo" type="number"></div>
-      </div>
-      <div class="ffield"><label>Produto/serviço</label><input id="fProduto"></div>
-      <div class="ffield"><label>Termo / condições (edite à vontade — isso é o que sai no PDF)</label><textarea id="fCondicoes"></textarea></div>
-    </div>
+    <div class="modal-body" id="modalBody"></div>
     <div class="modal-foot">
       <button class="btn" id="btnCancelar">Fechar</button>
       <button class="btn" id="btnSalvar">Salvar alterações</button>
-      <button class="btn" id="btnImprimir">🖨️ Imprimir</button>
-      <button class="btn btn-primary" id="btnGerarPdf">⬇️ Salvar PDF</button>
+      <button class="btn" id="btnImprimir">🖨️ Imprimir (2 vias)</button>
+      <button class="btn btn-primary" id="btnGerarPdf">⬇️ Salvar PDF (2 vias)</button>
     </div>
   </div>
 </div>
 
 <script>
 (async function(){
-  let itens = [], clientes = [], empresa = null;
+  let itens = [], clientes = [], empresas = [], produtos = [], ordens = [];
+  let garantiaAtual = null;
 
   function dataBR(v){ return v ? new Date(v).toLocaleDateString('pt-BR') : '—'; }
+  function moeda(v){ return (Number(v)||0).toLocaleString('pt-BR', { style:'currency', currency:'BRL' }); }
   function nomeCliente(id){ const c = clientes.find(x => x.ID === id); return c ? c.NOME : '—'; }
+  function clientePorId(id){ return clientes.find(x => x.ID === id) || {}; }
+  function porExtenso(n){
+    const nums = {1:'um',5:'cinco',7:'sete',10:'dez',15:'quinze',20:'vinte',30:'trinta',45:'quarenta e cinco',60:'sessenta',90:'noventa',120:'cento e vinte',180:'cento e oitenta',365:'trezentos e sessenta e cinco'};
+    return nums[Number(n)] || String(n);
+  }
 
-  const TERMO_PADRAO = (garantia, nomeCli) =>
-`GARANTIA Nº ${garantia.NUMERO_GARANTIA}
-
-Cliente: ${nomeCli}
-Produto/serviço: ${garantia.PRODUTO_DESCRICAO}
-Data de emissão: ${dataBR(garantia.DATA_EMISSAO)}
-Prazo de garantia: ${garantia.PRAZO_DIAS} dias corridos a partir da data de emissão.
-
-CONDIÇÕES:
-Esta garantia cobre exclusivamente defeitos de fabricação do produto/serviço acima descrito.
-Não são cobertos por esta garantia: danos causados por mau uso, quedas, contato com líquidos,
-umidade, oxidação, rompimento de lacres/selos de garantia, ou intervenção de terceiros não
-autorizados por esta loja.
-
-Para acionar a garantia, o cliente deve apresentar este termo (ou o número acima) e o produto
-em nossa loja dentro do prazo informado.`;
+  function cabecalhoLojas(){
+    return empresas.map(e => {
+      const endereco = [e.RUA, e.NUMERO].filter(Boolean).join(', ') + (e.BAIRRO ? ' - ' + e.BAIRRO : '') + (e.CIDADE ? ', ' + e.CIDADE : '') + (e.ESTADO ? '/' + e.ESTADO : '');
+      return `<div style="margin-bottom:4px;"><b>${e.NOME}</b> — ${endereco || 'endereço não cadastrado'} ${e.WHATSAPP ? '· ' + e.WHATSAPP : ''}</div>`;
+    }).join('') || '<div>Cadastre sua(s) loja(s) em Empresas para aparecer aqui.</div>';
+  }
 
   function renderLinhas(){
     if (!itens.length){ setHTML('linhas', '<tr class="empty-row"><td colspan="7">Nenhuma garantia emitida.</td></tr>'); return; }
     setHTML('linhas', itens.map(g => `<tr>
-      <td class="mono">${g.NUMERO_GARANTIA}</td><td>${g.PRODUTO_DESCRICAO}</td><td>${nomeCliente(g.CLIENTE_ID)}</td>
-      <td>${dataBR(g.DATA_EMISSAO)}</td><td>${g.PRAZO_DIAS} dias</td>
-      <td>${g.PDF_GERADO ? '<span class="badge ok">Gerado</span>' : '<span class="badge neutral">Não gerado</span>'}</td>
-      <td><button class="btn" style="padding:6px 10px; font-size:11.5px;" onclick="window.__abrirTermo('${g.ID}')">Abrir termo</button></td>
-      </tr>`).join(''));
+      <td class="mono">${g.NUMERO_GARANTIA}</td>
+      <td><span class="badge ${g.TIPO==='MANUTENCAO'?'info':'neutral'}">${g.TIPO==='MANUTENCAO'?'Manutenção':'Produto usado'}</span></td>
+      <td>${nomeCliente(g.CLIENTE_ID)}</td><td>${dataBR(g.DATA_EMISSAO)}</td><td>${g.PRAZO_DIAS} dias</td>
+      <td>${g.PDF_GERADO ? '<span class="badge ok">Gerado</span>' : '<span class="badge warn">Não gerado</span>'}</td>
+      <td style="display:flex; gap:6px;">
+        <button class="btn" style="padding:6px 10px; font-size:11.5px;" onclick="window.__abrirTermo('${g.ID}')">Abrir</button>
+        <button class="btn" style="padding:6px 10px; font-size:11.5px; color:var(--red);" onclick="window.__excluirGarantia('${g.ID}')">Excluir</button>
+      </td></tr>`).join(''));
   }
 
   async function carregar(){
     try {
       if (!(await checarPermissao('GARANTIAS','VISUALIZAR'))){ setHTML('linhas', '<tr class="empty-row"><td colspan="7">Sem permissão.</td></tr>'); return; }
-      clientes = await dbGetAll('CLIENTES');
-      itens = await dbGetAll('GARANTIAS');
-      const empresas = await dbGetAll('EMPRESAS');
-      empresa = empresas[0] || { NOME: 'BStyle Eletrônicos & Acessórios', WHATSAPP: '', CIDADE: '', ESTADO: '' };
+      [clientes, itens, empresas, produtos, ordens] = await Promise.all([
+        dbGetAll('CLIENTES'), dbGetAll('GARANTIAS'), dbGetAll('EMPRESAS'), dbGetAll('PRODUTOS'), dbGetAll('ASSISTENCIAS')
+      ]);
       renderLinhas();
     } catch (e) { mostrarToast('Erro: ' + e.message, 'erro'); }
   }
 
-  // ---------- Modal do termo ----------
+  // ---------- Modal: montagem por tipo ----------
   const modal = document.getElementById('modal');
-  let garantiaAtual = null;
 
   window.__abrirTermo = (id) => {
     garantiaAtual = itens.find(g => g.ID === id);
     if (!garantiaAtual) return;
-    document.getElementById('modalTitulo').textContent = 'Termo — ' + garantiaAtual.NUMERO_GARANTIA;
-    document.getElementById('fId').value = garantiaAtual.ID;
-    document.getElementById('fClienteNome').value = nomeCliente(garantiaAtual.CLIENTE_ID);
-    document.getElementById('fProduto').value = garantiaAtual.PRODUTO_DESCRICAO || '';
-    document.getElementById('fPrazo').value = garantiaAtual.PRAZO_DIAS || 90;
-    document.getElementById('fCondicoes').value = garantiaAtual.TERMO_EDITADO || TERMO_PADRAO(garantiaAtual, nomeCliente(garantiaAtual.CLIENTE_ID));
+    document.getElementById('modalTitulo').textContent = (garantiaAtual.TIPO === 'MANUTENCAO' ? 'Garantia de Manutenção — ' : 'Garantia de Produto Usado — ') + garantiaAtual.NUMERO_GARANTIA;
+
+    if (garantiaAtual.TIPO === 'MANUTENCAO') montarFormularioManutencao();
+    else montarFormularioProdutoUsado();
+
     modal.classList.add('open');
   };
+
+  function montarFormularioManutencao(){
+    const cliente = clientePorId(garantiaAtual.CLIENTE_ID);
+    setHTML('modalBody', `
+      <div class="section-title">1. Identificação do cliente</div>
+      <div class="frow2">
+        <div class="ffield"><label>Cliente</label><input id="fCliente" value="${cliente.NOME||''}" disabled></div>
+        <div class="ffield"><label>CPF</label><input id="fCpf" value="${cliente.CPF||''}" disabled></div>
+      </div>
+      <div class="frow2">
+        <div class="ffield"><label>Valor total do serviço (R$)</label><input id="fValor" type="number" step="0.01" value="${garantiaAtual.VALOR_SERVICO||0}"></div>
+        <div class="ffield"><label>Data de conclusão do serviço</label><input id="fDataConclusao" type="date" value="${(garantiaAtual.DATA_CONCLUSAO||'').substring(0,10)}"></div>
+      </div>
+      <div class="section-title">2. Descrição do serviço</div>
+      <div class="ffield"><label>Serviço realizado</label><input id="fServico" value="${garantiaAtual.SERVICO_DESCRICAO||''}" placeholder="Ex.: troca de tela"></div>
+      <div class="ffield"><label>Aparelho (marca/modelo)</label><input id="fAparelho" value="${garantiaAtual.PRODUTO_DESCRICAO||''}"></div>
+      <div class="section-title">3. Prazo de garantia</div>
+      <div class="ffield"><label>Prazo (dias)</label><input id="fPrazo" type="number" value="${garantiaAtual.PRAZO_DIAS||90}"></div>
+      <div class="section-title">Observações adicionais (opcional)</div>
+      <div class="ffield"><textarea id="fObs" placeholder="Alguma condição especial deste atendimento...">${garantiaAtual.OBSERVACOES_TERMO||''}</textarea></div>
+    `);
+  }
+
+  function montarFormularioProdutoUsado(){
+    const cliente = clientePorId(garantiaAtual.CLIENTE_ID);
+    setHTML('modalBody', `
+      <div class="section-title">1. Identificação do cliente</div>
+      <div class="frow2">
+        <div class="ffield"><label>Cliente</label><input id="fCliente" value="${cliente.NOME||''}" disabled></div>
+        <div class="ffield"><label>CPF</label><input id="fCpf" value="${cliente.CPF||''}" disabled></div>
+      </div>
+      <div class="ffield"><label>Telefone</label><input id="fTelefone" value="${cliente.TELEFONE||''}" disabled></div>
+      <div class="section-title">2. Descrição do produto</div>
+      <div class="frow2">
+        <div class="ffield"><label>Marca/Modelo</label><input id="fAparelho" value="${garantiaAtual.PRODUTO_DESCRICAO||''}"></div>
+        <div class="ffield"><label>Cor/Capacidade</label><input id="fCorCapacidade" value="${garantiaAtual.COR_CAPACIDADE||''}"></div>
+      </div>
+      <div class="ffield"><label>Estado do aparelho no ato da venda</label><textarea id="fEstadoAparelho">${garantiaAtual.ESTADO_APARELHO || 'Aparelho em perfeitas condições e testes realizados com o cliente.'}</textarea></div>
+      <div class="section-title">3. Prazo e condições da venda</div>
+      <div class="frow2">
+        <div class="ffield"><label>Prazo (dias)</label><input id="fPrazo" type="number" value="${garantiaAtual.PRAZO_DIAS||30}"></div>
+        <div class="ffield"><label>Data da venda</label><input id="fDataVenda" type="date" value="${(garantiaAtual.DATA_EMISSAO||'').substring(0,10)}"></div>
+      </div>
+      <div class="frow2">
+        <div class="ffield"><label>Valor pago (R$)</label><input id="fValor" type="number" step="0.01" value="${garantiaAtual.VALOR_PAGO||0}"></div>
+        <div class="ffield"><label>Forma de pagamento</label><input id="fFormaPagamento" value="${garantiaAtual.FORMA_PAGAMENTO||''}"></div>
+      </div>
+    `);
+  }
+
   document.getElementById('fecharModal').addEventListener('click', () => modal.classList.remove('open'));
   document.getElementById('btnCancelar').addEventListener('click', () => modal.classList.remove('open'));
 
-  async function salvarEdicao(){
-    const dados = {
-      PRODUTO_DESCRICAO: document.getElementById('fProduto').value.trim(),
-      PRAZO_DIAS: Number(document.getElementById('fPrazo').value) || 90,
-      TERMO_EDITADO: document.getElementById('fCondicoes').value
+  function coletarDadosFormulario(){
+    if (garantiaAtual.TIPO === 'MANUTENCAO') {
+      return {
+        VALOR_SERVICO: Number(document.getElementById('fValor').value)||0,
+        DATA_CONCLUSAO: document.getElementById('fDataConclusao').value,
+        SERVICO_DESCRICAO: document.getElementById('fServico').value.trim(),
+        PRODUTO_DESCRICAO: document.getElementById('fAparelho').value.trim(),
+        PRAZO_DIAS: Number(document.getElementById('fPrazo').value)||90,
+        OBSERVACOES_TERMO: document.getElementById('fObs').value.trim()
+      };
+    }
+    return {
+      PRODUTO_DESCRICAO: document.getElementById('fAparelho').value.trim(),
+      COR_CAPACIDADE: document.getElementById('fCorCapacidade').value.trim(),
+      ESTADO_APARELHO: document.getElementById('fEstadoAparelho').value.trim(),
+      PRAZO_DIAS: Number(document.getElementById('fPrazo').value)||30,
+      VALOR_PAGO: Number(document.getElementById('fValor').value)||0,
+      FORMA_PAGAMENTO: document.getElementById('fFormaPagamento').value.trim()
     };
+  }
+
+  async function salvarEdicao(){
     if (!(await checarPermissao('GARANTIAS','EDITAR'))){ mostrarToast('Sem permissão.', 'erro'); return null; }
+    const dados = coletarDadosFormulario();
     await dbUpdate('GARANTIAS', garantiaAtual.ID, dados);
     Object.assign(garantiaAtual, dados);
     return dados;
@@ -126,64 +185,148 @@ em nossa loja dentro do prazo informado.`;
     catch (e) { mostrarToast('Erro: ' + e.message, 'erro'); }
   });
 
+  // ---------- Monta o texto final do termo (conforme o modelo real da loja) ----------
+  function textoTermoManutencao(){
+    const cliente = clientePorId(garantiaAtual.CLIENTE_ID);
+    return `TERMO DE GARANTIA
+
+1. IDENTIFICAÇÃO DO CLIENTE
+Cliente: ${cliente.NOME||''}
+CPF: ${cliente.CPF||''}
+Valor Total do Serviço: ${moeda(garantiaAtual.VALOR_SERVICO)}
+Data de Conclusão do Serviço: ${dataBR(garantiaAtual.DATA_CONCLUSAO)}
+
+2. DESCRIÇÃO DO SERVIÇO
+Este termo refere-se à ${garantiaAtual.SERVICO_DESCRICAO || 'manutenção realizada'} do aparelho ${garantiaAtual.PRODUTO_DESCRICAO || ''}, realizado pela Assistência Técnica.
+
+3. PRAZO DE GARANTIA
+A garantia para o serviço prestado é de ${garantiaAtual.PRAZO_DIAS} (${porExtenso(garantiaAtual.PRAZO_DIAS)}) dias, contados a partir da data de conclusão do serviço.
+A garantia cobre defeitos de fabricação da peça trocada e problemas relacionados à instalação do serviço realizado.
+Importante: caso o cliente remova a película de proteção colocada pela Assistência Técnica (quando aplicável), a garantia perderá sua validade.
+
+4. EXCLUSÕES DA GARANTIA
+Não estão cobertos pela garantia: danos causados por mau uso (quedas, impactos, líquidos ou manuseio inadequado); danos causados por intervenções de terceiros ou reparos não autorizados.
+
+5. PROCEDIMENTO PARA ACIONAR A GARANTIA
+Apresentar o comprovante do serviço (nota fiscal ou recibo) e entrar em contato dentro do prazo de garantia, informando o problema. O atendimento será realizado mediante agendamento prévio.
+
+6. DISPOSIÇÕES FINAIS
+Este termo é regido pelas leis vigentes; controvérsias serão resolvidas no foro da comarca onde a assistência técnica está localizada.
+${garantiaAtual.OBSERVACOES_TERMO ? '\nObservações: ' + garantiaAtual.OBSERVACOES_TERMO : ''}
+
+Observação: este documento deve ser guardado pelo cliente como comprovante da garantia.`;
+  }
+
+  function textoTermoProdutoUsado(){
+    const cliente = clientePorId(garantiaAtual.CLIENTE_ID);
+    return `TERMO DE GARANTIA - PRODUTO USADO
+
+1. IDENTIFICAÇÃO DO CLIENTE
+Cliente: ${cliente.NOME||''}
+CPF: ${cliente.CPF||''}
+Telefone: ${cliente.TELEFONE||''}
+
+2. DESCRIÇÃO DO PRODUTO
+Marca/Modelo: ${garantiaAtual.PRODUTO_DESCRICAO||''}
+Cor/Capacidade: ${garantiaAtual.COR_CAPACIDADE||''}
+Estado do aparelho no ato da venda: ${garantiaAtual.ESTADO_APARELHO||''}
+
+3. PRAZO DE GARANTIA
+O presente aparelho de celular usado possui garantia de ${garantiaAtual.PRAZO_DIAS} (${porExtenso(garantiaAtual.PRAZO_DIAS)}) dias, contados a partir da data da compra.
+
+4. A GARANTIA COBRE
+Defeitos de funcionamento interno do aparelho e falhas técnicas que impeçam o uso normal do celular.
+
+5. NÃO ESTÃO COBERTOS PELA GARANTIA
+Danos por queda, impacto ou pressão; tela trincada, quebrada ou riscada após a venda; oxidação ou contato com líquido; problemas causados por assistência técnica não autorizada (terceiros).
+Observação: por se tratar de produto usado, a bateria é considerada item de desgaste natural, coberta apenas em caso de defeito técnico.
+
+6. CONDIÇÕES GERAIS
+O consumidor declara ter recebido o aparelho em perfeito estado de funcionamento, ciente de que se trata de produto usado, podendo apresentar sinais naturais de uso.
+Data da Venda: ${dataBR(garantiaAtual.DATA_EMISSAO)}
+Valor Pago: ${moeda(garantiaAtual.VALOR_PAGO)}
+Forma de Pagamento: ${garantiaAtual.FORMA_PAGAMENTO||''}`;
+  }
+
+  function montarHtmlImpressao(via){
+    const texto = garantiaAtual.TIPO === 'MANUTENCAO' ? textoTermoManutencao() : textoTermoProdutoUsado();
+    return `
+      <div style="padding:30px; font-family:Arial,sans-serif; color:#111; page-break-after:always;">
+        <div style="font-size:11px; color:#555; margin-bottom:14px;">${cabecalhoLojas().replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim()}</div>
+        <hr>
+        <div style="text-align:right; font-size:10px; color:#888; margin:6px 0;">${via}</div>
+        <pre style="white-space:pre-wrap; font-family:Arial,sans-serif; font-size:12.5px; line-height:1.6;">${texto.replace(/</g,'&lt;')}</pre>
+        <div style="margin-top:50px; display:flex; justify-content:space-between;">
+          <div>___________________________<br>Assinatura do Cliente</div>
+          <div>___________________________<br>Assinatura da ${garantiaAtual.TIPO==='MANUTENCAO' ? 'Assistência Técnica' : 'Loja'}</div>
+        </div>
+      </div>`;
+  }
+
   // ---------- Imprimir ----------
   document.getElementById('btnImprimir').addEventListener('click', async () => {
     try {
       await salvarEdicao();
-      const texto = document.getElementById('fCondicoes').value;
       const janela = window.open('', '_blank');
-      janela.document.write(`
-        <html><head><title>${garantiaAtual.NUMERO_GARANTIA}</title>
-        <style>body{font-family:Arial,sans-serif; padding:40px; white-space:pre-wrap; line-height:1.6; color:#111;} h2{margin-bottom:4px;}</style>
-        </head><body>
-        <h2>${empresa.NOME}</h2>
-        <p style="color:#555; margin-top:0;">${empresa.CIDADE||''} ${empresa.ESTADO||''} ${empresa.WHATSAPP? '· '+empresa.WHATSAPP : ''}</p>
-        <hr>
-        <div>${texto.replace(/</g,'&lt;')}</div>
-        </body></html>
-      `);
-      janela.document.close();
-      janela.focus();
+      janela.document.write(`<html><head><title>${garantiaAtual.NUMERO_GARANTIA}</title></head><body>
+        ${montarHtmlImpressao('1ª VIA — LOJA')}
+        ${montarHtmlImpressao('2ª VIA — CLIENTE')}
+      </body></html>`);
+      janela.document.close(); janela.focus();
       setTimeout(() => janela.print(), 400);
     } catch (e) { mostrarToast('Erro: ' + e.message, 'erro'); }
   });
 
-  // ---------- Salvar PDF ----------
+  // ---------- Salvar PDF (2 vias) ----------
   document.getElementById('btnGerarPdf').addEventListener('click', async () => {
     try {
-      const dados = await salvarEdicao();
+      await salvarEdicao();
       const { jsPDF } = window.jspdf;
       const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+      const texto = garantiaAtual.TIPO === 'MANUTENCAO' ? textoTermoManutencao() : textoTermoProdutoUsado();
 
-      doc.setFontSize(16); doc.setFont(undefined, 'bold');
-      doc.text(empresa.NOME || 'Loja', 20, 22);
-      doc.setFontSize(10); doc.setFont(undefined, 'normal');
-      doc.text([empresa.CIDADE||'', empresa.ESTADO||'', empresa.WHATSAPP||''].filter(Boolean).join(' · '), 20, 29);
-      doc.setLineWidth(0.3); doc.line(20, 33, 190, 33);
+      [['1ª VIA — LOJA', false], ['2ª VIA — CLIENTE', true]].forEach(([rotulo, novaPagina], idx) => {
+        if (idx > 0) doc.addPage();
+        let y = 18;
+        doc.setFontSize(9); doc.setTextColor(90);
+        empresas.forEach(e => {
+          const endereco = [e.RUA, e.NUMERO].filter(Boolean).join(', ') + (e.BAIRRO ? ' - '+e.BAIRRO : '');
+          doc.text(`${e.NOME} — ${endereco} ${e.WHATSAPP ? '· '+e.WHATSAPP : ''}`, 20, y);
+          y += 5;
+        });
+        doc.setDrawColor(200); doc.line(20, y+1, 190, y+1); y += 8;
+        doc.setFontSize(9); doc.setTextColor(150); doc.text(rotulo, 170, y, { align: 'right' }); y += 6;
 
-      doc.setFontSize(13); doc.setFont(undefined, 'bold');
-      doc.text('TERMO DE GARANTIA', 20, 42);
+        doc.setTextColor(20); doc.setFontSize(10.5);
+        const linhas = doc.splitTextToSize(texto, 170);
+        doc.text(linhas, 20, y);
+        y += linhas.length * 5.2 + 20;
+        if (y > 260) { doc.addPage(); y = 20; }
+        doc.line(20, y, 90, y); doc.text('Assinatura do Cliente', 20, y+5);
+        doc.line(120, y, 190, y); doc.text('Assinatura da ' + (garantiaAtual.TIPO==='MANUTENCAO' ? 'Assist. Técnica' : 'Loja'), 120, y+5);
+      });
 
-      doc.setFontSize(10.5); doc.setFont(undefined, 'normal');
-      const texto = document.getElementById('fCondicoes').value;
-      const linhas = doc.splitTextToSize(texto, 170);
-      doc.text(linhas, 20, 52);
+      doc.save((garantiaAtual.TIPO==='MANUTENCAO'?'Garantia_Manutencao_':'Garantia_ProdutoUsado_') + garantiaAtual.NUMERO_GARANTIA + '.pdf');
 
-      const yAssinatura = 52 + linhas.length * 5.2 + 20;
-      doc.line(20, yAssinatura, 90, yAssinatura);
-      doc.text('Assinatura da loja', 20, yAssinatura + 5);
-      doc.line(120, yAssinatura, 190, yAssinatura);
-      doc.text('Assinatura do cliente', 120, yAssinatura + 5);
-
-      doc.save('Garantia_' + garantiaAtual.NUMERO_GARANTIA + '.pdf');
-
-      if (!(await checarPermissao('GARANTIAS','EDITAR'))){ mostrarToast('Sem permissão pra marcar como gerado.', 'erro'); return; }
-      await dbUpdate('GARANTIAS', garantiaAtual.ID, { PDF_GERADO: true, DATA_GERACAO_PDF: new Date().toISOString() });
-      mostrarToast('PDF salvo no seu computador.');
+      if (await checarPermissao('GARANTIAS','EDITAR')) {
+        await dbUpdate('GARANTIAS', garantiaAtual.ID, { PDF_GERADO: true, DATA_GERACAO_PDF: new Date().toISOString() });
+      }
+      mostrarToast('PDF salvo (2 vias).');
       modal.classList.remove('open');
       carregar();
     } catch (e) { mostrarToast('Erro ao gerar PDF: ' + e.message, 'erro'); }
   });
+
+  // ---------- Excluir ----------
+  window.__excluirGarantia = async (id) => {
+    if (!confirm('Excluir esta garantia? Essa ação não pode ser desfeita.')) return;
+    try {
+      if (!(await checarPermissao('GARANTIAS','EXCLUIR'))){ mostrarToast('Sem permissão.', 'erro'); return; }
+      await dbDelete('GARANTIAS', id);
+      mostrarToast('Garantia excluída.');
+      carregar();
+    } catch (e) { mostrarToast('Erro: ' + e.message, 'erro'); }
+  };
 
   carregar();
 })();

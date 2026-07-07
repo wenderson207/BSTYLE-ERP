@@ -438,33 +438,33 @@ Ao assinar, o cliente declara estar ciente do serviço a ser realizado e do valo
   });
 
   // ---------- Salvar PDF ----------
-  document.getElementById('btnPdfOS').addEventListener('click', () => {
+  document.getElementById('btnPdfOS').addEventListener('click', async () => {
     if (!osAtual) return;
     try {
       const { jsPDF } = window.jspdf;
       const doc = new jsPDF({ unit: 'mm', format: 'a4' });
       const texto = textoOS();
+      const cliente = clientes.find(c => c.ID === osAtual.CLIENTE_ID) || {};
 
-      [['1ª VIA — LOJA'], ['2ª VIA — CLIENTE']].forEach(([rotulo], idx) => {
+      for (let idx = 0; idx < 2; idx++) {
+        const rotulo = idx === 0 ? '1ª VIA — LOJA' : '2ª VIA — CLIENTE';
         if (idx > 0) doc.addPage();
-        let y = 18;
-        doc.setFontSize(8.5); doc.setTextColor(90);
-        empresas.forEach(e => {
-          const endereco = [e.RUA, e.NUMERO].filter(Boolean).join(', ') + (e.BAIRRO ? ' - '+e.BAIRRO : '');
-          doc.text(`${e.NOME} — ${endereco} ${e.WHATSAPP ? '· '+e.WHATSAPP : ''}`, 20, y);
-          y += 5;
-        });
-        doc.setDrawColor(200); doc.line(20, y+1, 190, y+1); y += 8;
-        doc.setFontSize(9); doc.setTextColor(150); doc.text(rotulo, 170, y, { align: 'right' }); y += 6;
 
-        doc.setTextColor(20); doc.setFontSize(10);
+        let y = await desenharCabecalhoLoja(doc, empresas);
+        doc.setFontSize(13); doc.setFont(undefined,'bold');
+        doc.text('ORDEM DE SERVIÇO Nº: ' + osAtual.NUMERO_OS, 105, y, { align: 'center' }); y += 5;
+        doc.setFontSize(8.5); doc.setFont(undefined,'normal'); doc.setTextColor(120);
+        doc.text(rotulo, 190, y, { align: 'right' }); y += 6;
+        doc.setTextColor(20);
+
+        doc.setFontSize(10);
         const linhas = doc.splitTextToSize(texto, 170);
         doc.text(linhas, 20, y);
         y += linhas.length * 5 + 20;
-        if (y > 260) { doc.addPage(); y = 20; }
-        doc.line(20, y, 90, y); doc.text('Assinatura do Cliente', 20, y+5);
+        if (y > 255) { doc.addPage(); y = 20; }
+        doc.setDrawColor(20); doc.line(20, y, 90, y); doc.text('Assinatura do Cliente', 20, y+5);
         doc.line(120, y, 190, y); doc.text('Assinatura da Loja', 120, y+5);
-      });
+      }
 
       doc.save('OS_' + osAtual.NUMERO_OS + '.pdf');
       mostrarToast('PDF da OS salvo (2 vias).');

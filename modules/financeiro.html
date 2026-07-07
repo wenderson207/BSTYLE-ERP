@@ -26,11 +26,24 @@
   <div class="kpi"><div class="lbl">Saldo</div><div class="val" id="kpiSaldo">—</div></div>
 </div>
 
-<div class="tabs"><div class="tab active" data-tab="pagar">Contas a pagar</div><div class="tab" data-tab="receber">Contas a receber</div></div>
+<div class="tabs">
+  <div class="tab active" data-tab="pagar">Contas a pagar</div>
+  <div class="tab" data-tab="receber">Contas a receber</div>
+  <div class="tab" data-tab="caixa">Caixa diário</div>
+</div>
 
-<table class="dt"><thead><tr><th>Descrição</th><th>Categoria</th><th>Vencimento</th><th>Valor</th><th>Status</th><th></th></tr></thead>
-  <tbody id="linhas"><tr class="empty-row"><td colspan="6">Carregando…</td></tr></tbody>
-</table>
+<div id="painelContas">
+  <table class="dt"><thead><tr><th>Descrição</th><th>Categoria</th><th>Vencimento</th><th>Valor</th><th>Status</th><th></th></tr></thead>
+    <tbody id="linhas"><tr class="empty-row"><td colspan="6">Carregando…</td></tr></tbody>
+  </table>
+</div>
+
+<div id="painelCaixa" style="display:none;">
+  <div class="card" style="background:var(--bg-surface); border:1px solid var(--hairline); border-radius:12px; padding:20px 22px;">
+    <p style="color:var(--text-secondary); font-size:13px; margin:0 0 16px;">Confere se o dinheiro que devia ter no caixa bate com o que tem de verdade, no fim do dia.</p>
+    <div id="caixaConteudo">Carregando…</div>
+  </div>
+</div>
 
 <div class="modal-overlay" id="modal">
   <div class="modal-box">
@@ -56,7 +69,7 @@
 
   async function carregar(){
     try {
-      if (!(await checarPermissao('FINANCEIRO','VISUALIZAR'))){ document.getElementById('linhas').innerHTML='<tr class="empty-row"><td colspan="6">Sem permissão.</td></tr>'; return; }
+      if (!(await checarPermissao('FINANCEIRO','VISUALIZAR'))){ setHTML('linhas', '<tr class="empty-row"><td colspan="6">Sem permissão.</td></tr>'); return; }
       todos = await dbGetAll('FINANCEIRO');
       const pagos = todos.filter(l => l.STATUS === 'Pago');
       const entradas = pagos.filter(l=>l.TIPO==='Receita').reduce((s,l)=>s+Number(l.VALOR),0);
@@ -81,8 +94,87 @@
 
   document.querySelectorAll('.tab').forEach(tab => tab.addEventListener('click', () => {
     document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active')); tab.classList.add('active');
-    abaAtual = tab.dataset.tab; renderLista();
+    abaAtual = tab.dataset.tab;
+    document.getElementById('painelContas').style.display = abaAtual === 'caixa' ? 'none' : 'block';
+    document.getElementById('painelCaixa').style.display = abaAtual === 'caixa' ? 'block' : 'none';
+    if (abaAtual === 'caixa') carregarCaixa(); else renderLista();
   }));
+
+  // ---------- Caixa diário ----------
+  function chaveDoDiaCaixa(lojaId){ return (lojaId||'sem-loja') + '_' + new Date().toISOString().substring(0,10); }
+
+  async function carregarCaixa(){
+    const el = document.getElementById('caixaConteudo');
+    try {
+      if (!(await checarPermissao('FINANCEIRO','VISUALIZAR'))){ el.textContent = 'Sem permissão.'; return; }
+
+      const lojaId = window.lojaAtivaId || await obterLojaParaAcao('Caixa de qual loja você quer conferir?');
+      if (!lojaId) { el.textContent = 'Escolha uma loja pra ver o caixa.'; return; }
+
+      const idDia = chaveDoDiaCaixa(lojaId);
+      const caixaHoje = await dbGetById('CAIXA', idDia);
+
+      if (!caixaHoje || caixaHoje.STATUS === 'Fechado') {
+        el.innerHTML = `
+          <p style="font-size:13px; color:var(--text-secondary); margin-bottom:12px;">${caixaHoje ? 'Caixa de hoje já foi fechado. Você pode abrir de novo se precisar lançar algo a mais.' : 'Caixa de hoje ainda não foi aberto.'}</p>
+          <div class="frow2" style="max-width:400px;">
+            <div class="ffield"><label>Valor inicial em caixa (R$)</label><input id="valorAbertura" type="number" step="0.01" value="0"></div>
+          </div>
+          <button class="btn btn-primary" id="btnAbrirCaixa">Abrir caixa</button>`;
+        document.getElementById('btnAbrirCaixa').addEventListener('click', async () => {
+          try {
+            if (!(await checarPermissao('FINANCEIRO','CADASTRAR'))){ mostrarToast('Sem permissão.', 'erro'); return; }
+            await dbInsert('CAIXA', {
+              ID: idDia, EMPRESA_ID: lojaId, DATA: new Date().toISOString(),
+              VALOR_ABERTURA: Number(document.getElementById('valorAbertura').value)||0,
+              STATUS: 'Aberto', USUARIO_ABERTURA: usuarioAtual.ID
+            });
+            mostrarToast('Caixa aberto.');
+            carregarCaixa();
+          } catch (e) { mostrarToast('Erro: ' + e.message, 'erro'); }
+        });
+        return;
+      }
+
+      // Caixa aberto — mostra o resumo do dia
+      const vendasHoje = (await dbGetAll('VENDAS')).filter(v =>
+        v.EMPRESA_ID === lojaId && v.STATUS === 'Concluída' && new Date(v.DATA).toDateString() === new Date().toDateString()
+      );
+      const dinheiroHoje = vendasHoje.filter(v => v.FORMA_PAGAMENTO === 'Dinheiro').reduce((s,v)=>s+Number(v.VALOR_TOTAL||0),0);
+      const outrasFormasHoje = vendasHoje.filter(v => v.FORMA_PAGAMENTO !== 'Dinheiro').reduce((s,v)=>s+Number(v.VALOR_TOTAL||0),0);
+      const esperadoEmCaixa = Number(caixaHoje.VALOR_ABERTURA||0) + dinheiroHoje;
+
+      el.innerHTML = `
+        <div class="kpi-grid" style="margin-bottom:18px;">
+          <div class="kpi"><div class="lbl">Abertura</div><div class="val">${moeda(caixaHoje.VALOR_ABERTURA)}</div></div>
+          <div class="kpi"><div class="lbl">Vendas em dinheiro hoje</div><div class="val">${moeda(dinheiroHoje)}</div></div>
+          <div class="kpi"><div class="lbl">Outras formas (cartão/PIX)</div><div class="val">${moeda(outrasFormasHoje)}</div></div>
+          <div class="kpi"><div class="lbl">Esperado em caixa (dinheiro)</div><div class="val">${moeda(esperadoEmCaixa)}</div></div>
+        </div>
+        <div class="frow2" style="max-width:400px;">
+          <div class="ffield"><label>Valor contado ao fechar (R$)</label><input id="valorContado" type="number" step="0.01"></div>
+        </div>
+        <button class="btn btn-primary" id="btnFecharCaixa">Fechar caixa</button>
+        <div id="resultadoFechamento" style="margin-top:14px; font-size:13px;"></div>`;
+
+      document.getElementById('btnFecharCaixa').addEventListener('click', async () => {
+        const contado = Number(document.getElementById('valorContado').value);
+        if (isNaN(contado)){ mostrarToast('Informe o valor contado.', 'erro'); return; }
+        const diferenca = contado - esperadoEmCaixa;
+        try {
+          if (!(await checarPermissao('FINANCEIRO','EDITAR'))){ mostrarToast('Sem permissão.', 'erro'); return; }
+          await dbUpdate('CAIXA', idDia, {
+            STATUS: 'Fechado', VALOR_ESPERADO: esperadoEmCaixa, VALOR_CONTADO: contado, DIFERENCA: diferenca,
+            USUARIO_FECHAMENTO: usuarioAtual.ID, DATA_FECHAMENTO: new Date().toISOString()
+          });
+          const cor = diferenca === 0 ? 'var(--mint)' : (diferenca > 0 ? 'var(--blue)' : 'var(--red)');
+          const texto = diferenca === 0 ? 'Caixa bateu certinho! 🎉' : (diferenca > 0 ? `Sobrou ${moeda(diferenca)} no caixa.` : `Faltou ${moeda(Math.abs(diferenca))} no caixa.`);
+          setHTML('resultadoFechamento', `<b style="color:${cor};">${texto}</b>`);
+          mostrarToast('Caixa fechado.');
+        } catch (e) { mostrarToast('Erro: ' + e.message, 'erro'); }
+      });
+    } catch (e) { el.textContent = 'Erro: ' + e.message; }
+  }
 
   window.__baixar = async (id) => {
     try {

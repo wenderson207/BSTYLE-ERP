@@ -26,8 +26,8 @@
 </div>
 
 <table class="dt">
-  <thead><tr><th>Produto</th><th>SKU</th><th>Custo</th><th>Venda</th><th>Estoque</th><th></th></tr></thead>
-  <tbody id="linhas"><tr class="empty-row"><td colspan="6">Carregando…</td></tr></tbody>
+  <thead><tr><th>Produto</th><th>SKU</th><th>Loja</th><th>Custo</th><th>Venda</th><th>Estoque</th><th></th></tr></thead>
+  <tbody id="linhas"><tr class="empty-row"><td colspan="7">Carregando…</td></tr></tbody>
 </table>
 
 <div class="modal-overlay" id="modal">
@@ -59,28 +59,32 @@
 
 <script>
 (async function(){
-  let produtos = [];
+  let produtos = [], empresas = [];
   function moeda(v){ return (Number(v)||0).toLocaleString('pt-BR', { style:'currency', currency:'BRL' }); }
+  function nomeLoja(id){ if (!id) return '—'; const e = empresas.find(x=>x.ID===id); return e?e.NOME:'—'; }
 
   function renderLinhas(lista){
     const tbody = document.getElementById('linhas');
-    if (!lista.length){ tbody.innerHTML = '<tr class="empty-row"><td colspan="6">Nenhum produto encontrado.</td></tr>'; return; }
-    tbody.innerHTML = lista.map(p => {
+    if (!lista.length){ setHTML('linhas', '<tr class="empty-row"><td colspan="7">Nenhum produto encontrado.</td></tr>'); return; }
+    setHTML('linhas', lista.map(p => {
       const baixo = Number(p.ESTOQUE_ATUAL) <= Number(p.ESTOQUE_MINIMO);
       return `<tr>
-        <td><b>${p.NOME}</b></td><td class="mono">${p.SKU||'—'}</td><td>${moeda(p.PRECO_CUSTO)}</td><td>${moeda(p.PRECO_VENDA)}</td>
+        <td><b>${p.NOME}</b></td><td class="mono">${p.SKU||'—'}</td><td><span class="badge info" style="background:rgba(76,141,255,0.12); color:var(--blue);">${nomeLoja(p.EMPRESA_ID)}</span></td>
+        <td>${moeda(p.PRECO_CUSTO)}</td><td>${moeda(p.PRECO_VENDA)}</td>
         <td>${baixo ? '<span class="badge warn">'+p.ESTOQUE_ATUAL+' baixo</span>' : '<span class="badge ok">'+p.ESTOQUE_ATUAL+'</span>'}</td>
         <td style="display:flex; gap:6px;">
           <button class="btn" style="padding:6px 10px; font-size:11.5px;" onclick="window.__editarProduto('${p.ID}')">Editar</button>
           <button class="btn" style="padding:6px 10px; font-size:11.5px; color:var(--red);" onclick="window.__excluirProduto('${p.ID}')">Excluir</button>
         </td></tr>`;
-    }).join('');
+    }).join(''));
   }
 
   async function carregar(){
     try {
-      if (!(await checarPermissao('PRODUTOS', 'VISUALIZAR'))) { document.getElementById('linhas').innerHTML = '<tr class="empty-row"><td colspan="6">Sem permissão.</td></tr>'; return; }
-      produtos = (await dbGetAll('PRODUTOS')).filter(p => p.STATUS !== 'Excluído');
+      if (!(await checarPermissao('PRODUTOS', 'VISUALIZAR'))) { setHTML('linhas', '<tr class="empty-row"><td colspan="7">Sem permissão.</td></tr>'); return; }
+      empresas = await dbGetAll('EMPRESAS');
+      let todos = (await dbGetAll('PRODUTOS')).filter(p => p.STATUS !== 'Excluído');
+      produtos = window.lojaAtivaId ? todos.filter(p => p.EMPRESA_ID === window.lojaAtivaId) : todos;
       renderLinhas(produtos);
     } catch (e) { mostrarToast('Erro ao carregar produtos: ' + e.message, 'erro'); }
   }
@@ -127,6 +131,9 @@
         mostrarToast('Produto atualizado.');
       } else {
         if (!(await checarPermissao('PRODUTOS','CADASTRAR'))){ mostrarToast('Sem permissão.', 'erro'); return; }
+        const empresaId = await obterLojaParaAcao('Para qual loja é este produto?');
+        if (!empresaId) { mostrarToast('Cadastro cancelado — é preciso escolher a loja.', 'erro'); return; }
+        dados.EMPRESA_ID = empresaId;
         await dbInsert('PRODUTOS', Object.assign({ STATUS:'Ativo', DATA_CRIACAO: new Date().toISOString() }, dados));
         mostrarToast('Produto cadastrado.');
       }

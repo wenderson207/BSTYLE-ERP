@@ -147,6 +147,40 @@
 (async function(){
   const STATUS_COLUNAS = ['Aberta','Em diagnóstico','Aguardando peça','Em reparo','Pronto','Entregue'];
   let ordens = [], clientes = [], empresas = [];
+
+  /** Mantém o espelho público (OS_PUBLICO) sincronizado — é o que a página consulta.html lê, sem exigir login. */
+  async function atualizarEspelhoPublico(os){
+    try {
+      const cliente = clientes.find(c => c.ID === os.CLIENTE_ID) || {};
+      const empresaPrincipal = (window.lojaAtivaId && empresas.find(e => e.ID === window.lojaAtivaId)) || empresas[0] || {};
+      await db.collection('OS_PUBLICO').doc(os.ID).set({
+        NUMERO_OS: os.NUMERO_OS, CODIGO: os.CODIGO_ACOMPANHAMENTO, STATUS: os.STATUS,
+        MARCA: os.MARCA||'', MODELO: os.MODELO||'', PRAZO: os.PRAZO||'', DATA_ABERTURA: os.DATA_ABERTURA||'',
+        CLIENTE_NOME: cliente.NOME || '', NOME_LOJA: empresaPrincipal.NOME || ''
+      });
+    } catch (e) { /* não trava o fluxo principal se o espelho falhar */ }
+  }
+
+  /** Monta o link de acompanhamento pra mandar pro cliente. */
+  function linkAcompanhamento(os){
+    return window.location.origin + window.location.pathname.replace(/[^/]*$/, '') + 'consulta.html?id=' + os.ID + '&codigo=' + (os.CODIGO_ACOMPANHAMENTO||'');
+  }
+
+  /** Abre o WhatsApp do cliente com uma mensagem pronta sobre o status atual da OS. */
+  function abrirWhatsApp(os){
+    const cliente = clientes.find(c => c.ID === os.CLIENTE_ID) || {};
+    const telefone = String(cliente.TELEFONE||'').replace(/\D/g,'');
+    if (!telefone) { mostrarToast('Este cliente não tem telefone cadastrado.', 'erro'); return; }
+    const numeroComPais = telefone.length <= 11 ? '55' + telefone : telefone;
+
+    const mensagens = {
+      'Pronto': `Olá, ${cliente.NOME||''}! Seu aparelho ${os.MARCA||''} ${os.MODELO||''} (OS ${os.NUMERO_OS}) já está pronto para retirada! Acompanhe: ${linkAcompanhamento(os)}`,
+      'Entregue': `Olá, ${cliente.NOME||''}! Confirmando a entrega do seu aparelho ${os.MARCA||''} ${os.MODELO||''} (OS ${os.NUMERO_OS}). Obrigado pela confiança!`
+    };
+    const texto = mensagens[os.STATUS] || `Olá, ${cliente.NOME||''}! Sua OS ${os.NUMERO_OS} (${os.MARCA||''} ${os.MODELO||''}) está com status "${os.STATUS}". Acompanhe: ${linkAcompanhamento(os)}`;
+
+    window.open('https://wa.me/' + numeroComPais + '?text=' + encodeURIComponent(texto), '_blank');
+  }
   let senhaTipoAtual = 'PIN', sequenciaPadrao = [];
   let defeitosFrenteNova = [], defeitosVersoNova = [];
   let mesCalendario = new Date();
@@ -300,7 +334,9 @@
       const totalAno = ordens.filter(o => String(o.NUMERO_OS).startsWith('OS-'+ano)).length;
       const numeroOS = 'OS-' + ano + '-' + String(totalAno+1).padStart(5,'0');
 
-      await dbInsert('ASSISTENCIAS', {
+      const codigoAcompanhamento = Math.random().toString(36).substring(2,8).toUpperCase();
+
+      const novaOS = await dbInsert('ASSISTENCIAS', {
         NUMERO_OS: numeroOS, CLIENTE_ID: cliente, TECNICO_RESPONSAVEL: document.getElementById('fTecnico').value.trim(),
         MARCA: document.getElementById('fMarca').value.trim(), MODELO: document.getElementById('fModelo').value.trim(),
         IMEI: document.getElementById('fImei').value.trim(), ACESSORIOS_ENTREGUES: document.getElementById('fAcessorios').value.trim(),
@@ -308,8 +344,10 @@
         PECAS_A_REPOR: document.getElementById('fPecas').value.trim(), VALOR_SERVICO: Number(document.getElementById('fValor').value)||0,
         PRAZO: document.getElementById('fPrazo').value, SENHA_TIPO: senhaTipoAtual, SENHA_VALOR: senhaValor,
         DEFEITOS_FRENTE: JSON.stringify(defeitosFrenteNova), DEFEITOS_VERSO: JSON.stringify(defeitosVersoNova),
+        CODIGO_ACOMPANHAMENTO: codigoAcompanhamento,
         STATUS: 'Aberta', DATA_ABERTURA: new Date().toISOString(), DATA_ENTREGA_REAL: ''
       });
+      await atualizarEspelhoPublico(novaOS);
       mostrarToast('OS ' + numeroOS + ' aberta.');
       modalNova.classList.remove('open'); carregar();
     } catch (e) { mostrarToast('Erro: ' + e.message, 'erro'); }
@@ -327,6 +365,11 @@
     const defVerso = JSON.parse(osAtual.DEFEITOS_VERSO || '[]');
 
     setHTML('verCorpo', `
+      <div class="section-title">Comunicação com o cliente</div>
+      <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:6px;">
+        <button class="btn btn-primary" id="btnWhatsAppOS" type="button">💬 Enviar WhatsApp</button>
+        <span style="font-size:11px; color:var(--text-tertiary); font-family:var(--font-mono);">Link: ${linkAcompanhamento(osAtual)}</span>
+      </div>
       <div class="section-title">Status e prazo</div>
       <div class="frow2">
         <div class="ffield"><label>Status</label><select id="vStatus">${STATUS_COLUNAS.map(s => `<option value="${s}" ${s===osAtual.STATUS?'selected':''}>${s}</option>`).join('')}</select></div>
@@ -357,6 +400,7 @@
     renderDiagrama('diagramaVersoVer', defVerso, false);
 
     modalVer.classList.add('open');
+    document.getElementById('btnWhatsAppOS').addEventListener('click', () => abrirWhatsApp(osAtual));
   };
 
   document.getElementById('fecharModalVer').addEventListener('click', () => modalVer.classList.remove('open'));
@@ -377,6 +421,7 @@
       if (novoStatus === 'Entregue' && !osAtual.DATA_ENTREGA_REAL) dados.DATA_ENTREGA_REAL = new Date().toISOString();
 
       await dbUpdate('ASSISTENCIAS', osAtual.ID, dados);
+      await atualizarEspelhoPublico(Object.assign({}, osAtual, dados));
       mostrarToast('OS atualizada.');
       modalVer.classList.remove('open');
       carregar();

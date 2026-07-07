@@ -21,8 +21,11 @@
   <button class="btn btn-primary" id="btnNovo">+ Novo produto</button>
 </div>
 
-<div style="margin-bottom:14px;">
+<div style="margin-bottom:14px; display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
   <input id="busca" placeholder="Buscar por nome ou SKU…" style="width:100%; max-width:340px; background:var(--bg-surface); border:1px solid var(--hairline); color:var(--text-primary); padding:9px 12px; border-radius:8px; font-size:12.5px;">
+  <label style="display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text-secondary); cursor:pointer;">
+    <input type="checkbox" id="chkSoParados"> Só produtos parados (60+ dias sem vender)
+  </label>
 </div>
 
 <table class="dt">
@@ -63,17 +66,27 @@
   function moeda(v){ return (Number(v)||0).toLocaleString('pt-BR', { style:'currency', currency:'BRL' }); }
   function nomeLoja(id){ if (!id) return '—'; const e = empresas.find(x=>x.ID===id); return e?e.NOME:'—'; }
 
+  function ehEncalhe(p){
+    if (!p.DATA_CRIACAO || Number(p.ESTOQUE_ATUAL) <= 0) return false;
+    const dias = (new Date() - new Date(p.DATA_CRIACAO)) / 86400000;
+    return dias >= 60;
+  }
+
   function renderLinhas(lista){
     const tbody = document.getElementById('linhas');
-    if (!lista.length){ setHTML('linhas', '<tr class="empty-row"><td colspan="7">Nenhum produto encontrado.</td></tr>'); return; }
-    setHTML('linhas', lista.map(p => {
+    const soParados = document.getElementById('chkSoParados').checked;
+    const listaFiltrada = soParados ? lista.filter(ehEncalhe) : lista;
+    if (!listaFiltrada.length){ setHTML('linhas', '<tr class="empty-row"><td colspan="7">Nenhum produto encontrado.</td></tr>'); return; }
+    setHTML('linhas', listaFiltrada.map(p => {
       const baixo = Number(p.ESTOQUE_ATUAL) <= Number(p.ESTOQUE_MINIMO);
+      const parado = ehEncalhe(p);
       return `<tr>
-        <td><b>${p.NOME}</b></td><td class="mono">${p.SKU||'—'}</td><td><span class="badge info" style="background:rgba(76,141,255,0.12); color:var(--blue);">${nomeLoja(p.EMPRESA_ID)}</span></td>
+        <td><b>${p.NOME}</b> ${parado?'<span class="badge warn" title="Parado há 60+ dias">🐌 parado</span>':''}</td><td class="mono">${p.SKU||'—'}</td><td><span class="badge info" style="background:rgba(76,141,255,0.12); color:var(--blue);">${nomeLoja(p.EMPRESA_ID)}</span></td>
         <td>${moeda(p.PRECO_CUSTO)}</td><td>${moeda(p.PRECO_VENDA)}</td>
         <td>${baixo ? '<span class="badge warn">'+p.ESTOQUE_ATUAL+' baixo</span>' : '<span class="badge ok">'+p.ESTOQUE_ATUAL+'</span>'}</td>
         <td style="display:flex; gap:6px;">
           <button class="btn" style="padding:6px 10px; font-size:11.5px;" onclick="window.__editarProduto('${p.ID}')">Editar</button>
+          <button class="btn" style="padding:6px 10px; font-size:11.5px;" onclick="window.__imprimirEtiqueta('${p.ID}')">🏷️</button>
           <button class="btn" style="padding:6px 10px; font-size:11.5px; color:var(--red);" onclick="window.__excluirProduto('${p.ID}')">Excluir</button>
         </td></tr>`;
     }).join(''));
@@ -93,6 +106,29 @@
     const t = e.target.value.toLowerCase();
     renderLinhas(produtos.filter(p => (p.NOME||'').toLowerCase().includes(t) || (p.SKU||'').toLowerCase().includes(t)));
   });
+  document.getElementById('chkSoParados').addEventListener('change', () => renderLinhas(produtos));
+
+  window.__imprimirEtiqueta = (id) => {
+    const p = produtos.find(x => x.ID === id);
+    if (!p) return;
+    const codigo = p.CODIGO_BARRAS || p.SKU || p.ID;
+
+    const janela = window.open('', '_blank', 'width=420,height=320');
+    janela.document.write(`
+      <html><head><title>Etiqueta - ${p.NOME}</title></head>
+      <body style="font-family:Arial,sans-serif; padding:14px; text-align:center;">
+        <div style="font-size:13px; font-weight:bold; margin-bottom:4px;">${p.NOME}</div>
+        <div style="font-size:18px; font-weight:800; color:#111; margin-bottom:8px;">${moeda(p.PRECO_VENDA)}</div>
+        <svg id="barcode"></svg>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.6/JsBarcode.all.min.js"><\/script>
+        <script>
+          JsBarcode("#barcode", ${JSON.stringify(codigo)}, { format:"CODE128", width:1.6, height:44, fontSize:12, margin:4 });
+          setTimeout(() => window.print(), 300);
+        <\/script>
+      </body></html>
+    `);
+    janela.document.close();
+  };
 
   const modal = document.getElementById('modal');
   function abrirModal(p){

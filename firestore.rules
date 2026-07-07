@@ -119,7 +119,7 @@ service cloud.firestore {
     match /COMPRAS/{id} { allow read: if podeVer('COMPRAS'); allow create: if podeCadastrar('COMPRAS'); allow update, delete: if podeEditar('COMPRAS'); }
     match /ITENS_COMPRA/{id} { allow read: if podeVer('COMPRAS'); allow create: if podeCadastrar('COMPRAS'); allow update, delete: if false; }
     match /VENDAS/{id} { allow read: if podeVer('VENDAS'); allow create: if podeCadastrar('VENDAS'); allow update: if podeEditar('VENDAS'); allow delete: if podeExcluir('VENDAS'); }
-    match /ITENS_VENDA/{id} { allow read: if podeVer('VENDAS'); allow create: if podeCadastrar('VENDAS'); allow update, delete: if false; }
+    match /ITENS_VENDA/{id} { allow read: if podeVer('VENDAS'); allow create: if podeCadastrar('VENDAS'); allow update: if false; allow delete: if podeExcluir('VENDAS'); }
     match /ORCAMENTOS/{id} { allow read: if podeVer('ORCAMENTOS'); allow create: if podeCadastrar('ORCAMENTOS'); allow update: if podeEditar('ORCAMENTOS'); allow delete: if podeExcluir('ORCAMENTOS'); }
     match /ITENS_ORCAMENTO/{id} { allow read: if podeVer('ORCAMENTOS'); allow create: if podeCadastrar('ORCAMENTOS'); allow update, delete: if false; }
     match /ASSISTENCIAS/{id} { allow read: if podeVer('ASSISTENCIA'); allow create: if podeCadastrar('ASSISTENCIA'); allow update: if podeEditar('ASSISTENCIA'); allow delete: if podeExcluir('ASSISTENCIA'); }

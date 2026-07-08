@@ -243,12 +243,11 @@
   /** Monta um cartão bonito (HTML) do orçamento, fundo claro — fica ótimo como imagem de chat. */
   function montarCartaoOrcamento(o){
     const listaItens = JSON.parse(o.ITENS_JSON || '[]');
-    const subtotal = listaItens.reduce((s,i) => s + i.preco, 0);
     const nomeLoja = 'BSTYLE - Eletrônicos & Acessórios';
     return `
       <div style="width:520px; background:#ffffff; font-family:'Segoe UI',Arial,sans-serif; color:#1a1a1a; padding:0;">
         <div style="background:linear-gradient(135deg,#e2401c,#f5a623); padding:22px 26px; display:flex; align-items:center; gap:12px;">
-          <img src="assets/img/Logo.png" style="width:44px; height:44px; object-fit:contain; background:#fff; border-radius:8px; padding:4px;" onerror="this.style.display='none'">
+          <div style="width:40px; height:40px; background:#fff; border-radius:8px; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:18px; color:#e2401c; flex-shrink:0;">B</div>
           <div>
             <div style="font-size:15px; font-weight:800; color:#fff;">${nomeLoja}</div>
             <div style="font-size:11.5px; color:rgba(255,255,255,0.85);">Orçamento Nº ${o.NUMERO_ORCAMENTO}</div>
@@ -266,8 +265,7 @@
               ${listaItens.map(i => `<tr style="border-bottom:1px solid #f2f2f2;"><td style="padding:8px 0; font-size:13px;">${i.item}</td><td style="padding:8px 0; font-size:13px; text-align:right;">${moeda(i.preco)}</td></tr>`).join('')}
             </tbody>
           </table>
-          <div style="display:flex; justify-content:space-between; font-size:12.5px; color:#666; padding-top:8px;"><span>Subtotal</span><span>${moeda(subtotal)}</span></div>
-          ${o.DESCONTO ? `<div style="display:flex; justify-content:space-between; font-size:12.5px; color:#666;"><span>Desconto</span><span>-${moeda(o.DESCONTO)}</span></div>` : ''}
+          ${o.DESCONTO ? `<div style="display:flex; justify-content:space-between; font-size:12.5px; color:#666; padding-top:8px;"><span>Desconto</span><span>-${moeda(o.DESCONTO)}</span></div>` : ''}
           <div style="display:flex; justify-content:space-between; font-size:18px; font-weight:800; color:#e2401c; padding-top:10px; margin-top:6px; border-top:2px solid #1a1a1a;"><span>Total</span><span>${moeda(o.VALOR_TOTAL)}</span></div>
           <div style="text-align:center; font-size:11px; color:#999; margin-top:20px;">Orçamento válido por ${o.VALIDADE_DIAS} dias · gerado em ${dataBR(o.DATA)}</div>
         </div>
@@ -290,18 +288,25 @@
     if (!window.html2canvas) throw new Error('Não consegui carregar a biblioteca de imagem (sem internet?).');
 
     const holder = document.createElement('div');
-    holder.style.cssText = 'position:fixed; left:-9999px; top:0;';
+    holder.style.cssText = 'position:fixed; left:-9999px; top:0; z-index:-1;';
     holder.innerHTML = montarCartaoOrcamento(o);
     document.body.appendChild(holder);
 
-    // espera a logo carregar (ou falhar) antes de tirar o "print"
-    const img = holder.querySelector('img');
-    if (img && !img.complete) await new Promise(res => { img.onload = res; img.onerror = res; });
+    let canvas;
+    try {
+      canvas = await window.html2canvas(holder.firstElementChild, {
+        scale: 2, backgroundColor: '#ffffff', useCORS: true, allowTaint: false, logging: false
+      });
+    } finally {
+      document.body.removeChild(holder);
+    }
 
-    const canvas = await window.html2canvas(holder.firstElementChild, { scale: 2, backgroundColor: '#ffffff' });
-    document.body.removeChild(holder);
-
-    return new Promise(resolve => canvas.toBlob(blob => resolve(blob), 'image/png'));
+    return new Promise((resolve, reject) => {
+      canvas.toBlob(blob => {
+        if (!blob) { reject(new Error('Não consegui converter o cartão em imagem.')); return; }
+        resolve(blob);
+      }, 'image/png');
+    });
   }
 
   document.getElementById('btnEnviarWpp').addEventListener('click', async () => {
@@ -334,6 +339,7 @@
       carregar();
     } catch (e) {
       if (e.name === 'AbortError') return; // usuário cancelou o compartilhamento, tudo bem
+      console.error('Erro ao gerar imagem do orçamento:', e);
       mostrarToast('Erro ao gerar imagem: ' + e.message, 'erro');
     }
   });

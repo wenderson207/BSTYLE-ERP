@@ -98,6 +98,10 @@
       <div class="summary-row total"><span>Total</span><span id="resTotalVenda">R$ 0,00</span></div>
 
       <button class="btn btn-primary" style="width:100%; margin-top:16px; justify-content:center;" id="btnFinalizarVenda">Finalizar venda e gerar garantia</button>
+      <div id="garantiaGeradaWrap" style="display:none; margin-top:12px; padding:12px; border-radius:8px; background:rgba(47,225,168,0.08); border:1px solid rgba(47,225,168,0.3); text-align:center;">
+        <div style="font-size:12.5px; color:var(--mint); font-weight:600; margin-bottom:8px;">✅ Garantia gerada!</div>
+        <button class="btn btn-primary" style="width:100%; justify-content:center;" id="btnImprimirGarantiaAgora">🖨️ Imprimir garantia agora</button>
+      </div>
     </div>
   </div>
 
@@ -155,6 +159,7 @@
   let aparelhos = [], empresas = [], clientes = [];
   let configFidelidade = { ATIVO: false, VALOR_MINIMO: 0, PERCENTUAL_DESCONTO: 0 };
   let carrinhoVenda = [], clienteSelecionadoVenda = null;
+  let ultimaGarantiaGerada = null;
 
   function moeda(v){ return (Number(v)||0).toLocaleString('pt-BR', { style:'currency', currency:'BRL' }); }
   function nomeLoja(id){ if (!id) return '—'; const e = empresas.find(x=>x.ID===id); return e?e.NOME:'—'; }
@@ -379,6 +384,67 @@
     inputClienteVenda.style.display = 'block';
   });
 
+  // ---------- Imprimir a garantia na hora, sem precisar ir na aba Garantias ----------
+  function porExtensoCel(n){
+    const nums = {1:'um',5:'cinco',7:'sete',10:'dez',15:'quinze',20:'vinte',30:'trinta',45:'quarenta e cinco',60:'sessenta',90:'noventa',120:'cento e vinte',180:'cento e oitenta',365:'trezentos e sessenta e cinco'};
+    return nums[Number(n)] || String(n);
+  }
+  function dataBRCel(v){ return v ? new Date(v).toLocaleDateString('pt-BR') : '—'; }
+
+  document.getElementById('btnImprimirGarantiaAgora').addEventListener('click', () => {
+    if (!ultimaGarantiaGerada) return;
+    const g = ultimaGarantiaGerada;
+    const cliente = clientes.find(c => c.ID === g.CLIENTE_ID) || {};
+    const empresaPrincipal = empresas[0] || {};
+
+    const html = `
+      <div style="width:720px; margin:0 auto; padding:34px; font-family:'Segoe UI',Arial,sans-serif; color:#1a1a1a; box-sizing:border-box;">
+        <div style="display:flex; align-items:center; gap:10px; padding-bottom:12px;">
+          <img src="assets/img/Logo.png" style="width:52px; height:52px; object-fit:contain;" onerror="this.style.display='none'">
+          <div style="font-size:19px; font-weight:800; color:#e2401c;">${empresaPrincipal.NOME || 'Loja'}</div>
+        </div>
+        <div style="height:4px; background:linear-gradient(90deg,#e2401c,#f5a623);"></div>
+        <h1 style="text-align:center; font-size:25px; margin:20px 0 6px; font-weight:800;">Termo de Garantia – Produto Usado</h1>
+        <div style="height:2px; background:#e2401c; margin-bottom:14px;"></div>
+
+        <h3 style="font-size:12.5px; margin:14px 0 6px;">1. IDENTIFICAÇÃO DO CLIENTE</h3>
+        <div style="font-size:12px; line-height:1.9;"><b>Cliente:</b> ${cliente.NOME||''}<br><b>CPF:</b> ${cliente.CPF||''}<br><b>Telefone:</b> ${cliente.TELEFONE||''}</div>
+
+        <h3 style="font-size:12.5px; margin:16px 0 6px;">2. DESCRIÇÃO DO PRODUTO</h3>
+        <div style="font-size:12px; line-height:1.9;">
+          <b>Marca/Modelo:</b> ${g.PRODUTO_DESCRICAO||''}<br><b>Cor / Capacidade:</b> ${g.COR_CAPACIDADE||''}<br>
+          <b>Estado do aparelho no ato da venda:</b> ${g.ESTADO_APARELHO||''}
+        </div>
+
+        <h3 style="font-size:12.5px; margin:16px 0 6px;">3. PRAZO DE GARANTIA</h3>
+        <p style="font-size:12px; line-height:1.7; margin:0;">O presente aparelho de celular usado possui garantia de <b>${g.PRAZO_DIAS} (${porExtensoCel(g.PRAZO_DIAS)}) dias</b>, contados a partir da data da compra.</p>
+
+        <h3 style="font-size:12.5px; margin:16px 0 6px;">4. A GARANTIA COBRE</h3>
+        <ul style="font-size:12px; line-height:1.7; margin:0; padding-left:18px;"><li>Defeitos de funcionamento interno do aparelho.</li><li>Falhas técnicas que impeçam o uso normal do celular.</li></ul>
+
+        <h3 style="font-size:12.5px; margin:16px 0 6px;">5. NÃO ESTÃO COBERTOS PELA GARANTIA</h3>
+        <ul style="font-size:12px; line-height:1.7; margin:0 0 8px; padding-left:18px;">
+          <li>Danos por queda, impacto ou pressão.</li><li>Tela trincada, quebrada ou riscada após a venda.</li>
+          <li>Oxidação ou contato com qualquer tipo de líquido.</li><li>Problemas causados por assistência técnica não autorizada (terceiros).</li>
+        </ul>
+        <p style="font-size:11.5px; color:#c0392b; line-height:1.6;"><b>Observação:</b> Por se tratar de produto usado, a <u>BATERIA</u> é considerada item de desgaste natural, estando coberta apenas em caso de defeito técnico.</p>
+
+        <h3 style="font-size:12.5px; margin:16px 0 6px;">6. CONDIÇÕES GERAIS</h3>
+        <p style="font-size:12px; font-weight:600; line-height:1.7;">O consumidor declara ter recebido o aparelho em perfeito estado de funcionamento, ciente de que se trata de produto usado, podendo apresentar sinais naturais de uso.</p>
+
+        <div style="margin-top:16px; font-size:12px; line-height:2;">
+          <b>Data da Venda:</b> ${dataBRCel(g.DATA_EMISSAO)}<br><b>Valor Pago:</b> ${moeda(g.VALOR_PAGO)}<br><b>Forma de Pagamento:</b> ${g.FORMA_PAGAMENTO||''}
+        </div>
+        <div style="margin-top:50px; font-size:12px;">Assinatura do Cliente: ___________________________</div>
+        <div style="margin-top:26px; font-size:12px;">Assinatura da Loja: ___________________________</div>
+      </div>`;
+
+    const janela = window.open('', '_blank');
+    janela.document.write(`<html><head><title>${g.NUMERO_GARANTIA}</title></head><body>${html}</body></html>`);
+    janela.document.close(); janela.focus();
+    setTimeout(() => janela.print(), 400);
+  });
+
   function verificarFidelidadeVenda(){
     const aviso = document.getElementById('avisoFidelidadeVenda');
     if (!configFidelidade.ATIVO || !clienteSelecionadoVenda || Number(clienteSelecionadoVenda.VALOR_GASTO_TOTAL||0) < Number(configFidelidade.VALOR_MINIMO||0)) {
@@ -455,7 +521,7 @@
         await dbUpdate('PRODUTOS', aparelho.ID, { ESTOQUE_ATUAL: 0 });
         await dbInsert('MOVIMENTOS_ESTOQUE', { EMPRESA_ID: aparelho.EMPRESA_ID||'', PRODUTO_ID: aparelho.ID, TIPO:'SAIDA_VENDA', QUANTIDADE: -1, MOTIVO:'Venda '+venda.ID, USUARIO_ID: usuarioAtual.ID, DATA: new Date().toISOString() });
 
-        await dbInsert('GARANTIAS', {
+        const garantiaGerada = await dbInsert('GARANTIAS', {
           VENDA_ID: venda.ID, CLIENTE_ID: clienteSelecionadoVenda.ID, PRODUTO_DESCRICAO: aparelho.MARCA + ' ' + aparelho.MODELO,
           NUMERO_GARANTIA: gerarId('GAR'), PRAZO_DIAS: aparelho.GARANTIA_PADRAO_DIAS || 90, TIPO: 'PRODUTO_USADO',
           COR_CAPACIDADE: [aparelho.COR, aparelho.MEMORIA ? aparelho.MEMORIA+'GB' : ''].filter(Boolean).join(' / '),
@@ -463,6 +529,7 @@
           VALOR_PAGO: item.PRECO_UNITARIO, FORMA_PAGAMENTO: formaPagamento,
           DATA_EMISSAO: new Date().toISOString(), STATUS: 'Ativa'
         });
+        ultimaGarantiaGerada = garantiaGerada;
       }
 
       await dbInsert('FINANCEIRO', {
@@ -476,6 +543,9 @@
       });
 
       mostrarToast('Venda concluída! Garantia(s) gerada(s) — veja na aba Garantias.');
+      if (ultimaGarantiaGerada) {
+        document.getElementById('garantiaGeradaWrap').style.display = 'block';
+      }
       carrinhoVenda = []; clienteSelecionadoVenda = null;
       document.getElementById('clienteSelecionadoWrap').style.display='none';
       document.getElementById('buscaClienteVenda').style.display='block';

@@ -254,8 +254,11 @@ window.recarregarModuloAtual = () => {
  * Carrega assets/img/Logo.png como data URL (necessário pro jsPDF.addImage).
  * Se a logo não existir/falhar, resolve null — quem chamar deve seguir sem logo.
  */
-function carregarLogoComoDataUrl(){
+window.carregarLogoComoDataUrl = function(){
   return new Promise((resolve) => {
+    let jaResolveu = false;
+    const finalizar = (valor) => { if (!jaResolveu) { jaResolveu = true; resolve(valor); } };
+
     const img = new Image();
     img.crossOrigin = 'anonymous';
     img.onload = () => {
@@ -263,11 +266,13 @@ function carregarLogoComoDataUrl(){
         const canvas = document.createElement('canvas');
         canvas.width = img.width; canvas.height = img.height;
         canvas.getContext('2d').drawImage(img, 0, 0);
-        resolve(canvas.toDataURL('image/png'));
-      } catch (e) { resolve(null); }
+        finalizar(canvas.toDataURL('image/png'));
+      } catch (e) { finalizar(null); }
     };
-    img.onerror = () => resolve(null);
+    img.onerror = () => finalizar(null);
     img.src = 'assets/img/Logo.png';
+
+    setTimeout(() => finalizar(null), 2500); // não deixa travar pra sempre se a imagem nunca responder
   });
 }
 

@@ -296,7 +296,7 @@ window.desenharCabecalhoLoja = async function(doc, empresasList){
 
   const xTexto = logoOk ? 44 : 20;
   doc.setFontSize(13); doc.setFont(undefined, 'bold'); doc.setTextColor(20);
-  doc.text(empresa.NOME || 'Loja', xTexto, 20);
+  doc.text('BSTYLE - Eletrônicos & Acessórios', xTexto, 20);
   doc.setFontSize(8.5); doc.setFont(undefined, 'normal'); doc.setTextColor(70);
   doc.text('Assistência técnica de eletrônicos e celulares' + (empresa.CNPJ ? ' - CNPJ ' + empresa.CNPJ : ''), xTexto, 25);
   doc.text(endereco || 'Endereço não cadastrado', xTexto, 29.5);

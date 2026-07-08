@@ -324,24 +324,25 @@
       const blob = await gerarImagemOrcamento(salvo);
       const arquivo = new File([blob], 'Orcamento_' + salvo.NUMERO_ORCAMENTO + '.png', { type: 'image/png' });
 
+      // Abre a imagem numa aba nova sempre — dá pra clicar com o botão direito
+      // e "Copiar imagem" ou "Salvar imagem como...", direto do navegador.
+      const urlAbaNova = URL.createObjectURL(blob);
+      window.open(urlAbaNova, '_blank');
+
       // No celular, isso abre o menu de compartilhar de verdade com a imagem já anexada.
       if (navigator.canShare && navigator.canShare({ files: [arquivo] })) {
-        await navigator.share({ files: [arquivo], title: 'Orçamento ' + salvo.NUMERO_ORCAMENTO, text: textoOrcamento(salvo) });
-        mostrarToast('Orçamento salvo.');
+        try {
+          await navigator.share({ files: [arquivo], title: 'Orçamento ' + salvo.NUMERO_ORCAMENTO, text: textoOrcamento(salvo) });
+        } catch (erroShare) {
+          if (erroShare.name !== 'AbortError') mostrarToast('Não deu pra compartilhar direto — a imagem está aberta na outra aba, copie de lá.', 'erro');
+        }
       } else {
-        // Sem suporte a compartilhar arquivo (a maioria dos computadores) -- baixa a imagem
-        // e abre o WhatsApp com o texto, pra anexar a imagem manualmente.
+        // Sem suporte a compartilhar arquivo (a maioria dos computadores) -- baixa a imagem também.
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a'); a.href = url; a.download = arquivo.name; a.click();
         URL.revokeObjectURL(url);
-
-        const telefone = String(salvo.CLIENTE_TELEFONE||'').replace(/\D/g,'');
-        if (telefone) {
-          const numeroComPais = telefone.length<=11 ? '55'+telefone : telefone;
-          window.open('https://wa.me/' + numeroComPais, '_blank');
-        }
-        mostrarToast('Imagem baixada! Anexe ela na conversa do WhatsApp que abriu.');
       }
+      mostrarToast('Imagem aberta em outra aba — clique com o botão direito nela pra copiar ou salvar.');
       carregar();
     } catch (e) {
       if (e.name === 'AbortError') return; // usuário cancelou o compartilhamento, tudo bem

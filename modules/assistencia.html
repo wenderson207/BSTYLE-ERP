@@ -26,9 +26,15 @@
   .section-title{ font-family:var(--font-display); font-size:14px; font-weight:600; margin:22px 0 10px; padding-top:14px; border-top:1px solid var(--hairline); }
   .section-title:first-child{ border-top:none; padding-top:0; margin-top:0; }
 
-  .senha-tabs{ display:flex; gap:8px; margin-bottom:14px; }
-  .senha-tabs button{ flex:1; padding:8px; border-radius:8px; border:1px solid var(--hairline); background:var(--bg-elevated); color:var(--text-secondary); cursor:pointer; }
-  .senha-tabs button.active{ border-color:var(--mint); color:var(--mint); }
+  .senha-tabs{ display:flex; gap:0; margin-bottom:14px; border:1px solid var(--hairline); border-radius:8px; overflow:hidden; }
+  .senha-tabs button{ flex:1; padding:9px 8px; border:none; border-right:1px solid var(--hairline); background:var(--bg-elevated); color:var(--text-secondary); cursor:pointer; font-size:12.5px; font-family:inherit; }
+  .senha-tabs button:last-child{ border-right:none; }
+  .senha-tabs button.active{ background:var(--mint); color:#07130F; font-weight:600; }
+  .tabela-pecas{ width:100%; border-collapse:collapse; }
+  .tabela-pecas th{ text-align:left; font-size:10.5px; color:var(--text-tertiary); font-family:var(--font-mono); text-transform:uppercase; padding:0 6px 6px 0; }
+  .tabela-pecas td{ padding:4px 6px 4px 0; }
+  .tabela-pecas input{ width:100%; background:var(--bg-elevated); border:1px solid var(--hairline); color:var(--text-primary); padding:8px 10px; border-radius:6px; font-size:12.5px; font-family:inherit; box-sizing:border-box; }
+  .tabela-pecas tfoot td{ padding-top:10px; border-top:1px solid var(--hairline); font-size:12.5px; }
   .pattern-grid{ display:grid; grid-template-columns:repeat(3,40px); grid-template-rows:repeat(3,40px); gap:16px; margin:10px auto; width:fit-content; }
   .pattern-dot{ width:40px; height:40px; border-radius:50%; border:2px solid var(--hairline); background:var(--bg-elevated); cursor:pointer; position:relative; }
   .pattern-dot.active{ border-color:var(--mint); background:rgba(47,225,168,0.15); }
@@ -95,7 +101,13 @@
       <div class="section-title">Diagnóstico e serviço</div>
       <div class="ffield"><label>Defeito informado pelo cliente *</label><textarea id="fDefeito"></textarea></div>
       <div class="ffield"><label>Diagnóstico técnico</label><textarea id="fDiagnostico" placeholder="Preenchido pelo técnico ao avaliar o aparelho"></textarea></div>
-      <div class="ffield"><label>Peças a repor</label><textarea id="fPecas" placeholder="Ex.: Tela original, bateria 3000mAh…"></textarea></div>
+      <div class="ffield"><label>Peças a repor</label>
+        <table class="tabela-pecas">
+          <thead><tr><th>Peça</th><th style="width:130px;">Preço (R$)</th></tr></thead>
+          <tbody id="linhasPecasNova"></tbody>
+          <tfoot><tr><td style="text-align:right; font-weight:600;">Total das peças:</td><td style="font-weight:700;" id="totalPecasNova">R$ 0,00</td></tr></tfoot>
+        </table>
+      </div>
       <div class="frow2">
         <div class="ffield"><label>Valor do serviço (R$)</label><input id="fValor" type="number" step="0.01"></div>
         <div class="ffield"><label>Previsão de entrega</label><input id="fPrazo" type="date"></div>
@@ -147,6 +159,43 @@
 (async function(){
   const STATUS_COLUNAS = ['Aberta','Em diagnóstico','Aguardando peça','Em reparo','Pronto','Entregue'];
   let ordens = [], clientes = [], empresas = [];
+
+  function moeda(v){ return (Number(v)||0).toLocaleString('pt-BR', { style:'currency', currency:'BRL' }); }
+
+  /** Monta as linhas da tabela de peças (mínimo 5), preenchidas se vier itens existentes. */
+  function gerarLinhasPecas(containerId, totalElId, itensExistentes){
+    const tbody = document.getElementById(containerId);
+    const itens = (itensExistentes && itensExistentes.length) ? itensExistentes : [];
+    const totalLinhas = Math.max(5, itens.length);
+    let html = '';
+    for (let i = 0; i < totalLinhas; i++){
+      const item = itens[i] || { nome:'', preco:'' };
+      html += `<tr>
+        <td><input class="input-peca" value="${item.nome||''}" placeholder="Ex.: Tela original"></td>
+        <td><input class="input-preco-peca" type="number" step="0.01" value="${item.preco||''}"></td>
+      </tr>`;
+    }
+    tbody.innerHTML = html;
+    tbody.querySelectorAll('.input-preco-peca').forEach(inp => inp.addEventListener('input', () => calcularTotalPecas(containerId, totalElId)));
+    calcularTotalPecas(containerId, totalElId);
+  }
+
+  function calcularTotalPecas(containerId, totalElId){
+    const total = [...document.querySelectorAll('#'+containerId+' .input-preco-peca')].reduce((s,inp) => s + (Number(inp.value)||0), 0);
+    document.getElementById(totalElId).textContent = moeda(total);
+  }
+
+  /** Lê a tabela e devolve { itens, texto, total } — texto é o formato antigo, pra manter compatibilidade. */
+  function coletarPecas(containerId){
+    const linhas = [...document.querySelectorAll('#'+containerId+' tr')];
+    const itens = linhas.map(l => ({
+      nome: l.querySelector('.input-peca').value.trim(),
+      preco: Number(l.querySelector('.input-preco-peca').value) || 0
+    })).filter(i => i.nome || i.preco);
+    const texto = itens.map(i => i.preco ? `${i.nome} (${moeda(i.preco)})` : i.nome).join(', ');
+    const total = itens.reduce((s,i) => s + i.preco, 0);
+    return { itens, texto, total };
+  }
 
   /** Mantém o espelho público (OS_PUBLICO) sincronizado — é o que a página consulta.html lê, sem exigir login. */
   async function atualizarEspelhoPublico(os){
@@ -310,8 +359,9 @@
   const modalNova = document.getElementById('modalNova');
   document.getElementById('btnNovaOS').addEventListener('click', () => {
     defeitosFrenteNova = []; defeitosVersoNova = [];
-    ['fCliente','fTecnico','fMarca','fModelo','fImei','fAcessorios','fDefeito','fDiagnostico','fPecas','fValor','fPrazo','fSenhaPin','fSenhaTexto'].forEach(id => document.getElementById(id).value = '');
+    ['fCliente','fTecnico','fMarca','fModelo','fImei','fAcessorios','fDefeito','fDiagnostico','fValor','fPrazo','fSenhaPin','fSenhaTexto'].forEach(id => document.getElementById(id).value = '');
     sequenciaPadrao = []; document.getElementById('patternSeq').textContent = '—';
+    gerarLinhasPecas('linhasPecasNova', 'totalPecasNova', []);
     renderDiagrama('diagramaFrenteNova', defeitosFrenteNova, true);
     renderDiagrama('diagramaVersoNova', defeitosVersoNova, true);
     modalNova.classList.add('open');
@@ -335,13 +385,15 @@
       const numeroOS = 'OS-' + ano + '-' + String(totalAno+1).padStart(5,'0');
 
       const codigoAcompanhamento = Math.random().toString(36).substring(2,8).toUpperCase();
+      const pecas = coletarPecas('linhasPecasNova');
 
       const novaOS = await dbInsert('ASSISTENCIAS', {
         NUMERO_OS: numeroOS, CLIENTE_ID: cliente, TECNICO_RESPONSAVEL: document.getElementById('fTecnico').value.trim(),
         MARCA: document.getElementById('fMarca').value.trim(), MODELO: document.getElementById('fModelo').value.trim(),
         IMEI: document.getElementById('fImei').value.trim(), ACESSORIOS_ENTREGUES: document.getElementById('fAcessorios').value.trim(),
         DEFEITO_INFORMADO: defeito, DIAGNOSTICO: document.getElementById('fDiagnostico').value.trim(),
-        PECAS_A_REPOR: document.getElementById('fPecas').value.trim(), VALOR_SERVICO: Number(document.getElementById('fValor').value)||0,
+        PECAS_A_REPOR: pecas.texto, PECAS_ITENS: JSON.stringify(pecas.itens), VALOR_PECAS: pecas.total,
+        VALOR_SERVICO: Number(document.getElementById('fValor').value)||0,
         PRAZO: document.getElementById('fPrazo').value, SENHA_TIPO: senhaTipoAtual, SENHA_VALOR: senhaValor,
         DEFEITOS_FRENTE: JSON.stringify(defeitosFrenteNova), DEFEITOS_VERSO: JSON.stringify(defeitosVersoNova),
         CODIGO_ACOMPANHAMENTO: codigoAcompanhamento,
@@ -384,7 +436,13 @@
       <div class="section-title">Diagnóstico e serviço</div>
       <div class="ffield"><label>Defeito informado</label><textarea id="vDefeito">${osAtual.DEFEITO_INFORMADO||''}</textarea></div>
       <div class="ffield"><label>Diagnóstico técnico</label><textarea id="vDiagnostico">${osAtual.DIAGNOSTICO||''}</textarea></div>
-      <div class="ffield"><label>Peças a repor</label><textarea id="vPecas">${osAtual.PECAS_A_REPOR||''}</textarea></div>
+      <div class="ffield"><label>Peças a repor</label>
+        <table class="tabela-pecas">
+          <thead><tr><th>Peça</th><th style="width:130px;">Preço (R$)</th></tr></thead>
+          <tbody id="linhasPecasVer"></tbody>
+          <tfoot><tr><td style="text-align:right; font-weight:600;">Total das peças:</td><td style="font-weight:700;" id="totalPecasVer">R$ 0,00</td></tr></tfoot>
+        </table>
+      </div>
       <div class="frow2">
         <div class="ffield"><label>Valor do serviço (R$)</label><input id="vValor" type="number" step="0.01" value="${osAtual.VALOR_SERVICO||0}"></div>
         <div class="ffield"><label>Técnico responsável</label><input id="vTecnico" value="${osAtual.TECNICO_RESPONSAVEL||''}"></div>
@@ -399,6 +457,11 @@
     renderDiagrama('diagramaFrenteVer', defFrente, false);
     renderDiagrama('diagramaVersoVer', defVerso, false);
 
+    let itensPecasExistentes = [];
+    try { itensPecasExistentes = JSON.parse(osAtual.PECAS_ITENS || '[]'); } catch (e) { itensPecasExistentes = []; }
+    if (!itensPecasExistentes.length && osAtual.PECAS_A_REPOR) itensPecasExistentes = [{ nome: osAtual.PECAS_A_REPOR, preco: '' }];
+    gerarLinhasPecas('linhasPecasVer', 'totalPecasVer', itensPecasExistentes);
+
     modalVer.classList.add('open');
     document.getElementById('btnWhatsAppOS').addEventListener('click', () => abrirWhatsApp(osAtual));
   };
@@ -411,11 +474,13 @@
     try {
       if (!(await checarPermissao('ASSISTENCIA','EDITAR'))){ mostrarToast('Sem permissão.', 'erro'); return; }
       const novoStatus = document.getElementById('vStatus').value;
+      const pecasVer = coletarPecas('linhasPecasVer');
       const dados = {
         STATUS: novoStatus, PRAZO: document.getElementById('vPrazo').value,
         MARCA: document.getElementById('vMarca').value.trim(), MODELO: document.getElementById('vModelo').value.trim(),
         IMEI: document.getElementById('vImei').value.trim(), DEFEITO_INFORMADO: document.getElementById('vDefeito').value.trim(),
-        DIAGNOSTICO: document.getElementById('vDiagnostico').value.trim(), PECAS_A_REPOR: document.getElementById('vPecas').value.trim(),
+        DIAGNOSTICO: document.getElementById('vDiagnostico').value.trim(),
+        PECAS_A_REPOR: pecasVer.texto, PECAS_ITENS: JSON.stringify(pecasVer.itens), VALOR_PECAS: pecasVer.total,
         VALOR_SERVICO: Number(document.getElementById('vValor').value)||0, TECNICO_RESPONSAVEL: document.getElementById('vTecnico').value.trim()
       };
       if (novoStatus === 'Entregue' && !osAtual.DATA_ENTREGA_REAL) dados.DATA_ENTREGA_REAL = new Date().toISOString();

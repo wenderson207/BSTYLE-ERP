@@ -68,7 +68,7 @@
     <div class="modal-foot">
       <button class="btn" id="btnCancelar">Fechar</button>
       <button class="btn" id="btnSalvar">Salvar</button>
-      <button class="btn" id="btnEnviarWpp">💬 Enviar por WhatsApp</button>
+      <button class="btn" id="btnEnviarWpp">🖼️ Enviar imagem no WhatsApp</button>
       <button class="btn btn-primary" id="btnSalvarPdf">⬇️ Salvar PDF</button>
     </div>
   </div>
@@ -240,17 +240,102 @@
     return texto;
   }
 
+  /** Monta um cartão bonito (HTML) do orçamento, fundo claro — fica ótimo como imagem de chat. */
+  function montarCartaoOrcamento(o){
+    const listaItens = JSON.parse(o.ITENS_JSON || '[]');
+    const subtotal = listaItens.reduce((s,i) => s + i.preco, 0);
+    const nomeLoja = 'BSTYLE - Eletrônicos & Acessórios';
+    return `
+      <div style="width:520px; background:#ffffff; font-family:'Segoe UI',Arial,sans-serif; color:#1a1a1a; padding:0;">
+        <div style="background:linear-gradient(135deg,#e2401c,#f5a623); padding:22px 26px; display:flex; align-items:center; gap:12px;">
+          <img src="assets/img/Logo.png" style="width:44px; height:44px; object-fit:contain; background:#fff; border-radius:8px; padding:4px;" onerror="this.style.display='none'">
+          <div>
+            <div style="font-size:15px; font-weight:800; color:#fff;">${nomeLoja}</div>
+            <div style="font-size:11.5px; color:rgba(255,255,255,0.85);">Orçamento Nº ${o.NUMERO_ORCAMENTO}</div>
+          </div>
+        </div>
+        <div style="padding:24px 26px;">
+          <div style="font-size:12.5px; color:#555; margin-bottom:14px; line-height:1.7;">
+            <b>Cliente:</b> ${o.CLIENTE_NOME}<br>
+            ${o.APARELHO ? '<b>Aparelho:</b> ' + o.APARELHO + '<br>' : ''}
+            ${o.PROBLEMA_RELATADO ? '<b>Problema relatado:</b> ' + o.PROBLEMA_RELATADO : ''}
+          </div>
+          <table style="width:100%; border-collapse:collapse; margin-bottom:6px;">
+            <thead><tr style="border-bottom:2px solid #eee;"><th style="text-align:left; font-size:10.5px; color:#999; padding-bottom:8px; text-transform:uppercase;">Item</th><th style="text-align:right; font-size:10.5px; color:#999; padding-bottom:8px; text-transform:uppercase;">Valor</th></tr></thead>
+            <tbody>
+              ${listaItens.map(i => `<tr style="border-bottom:1px solid #f2f2f2;"><td style="padding:8px 0; font-size:13px;">${i.item}</td><td style="padding:8px 0; font-size:13px; text-align:right;">${moeda(i.preco)}</td></tr>`).join('')}
+            </tbody>
+          </table>
+          <div style="display:flex; justify-content:space-between; font-size:12.5px; color:#666; padding-top:8px;"><span>Subtotal</span><span>${moeda(subtotal)}</span></div>
+          ${o.DESCONTO ? `<div style="display:flex; justify-content:space-between; font-size:12.5px; color:#666;"><span>Desconto</span><span>-${moeda(o.DESCONTO)}</span></div>` : ''}
+          <div style="display:flex; justify-content:space-between; font-size:18px; font-weight:800; color:#e2401c; padding-top:10px; margin-top:6px; border-top:2px solid #1a1a1a;"><span>Total</span><span>${moeda(o.VALOR_TOTAL)}</span></div>
+          <div style="text-align:center; font-size:11px; color:#999; margin-top:20px;">Orçamento válido por ${o.VALIDADE_DIAS} dias · gerado em ${dataBR(o.DATA)}</div>
+        </div>
+      </div>`;
+  }
+
+  async function carregarHtml2Canvas(){
+    return new Promise(resolve => {
+      if (window.html2canvas) return resolve();
+      const s = document.createElement('script');
+      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+      s.onload = resolve; s.onerror = resolve;
+      document.head.appendChild(s);
+    });
+  }
+
+  /** Gera a imagem do cartão fora da tela, converte em arquivo PNG. */
+  async function gerarImagemOrcamento(o){
+    await carregarHtml2Canvas();
+    if (!window.html2canvas) throw new Error('Não consegui carregar a biblioteca de imagem (sem internet?).');
+
+    const holder = document.createElement('div');
+    holder.style.cssText = 'position:fixed; left:-9999px; top:0;';
+    holder.innerHTML = montarCartaoOrcamento(o);
+    document.body.appendChild(holder);
+
+    // espera a logo carregar (ou falhar) antes de tirar o "print"
+    const img = holder.querySelector('img');
+    if (img && !img.complete) await new Promise(res => { img.onload = res; img.onerror = res; });
+
+    const canvas = await window.html2canvas(holder.firstElementChild, { scale: 2, backgroundColor: '#ffffff' });
+    document.body.removeChild(holder);
+
+    return new Promise(resolve => canvas.toBlob(blob => resolve(blob), 'image/png'));
+  }
+
   document.getElementById('btnEnviarWpp').addEventListener('click', async () => {
     try {
       const salvo = await salvarOrcamento();
       if (!salvo) return;
-      const telefone = String(salvo.CLIENTE_TELEFONE||'').replace(/\D/g,'');
-      if (!telefone) { mostrarToast('Informe o telefone do cliente pra enviar por WhatsApp.', 'erro'); return; }
-      const numeroComPais = telefone.length<=11 ? '55'+telefone : telefone;
-      window.open('https://wa.me/' + numeroComPais + '?text=' + encodeURIComponent(textoOrcamento(salvo)), '_blank');
-      mostrarToast('Orçamento salvo.');
+
+      mostrarToast('Gerando imagem…');
+      const blob = await gerarImagemOrcamento(salvo);
+      const arquivo = new File([blob], 'Orcamento_' + salvo.NUMERO_ORCAMENTO + '.png', { type: 'image/png' });
+
+      // No celular, isso abre o menu de compartilhar de verdade com a imagem já anexada.
+      if (navigator.canShare && navigator.canShare({ files: [arquivo] })) {
+        await navigator.share({ files: [arquivo], title: 'Orçamento ' + salvo.NUMERO_ORCAMENTO, text: textoOrcamento(salvo) });
+        mostrarToast('Orçamento salvo.');
+      } else {
+        // Sem suporte a compartilhar arquivo (a maioria dos computadores) -- baixa a imagem
+        // e abre o WhatsApp com o texto, pra anexar a imagem manualmente.
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a'); a.href = url; a.download = arquivo.name; a.click();
+        URL.revokeObjectURL(url);
+
+        const telefone = String(salvo.CLIENTE_TELEFONE||'').replace(/\D/g,'');
+        if (telefone) {
+          const numeroComPais = telefone.length<=11 ? '55'+telefone : telefone;
+          window.open('https://wa.me/' + numeroComPais, '_blank');
+        }
+        mostrarToast('Imagem baixada! Anexe ela na conversa do WhatsApp que abriu.');
+      }
       carregar();
-    } catch (e) { mostrarToast('Erro: ' + e.message, 'erro'); }
+    } catch (e) {
+      if (e.name === 'AbortError') return; // usuário cancelou o compartilhamento, tudo bem
+      mostrarToast('Erro ao gerar imagem: ' + e.message, 'erro');
+    }
   });
 
   document.getElementById('btnSalvarPdf').addEventListener('click', async () => {

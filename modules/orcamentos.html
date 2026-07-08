@@ -1,46 +1,294 @@
-<div class="toolbar"><div><h1 style="font-family:var(--font-display); font-size:22px; margin:0 0 4px;">Orçamentos</h1></div></div>
+<style>
+  .modal-overlay{ position:fixed; inset:0; background:rgba(3,5,8,0.6); display:none; align-items:center; justify-content:center; z-index:100; padding:24px; }
+  .modal-overlay.open{ display:flex; }
+  .modal-box{ background:var(--bg-surface); border:1px solid var(--hairline); border-radius:14px; width:100%; max-width:640px; max-height:90vh; overflow-y:auto; }
+  .modal-head{ display:flex; justify-content:space-between; padding:18px 22px; border-bottom:1px solid var(--hairline); position:sticky; top:0; background:var(--bg-surface); }
+  .modal-body{ padding:20px 22px; }
+  .modal-foot{ display:flex; justify-content:flex-end; gap:10px; padding:16px 22px; border-top:1px solid var(--hairline); flex-wrap:wrap; }
+  .ffield{ margin-bottom:14px; }
+  .ffield label{ display:block; font-size:12px; color:var(--text-secondary); margin-bottom:6px; }
+  .ffield input, .ffield select, .ffield textarea{ width:100%; background:var(--bg-elevated); border:1px solid var(--hairline); color:var(--text-primary); padding:10px 12px; border-radius:8px; font-size:13px; font-family:inherit; box-sizing:border-box; }
+  .frow2{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  .modal-close{ background:none; border:none; color:var(--text-tertiary); font-size:18px; cursor:pointer; }
+  .section-title{ font-family:var(--font-display); font-size:13px; font-weight:600; margin:18px 0 10px; padding-top:12px; border-top:1px solid var(--hairline); }
+  .section-title:first-child{ border-top:none; padding-top:0; margin-top:0; }
+  .tabela-itens{ width:100%; border-collapse:collapse; }
+  .tabela-itens th{ text-align:left; font-size:10.5px; color:var(--text-tertiary); font-family:var(--font-mono); text-transform:uppercase; padding:0 6px 6px 0; }
+  .tabela-itens td{ padding:4px 6px 4px 0; }
+  .tabela-itens input{ width:100%; background:var(--bg-elevated); border:1px solid var(--hairline); color:var(--text-primary); padding:8px 10px; border-radius:6px; font-size:12.5px; font-family:inherit; box-sizing:border-box; }
+  .tabela-itens tfoot td{ padding-top:10px; border-top:1px solid var(--hairline); font-size:12.5px; }
+  .badge{ display:inline-flex; padding:3px 9px; border-radius:20px; font-size:11px; font-weight:600; font-family:var(--font-mono); }
+  .badge.info{ background:rgba(76,141,255,0.12); color:var(--blue); }
+  .badge.ok{ background:rgba(47,225,168,0.12); color:var(--mint); }
+  .badge.danger{ background:rgba(255,92,92,0.12); color:var(--red); }
+  .badge.neutral{ background:var(--bg-elevated); color:var(--text-secondary); }
+</style>
+
+<div class="toolbar">
+  <div><h1 style="font-family:var(--font-display); font-size:22px; margin:0 0 4px;">Orçamentos</h1>
+  <p style="color:var(--text-secondary); font-size:13px; margin:0;">Cliente não precisa estar cadastrado — o nome digitado aqui não vira cadastro.</p></div>
+  <button class="btn btn-primary" id="btnNovo">+ Novo orçamento</button>
+</div>
 
 <table class="dt">
-  <thead><tr><th>Cliente</th><th>Data</th><th>Valor</th><th>Status</th><th></th></tr></thead>
-  <tbody id="linhas"><tr class="empty-row"><td colspan="5">Carregando…</td></tr></tbody>
+  <thead><tr><th>Nº</th><th>Cliente</th><th>Aparelho</th><th>Data</th><th>Valor</th><th>Status</th><th></th></tr></thead>
+  <tbody id="linhas"><tr class="empty-row"><td colspan="7">Carregando…</td></tr></tbody>
 </table>
+
+<div class="modal-overlay" id="modal">
+  <div class="modal-box">
+    <div class="modal-head"><h3 id="modalTitulo" style="font-family:var(--font-display); margin:0;">Novo orçamento</h3><button class="modal-close" id="fecharModal">✕</button></div>
+    <div class="modal-body">
+      <input type="hidden" id="fId">
+      <div class="section-title">Cliente</div>
+      <div class="frow2">
+        <div class="ffield"><label>Nome do cliente *</label><input id="fClienteNome" placeholder="Não precisa estar cadastrado"></div>
+        <div class="ffield"><label>Telefone</label><input id="fClienteTelefone" placeholder="(11) 90000-0000"></div>
+      </div>
+
+      <div class="section-title">Aparelho e problema</div>
+      <div class="ffield"><label>Aparelho (marca/modelo)</label><input id="fAparelho" placeholder="Ex.: Samsung A23"></div>
+      <div class="ffield"><label>Problema relatado</label><textarea id="fProblema" placeholder="Descreva o problema informado pelo cliente"></textarea></div>
+
+      <div class="section-title">Peças / serviços do orçamento</div>
+      <table class="tabela-itens">
+        <thead><tr><th>Item</th><th style="width:130px;">Preço (R$)</th></tr></thead>
+        <tbody id="linhasItens"></tbody>
+        <tfoot>
+          <tr><td style="text-align:right;">Subtotal:</td><td id="subtotalItens">R$ 0,00</td></tr>
+          <tr><td style="text-align:right; font-weight:600;">Total (com desconto):</td><td style="font-weight:700;" id="totalItens">R$ 0,00</td></tr>
+        </tfoot>
+      </table>
+
+      <div class="frow2" style="margin-top:14px;">
+        <div class="ffield"><label>Desconto (R$)</label><input id="fDesconto" type="number" step="0.01" value="0"></div>
+        <div class="ffield"><label>Validade do orçamento (dias)</label><input id="fValidade" type="number" value="15"></div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn" id="btnCancelar">Fechar</button>
+      <button class="btn" id="btnSalvar">Salvar</button>
+      <button class="btn" id="btnEnviarWpp">💬 Enviar por WhatsApp</button>
+      <button class="btn btn-primary" id="btnSalvarPdf">⬇️ Salvar PDF</button>
+    </div>
+  </div>
+</div>
 
 <script>
 (async function(){
-  let itens = [], clientes = [];
+  let itens = [], empresas = [];
+  let orcamentoAtual = null;
+
   function moeda(v){ return (Number(v)||0).toLocaleString('pt-BR', { style:'currency', currency:'BRL' }); }
   function dataBR(v){ return v ? new Date(v).toLocaleDateString('pt-BR') : '—'; }
-  function nomeCliente(id){ const c = clientes.find(x => x.ID === id); return c ? c.NOME : id || '—'; }
   function badge(s){ const map = { Aberto:'info', Aprovado:'ok', Recusado:'danger', Expirado:'neutral' };
     return '<span class="badge ' + (map[s]||'neutral') + '">' + s + '</span>'; }
 
   async function carregar(){
     try {
-      if (!(await checarPermissao('ORCAMENTOS','VISUALIZAR'))){ document.getElementById('linhas').innerHTML='<tr class="empty-row"><td colspan="5">Sem permissão.</td></tr>'; return; }
-      clientes = await dbGetAll('CLIENTES');
-      itens = await dbGetAll('ORCAMENTOS');
+      if (!(await checarPermissao('ORCAMENTOS','VISUALIZAR'))){ setHTML('linhas', '<tr class="empty-row"><td colspan="7">Sem permissão.</td></tr>'); return; }
+      empresas = await dbGetAll('EMPRESAS');
+      let todos = await dbGetAll('ORCAMENTOS');
+      if (window.lojaAtivaId) todos = todos.filter(o => o.EMPRESA_ID === window.lojaAtivaId);
+      itens = todos.sort((a,b) => new Date(b.DATA) - new Date(a.DATA));
       renderLinhas();
     } catch (e) { mostrarToast('Erro: ' + e.message, 'erro'); }
   }
 
   function renderLinhas(){
-    const tbody = document.getElementById('linhas');
-    if (!itens.length){ tbody.innerHTML = '<tr class="empty-row"><td colspan="5">Nenhum orçamento.</td></tr>'; return; }
-    tbody.innerHTML = itens.map(o => `<tr>
-      <td>${nomeCliente(o.CLIENTE_ID)}</td><td>${dataBR(o.DATA)}</td><td>${moeda(o.VALOR_TOTAL)}</td><td>${badge(o.STATUS)}</td>
-      <td>${o.STATUS==='Aberto' ? '<button class="btn" style="padding:6px 10px;font-size:11.5px;" onclick="window.__converter(\''+o.ID+'\')">Converter em venda</button>' : ''}</td>
-      </tr>`).join('');
+    if (!itens.length){ setHTML('linhas', '<tr class="empty-row"><td colspan="7">Nenhum orçamento ainda.</td></tr>'); return; }
+    setHTML('linhas', itens.map(o => `<tr>
+      <td class="mono">${o.NUMERO_ORCAMENTO||'—'}</td><td>${o.CLIENTE_NOME||'—'}</td><td>${o.APARELHO||'—'}</td>
+      <td>${dataBR(o.DATA)}</td><td>${moeda(o.VALOR_TOTAL)}</td><td>${badge(o.STATUS)}</td>
+      <td style="display:flex; gap:6px;">
+        <button class="btn" style="padding:6px 10px; font-size:11.5px;" onclick="window.__abrirOrcamento('${o.ID}')">Ver/Editar</button>
+        <button class="btn" style="padding:6px 10px; font-size:11.5px; color:var(--red);" onclick="window.__excluirOrcamento('${o.ID}')">Excluir</button>
+      </td></tr>`).join(''));
   }
 
-  window.__converter = async (id) => {
-    if (!confirm('Marcar este orçamento como aprovado/convertido? (a venda em si ainda precisa ser lançada no PDV)')) return;
+  function gerarLinhasItens(itensExistentes){
+    const tbody = document.getElementById('linhasItens');
+    const listaItens = itensExistentes && itensExistentes.length ? itensExistentes : [];
+    const totalLinhas = Math.max(5, listaItens.length);
+    let html = '';
+    for (let i = 0; i < totalLinhas; i++){
+      const it = listaItens[i] || { item:'', preco:'' };
+      html += `<tr><td><input class="input-item" value="${it.item||''}" placeholder="Ex.: Troca de tela"></td><td><input class="input-preco-item" type="number" step="0.01" value="${it.preco||''}"></td></tr>`;
+    }
+    tbody.innerHTML = html;
+    tbody.querySelectorAll('.input-preco-item').forEach(inp => inp.addEventListener('input', atualizarTotaisModal));
+    atualizarTotaisModal();
+  }
+  document.getElementById('fDesconto').addEventListener('input', atualizarTotaisModal);
+
+  function coletarItens(){
+    return [...document.querySelectorAll('#linhasItens tr')].map(l => ({
+      item: l.querySelector('.input-item').value.trim(),
+      preco: Number(l.querySelector('.input-preco-item').value) || 0
+    })).filter(i => i.item || i.preco);
+  }
+
+  function atualizarTotaisModal(){
+    const subtotal = coletarItens().reduce((s,i) => s + i.preco, 0);
+    const desconto = Number(document.getElementById('fDesconto').value) || 0;
+    document.getElementById('subtotalItens').textContent = moeda(subtotal);
+    document.getElementById('totalItens').textContent = moeda(Math.max(subtotal - desconto, 0));
+  }
+
+  const modal = document.getElementById('modal');
+  document.getElementById('btnNovo').addEventListener('click', () => {
+    orcamentoAtual = null;
+    document.getElementById('modalTitulo').textContent = 'Novo orçamento';
+    document.getElementById('fId').value = '';
+    ['fClienteNome','fClienteTelefone','fAparelho','fProblema'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('fDesconto').value = 0;
+    document.getElementById('fValidade').value = 15;
+    gerarLinhasItens([]);
+    modal.classList.add('open');
+  });
+  document.getElementById('fecharModal').addEventListener('click', () => modal.classList.remove('open'));
+  document.getElementById('btnCancelar').addEventListener('click', () => modal.classList.remove('open'));
+
+  window.__abrirOrcamento = (id) => {
+    orcamentoAtual = itens.find(o => o.ID === id);
+    if (!orcamentoAtual) return;
+    document.getElementById('modalTitulo').textContent = 'Orçamento ' + (orcamentoAtual.NUMERO_ORCAMENTO||'');
+    document.getElementById('fId').value = orcamentoAtual.ID;
+    document.getElementById('fClienteNome').value = orcamentoAtual.CLIENTE_NOME||'';
+    document.getElementById('fClienteTelefone').value = orcamentoAtual.CLIENTE_TELEFONE||'';
+    document.getElementById('fAparelho').value = orcamentoAtual.APARELHO||'';
+    document.getElementById('fProblema').value = orcamentoAtual.PROBLEMA_RELATADO||'';
+    document.getElementById('fDesconto').value = orcamentoAtual.DESCONTO||0;
+    document.getElementById('fValidade').value = orcamentoAtual.VALIDADE_DIAS||15;
+    let itensSalvos = [];
+    try { itensSalvos = JSON.parse(orcamentoAtual.ITENS_JSON || '[]'); } catch(e) { itensSalvos = []; }
+    gerarLinhasItens(itensSalvos);
+    modal.classList.add('open');
+  };
+
+  function coletarDadosFormulario(){
+    const listaItens = coletarItens();
+    const subtotal = listaItens.reduce((s,i) => s + i.preco, 0);
+    const desconto = Number(document.getElementById('fDesconto').value) || 0;
+    return {
+      CLIENTE_NOME: document.getElementById('fClienteNome').value.trim(),
+      CLIENTE_TELEFONE: document.getElementById('fClienteTelefone').value.trim(),
+      APARELHO: document.getElementById('fAparelho').value.trim(),
+      PROBLEMA_RELATADO: document.getElementById('fProblema').value.trim(),
+      ITENS_JSON: JSON.stringify(listaItens),
+      DESCONTO: desconto, VALOR_TOTAL: Math.max(subtotal - desconto, 0), VALIDADE_DIAS: Number(document.getElementById('fValidade').value)||15
+    };
+  }
+
+  async function salvarOrcamento(){
+    const dados = coletarDadosFormulario();
+    if (!dados.CLIENTE_NOME){ mostrarToast('Informe o nome do cliente.', 'erro'); return null; }
+
+    if (orcamentoAtual) {
+      if (!(await checarPermissao('ORCAMENTOS','EDITAR'))){ mostrarToast('Sem permissão.', 'erro'); return null; }
+      await dbUpdate('ORCAMENTOS', orcamentoAtual.ID, dados);
+      Object.assign(orcamentoAtual, dados);
+      return orcamentoAtual;
+    } else {
+      if (!(await checarPermissao('ORCAMENTOS','CADASTRAR'))){ mostrarToast('Sem permissão.', 'erro'); return null; }
+      const empresaId = await obterLojaParaAcao('Orçamento de qual loja?');
+      if (!empresaId) { mostrarToast('Cadastro cancelado — é preciso escolher a loja.', 'erro'); return null; }
+      const ano = new Date().getFullYear();
+      const totalAno = itens.filter(o => String(o.NUMERO_ORCAMENTO).startsWith('ORC-'+ano)).length;
+      const numero = 'ORC-' + ano + '-' + String(totalAno+1).padStart(5,'0');
+      orcamentoAtual = await dbInsert('ORCAMENTOS', Object.assign({
+        NUMERO_ORCAMENTO: numero, EMPRESA_ID: empresaId, DATA: new Date().toISOString(), STATUS: 'Aberto'
+      }, dados));
+      return orcamentoAtual;
+    }
+  }
+
+  document.getElementById('btnSalvar').addEventListener('click', async () => {
     try {
-      if (!(await checarPermissao('ORCAMENTOS','EDITAR'))){ mostrarToast('Sem permissão.', 'erro'); return; }
-      await dbUpdate('ORCAMENTOS', id, { STATUS: 'Aprovado' });
-      mostrarToast('Orçamento aprovado.');
+      const salvo = await salvarOrcamento();
+      if (!salvo) return;
+      mostrarToast('Orçamento salvo.');
+      modal.classList.remove('open');
+      carregar();
+    } catch (e) { mostrarToast('Erro: ' + e.message, 'erro'); }
+  });
+
+  window.__excluirOrcamento = async (id) => {
+    if (!confirm('Excluir este orçamento?')) return;
+    try {
+      if (!(await checarPermissao('ORCAMENTOS','EXCLUIR'))){ mostrarToast('Sem permissão.', 'erro'); return; }
+      await dbDelete('ORCAMENTOS', id);
+      mostrarToast('Orçamento excluído.');
       carregar();
     } catch (e) { mostrarToast('Erro: ' + e.message, 'erro'); }
   };
+
+  function textoOrcamento(o){
+    const listaItens = JSON.parse(o.ITENS_JSON || '[]');
+    const subtotal = listaItens.reduce((s,i) => s + i.preco, 0);
+    const nomeLoja = (empresas[0] && empresas[0].NOME) || 'Nossa loja';
+    let texto = `📋 *${nomeLoja}* — Orçamento ${o.NUMERO_ORCAMENTO}\n\n`;
+    texto += `Cliente: ${o.CLIENTE_NOME}\n`;
+    if (o.APARELHO) texto += `Aparelho: ${o.APARELHO}\n`;
+    if (o.PROBLEMA_RELATADO) texto += `Problema relatado: ${o.PROBLEMA_RELATADO}\n`;
+    texto += `\n*Itens do orçamento:*\n`;
+    texto += listaItens.map(i => `• ${i.item} — ${moeda(i.preco)}`).join('\n');
+    texto += `\n\nSubtotal: ${moeda(subtotal)}`;
+    if (o.DESCONTO) texto += `\nDesconto: ${moeda(o.DESCONTO)}`;
+    texto += `\n*Total: ${moeda(o.VALOR_TOTAL)}*`;
+    texto += `\n\nOrçamento válido por ${o.VALIDADE_DIAS} dias.`;
+    return texto;
+  }
+
+  document.getElementById('btnEnviarWpp').addEventListener('click', async () => {
+    try {
+      const salvo = await salvarOrcamento();
+      if (!salvo) return;
+      const telefone = String(salvo.CLIENTE_TELEFONE||'').replace(/\D/g,'');
+      if (!telefone) { mostrarToast('Informe o telefone do cliente pra enviar por WhatsApp.', 'erro'); return; }
+      const numeroComPais = telefone.length<=11 ? '55'+telefone : telefone;
+      window.open('https://wa.me/' + numeroComPais + '?text=' + encodeURIComponent(textoOrcamento(salvo)), '_blank');
+      mostrarToast('Orçamento salvo.');
+      carregar();
+    } catch (e) { mostrarToast('Erro: ' + e.message, 'erro'); }
+  });
+
+  document.getElementById('btnSalvarPdf').addEventListener('click', async () => {
+    try {
+      const salvo = await salvarOrcamento();
+      if (!salvo) return;
+
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+      let y = await desenharCabecalhoLoja(doc, empresas);
+
+      doc.setFontSize(15); doc.setFont(undefined,'bold'); doc.setTextColor(20);
+      doc.text('ORÇAMENTO Nº ' + salvo.NUMERO_ORCAMENTO, 105, y, { align:'center' }); y += 10;
+
+      const secao = (t) => { doc.setFontSize(11); doc.setFont(undefined,'bold'); doc.text(t, 20, y); y += 6; };
+      const linha = (l,v) => { doc.setFontSize(10); doc.setFont(undefined,'bold'); doc.text(l,20,y); doc.setFont(undefined,'normal'); doc.text(String(v||''),65,y); y += 5.5; };
+
+      secao('Cliente'); linha('Nome:', salvo.CLIENTE_NOME); linha('Telefone:', salvo.CLIENTE_TELEFONE); linha('Aparelho:', salvo.APARELHO); y += 3;
+      if (salvo.PROBLEMA_RELATADO) { secao('Problema relatado'); doc.setFontSize(10); doc.setFont(undefined,'normal'); const t = doc.splitTextToSize(salvo.PROBLEMA_RELATADO, 170); doc.text(t,20,y); y += t.length*5+4; }
+
+      secao('Itens do orçamento');
+      const listaItens = JSON.parse(salvo.ITENS_JSON || '[]');
+      doc.setFontSize(10); doc.setFont(undefined,'normal');
+      listaItens.forEach(i => { doc.text('• ' + i.item, 24, y); doc.text(moeda(i.preco), 170, y, { align:'right' }); y += 5.5; });
+      y += 4;
+      doc.setDrawColor(200); doc.line(20,y,190,y); y += 6;
+      const subtotal = listaItens.reduce((s,i)=>s+i.preco,0);
+      linha('Subtotal:', moeda(subtotal));
+      if (salvo.DESCONTO) linha('Desconto:', moeda(salvo.DESCONTO));
+      doc.setFontSize(12); doc.setFont(undefined,'bold'); doc.text('Total: ' + moeda(salvo.VALOR_TOTAL), 20, y); y += 8;
+      doc.setFontSize(9.5); doc.setFont(undefined,'normal'); doc.text('Orçamento válido por ' + salvo.VALIDADE_DIAS + ' dias.', 20, y);
+
+      doc.save('Orcamento_' + salvo.NUMERO_ORCAMENTO + '.pdf');
+      mostrarToast('PDF salvo no seu computador.');
+      modal.classList.remove('open');
+      carregar();
+    } catch (e) { mostrarToast('Erro ao gerar PDF: ' + e.message, 'erro'); }
+  });
 
   carregar();
 })();

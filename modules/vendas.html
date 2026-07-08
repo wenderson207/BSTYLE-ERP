@@ -62,6 +62,10 @@
     <div class="summary-row total"><span>Total</span><span id="resTotal">R$ 0,00</span></div>
 
     <button class="btn btn-primary" style="width:100%; margin-top:16px; justify-content:center;" id="btnFinalizar">Finalizar venda</button>
+    <div id="notaFiscalWrap" style="display:none; margin-top:12px; padding:12px; border-radius:8px; background:rgba(47,225,168,0.08); border:1px solid rgba(47,225,168,0.3); text-align:center;">
+      <div style="font-size:12.5px; color:var(--mint); font-weight:600; margin-bottom:8px;">✅ Venda concluída!</div>
+      <button class="btn btn-primary" style="width:100%; justify-content:center;" id="btnEnviarNotaWpp">💬 Enviar nota via WhatsApp</button>
+    </div>
   </div>
 </div>
 
@@ -81,6 +85,8 @@
   let carrinho = [];
   let clienteSelecionado = null;
   let produtosDaLoja = [], todosClientes = [];
+  let ultimaVendaParaNota = null;
+  let empresasCarregadas = [];
   let configFidelidade = { ATIVO: false, VALOR_MINIMO: 0, PERCENTUAL_DESCONTO: 0 };
 
   function moeda(v){ return (Number(v)||0).toLocaleString('pt-BR', { style:'currency', currency:'BRL' }); }
@@ -89,15 +95,15 @@
   try {
     todosProdutosCarregados = (await dbGetAll('PRODUTOS')).filter(p => p.STATUS !== 'Excluído');
     todosClientes = (await dbGetAll('CLIENTES')).filter(c => c.STATUS !== 'Excluído');
-    const empresas = await dbGetAll('EMPRESAS');
+    empresasCarregadas = await dbGetAll('EMPRESAS');
 
     const selEmpresa = document.getElementById('fEmpresaVenda');
     if (window.lojaAtivaId) {
       // Filtro geral já define uma loja específica — trava o seletor nela.
-      setHTML('fEmpresaVenda', empresas.map(e => `<option value="${e.ID}" ${e.ID===window.lojaAtivaId?'selected':''}>${e.NOME}</option>`).join(''));
+      setHTML('fEmpresaVenda', empresasCarregadas.map(e => `<option value="${e.ID}" ${e.ID===window.lojaAtivaId?'selected':''}>${e.NOME}</option>`).join(''));
       selEmpresa.disabled = true;
     } else {
-      setHTML('fEmpresaVenda', '<option value="">Selecione a loja…</option>' + empresas.map(e => `<option value="${e.ID}">${e.NOME}</option>`).join(''));
+      setHTML('fEmpresaVenda', '<option value="">Selecione a loja…</option>' + empresasCarregadas.map(e => `<option value="${e.ID}">${e.NOME}</option>`).join(''));
     }
     atualizarProdutosDaLoja();
     document.getElementById('fEmpresaVenda').addEventListener('change', atualizarProdutosDaLoja);
@@ -299,6 +305,15 @@
       }
 
       mostrarToast('Venda concluída com sucesso!' + (clienteSelecionado ? ' Garantia(s) emitida(s).' : ''));
+
+      const notaFiscalWrap = document.getElementById('notaFiscalWrap');
+      if (clienteSelecionado && String(clienteSelecionado.TELEFONE||'').replace(/\D/g,'')) {
+        ultimaVendaParaNota = { cliente: clienteSelecionado, itens: carrinho.slice(), venda: Object.assign({}, venda, { FORMA_PAGAMENTO: formaPagamento, VALOR_TOTAL: valorTotal, DESCONTO: desconto }) };
+        notaFiscalWrap.style.display = 'block';
+      } else {
+        notaFiscalWrap.style.display = 'none';
+      }
+
       carrinho = []; clienteSelecionado = null;
       document.getElementById('clienteSelecionadoWrap').style.display='none';
       document.getElementById('buscaCliente').style.display='block';
@@ -389,6 +404,26 @@
       carregarHistorico();
     } catch (e) { mostrarToast('Erro ao excluir venda: ' + e.message, 'erro'); }
   };
+
+  // ---------- Enviar nota fiscal (recibo) por WhatsApp ----------
+  document.getElementById('btnEnviarNotaWpp').addEventListener('click', () => {
+    if (!ultimaVendaParaNota) return;
+    const { cliente, itens, venda } = ultimaVendaParaNota;
+    const telefone = String(cliente.TELEFONE||'').replace(/\D/g,'');
+    const numeroComPais = telefone.length<=11 ? '55'+telefone : telefone;
+    const nomeLojaNota = (empresasCarregadas.find(e => e.ID === venda.EMPRESA_ID) || empresasCarregadas[0] || {}).NOME || 'Nossa loja';
+
+    let texto = `🧾 *${nomeLojaNota}* — Comprovante de venda\n\n`;
+    texto += itens.map(i => `${i.QUANTIDADE}x ${i.NOME} — ${moeda(i.QUANTIDADE*i.PRECO_UNITARIO)}`).join('\n');
+    texto += `\n\n*Subtotal:* ${moeda(itens.reduce((s,i)=>s+i.QUANTIDADE*i.PRECO_UNITARIO,0))}`;
+    if (venda.DESCONTO) texto += `\n*Desconto:* ${moeda(venda.DESCONTO)}`;
+    texto += `\n*Total pago:* ${moeda(venda.VALOR_TOTAL)}`;
+    texto += `\n*Forma de pagamento:* ${venda.FORMA_PAGAMENTO}`;
+    texto += `\n\nObrigado pela preferência, ${cliente.NOME}! 🙏`;
+
+    window.open('https://wa.me/' + numeroComPais + '?text=' + encodeURIComponent(texto), '_blank');
+    document.getElementById('notaFiscalWrap').style.display = 'none';
+  });
 
   renderCarrinho();
   carregarHistorico();

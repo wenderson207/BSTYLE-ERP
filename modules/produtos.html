@@ -29,8 +29,8 @@
 </div>
 
 <table class="dt">
-  <thead><tr><th>Produto</th><th>SKU</th><th>Loja</th><th>Custo</th><th>Venda</th><th>Estoque</th><th></th></tr></thead>
-  <tbody id="linhas"><tr class="empty-row"><td colspan="7">Carregando…</td></tr></tbody>
+  <thead><tr><th>Produto</th><th>SKU</th><th>Categoria</th><th>Loja</th><th>Custo</th><th>Venda</th><th>Estoque</th><th></th></tr></thead>
+  <tbody id="linhas"><tr class="empty-row"><td colspan="8">Carregando…</td></tr></tbody>
 </table>
 
 <div class="modal-overlay" id="modal">
@@ -42,6 +42,9 @@
       <div class="frow2">
         <div class="ffield"><label>SKU</label><input id="fSku"></div>
         <div class="ffield"><label>Código de barras</label><input id="fBarras"></div>
+      </div>
+      <div class="ffield"><label>Categoria</label><input id="fCategoria" list="listaCategorias" placeholder="Ex.: Acessórios, Cabos, Fones…">
+        <datalist id="listaCategorias"></datalist>
       </div>
       <div id="avisoDuplicado" style="display:none; margin-bottom:14px; padding:10px 12px; border-radius:8px; background:rgba(245,166,35,0.1); border:1px solid rgba(245,166,35,0.35); font-size:12.5px;"></div>
       <div class="frow2">
@@ -77,12 +80,12 @@
     const tbody = document.getElementById('linhas');
     const soParados = document.getElementById('chkSoParados').checked;
     const listaFiltrada = soParados ? lista.filter(ehEncalhe) : lista;
-    if (!listaFiltrada.length){ setHTML('linhas', '<tr class="empty-row"><td colspan="7">Nenhum produto encontrado.</td></tr>'); return; }
+    if (!listaFiltrada.length){ setHTML('linhas', '<tr class="empty-row"><td colspan="8">Nenhum produto encontrado.</td></tr>'); return; }
     setHTML('linhas', listaFiltrada.map(p => {
       const baixo = Number(p.ESTOQUE_ATUAL) <= Number(p.ESTOQUE_MINIMO);
       const parado = ehEncalhe(p);
       return `<tr>
-        <td><b>${p.NOME}</b> ${parado?'<span class="badge warn" title="Parado há 60+ dias">🐌 parado</span>':''}</td><td class="mono">${p.SKU||'—'}</td><td><span class="badge info" style="background:rgba(76,141,255,0.12); color:var(--blue);">${nomeLoja(p.EMPRESA_ID)}</span></td>
+        <td><b>${p.NOME}</b> ${parado?'<span class="badge warn" title="Parado há 60+ dias">🐌 parado</span>':''}</td><td class="mono">${p.SKU||'—'}</td><td>${p.CATEGORIA||'Geral'}</td><td><span class="badge info" style="background:rgba(76,141,255,0.12); color:var(--blue);">${nomeLoja(p.EMPRESA_ID)}</span></td>
         <td>${moeda(p.PRECO_CUSTO)}</td><td>${moeda(p.PRECO_VENDA)}</td>
         <td>${baixo ? '<span class="badge warn">'+p.ESTOQUE_ATUAL+' baixo</span>' : '<span class="badge ok">'+p.ESTOQUE_ATUAL+'</span>'}</td>
         <td style="display:flex; gap:6px;">
@@ -95,11 +98,14 @@
 
   async function carregar(){
     try {
-      if (!(await checarPermissao('PRODUTOS', 'VISUALIZAR'))) { setHTML('linhas', '<tr class="empty-row"><td colspan="7">Sem permissão.</td></tr>'); return; }
+      if (!(await checarPermissao('PRODUTOS', 'VISUALIZAR'))) { setHTML('linhas', '<tr class="empty-row"><td colspan="8">Sem permissão.</td></tr>'); return; }
       empresas = await dbGetAll('EMPRESAS');
       let todos = (await dbGetAll('PRODUTOS')).filter(p => p.STATUS !== 'Excluído');
       produtos = window.lojaAtivaId ? todos.filter(p => p.EMPRESA_ID === window.lojaAtivaId) : todos;
       renderLinhas(produtos);
+
+      const categoriasExistentes = [...new Set(todos.map(p => p.CATEGORIA).filter(Boolean))];
+      setHTML('listaCategorias', categoriasExistentes.map(c => `<option value="${c}">`).join(''));
     } catch (e) { mostrarToast('Erro ao carregar produtos: ' + e.message, 'erro'); }
   }
 
@@ -138,6 +144,7 @@
     document.getElementById('fNome').value = p ? p.NOME : '';
     document.getElementById('fSku').value = p ? p.SKU||'' : '';
     document.getElementById('fBarras').value = p ? p.CODIGO_BARRAS||'' : '';
+    document.getElementById('fCategoria').value = p ? p.CATEGORIA||'' : '';
     document.getElementById('fCusto').value = p ? p.PRECO_CUSTO : '';
     document.getElementById('fVenda').value = p ? p.PRECO_VENDA : '';
     document.getElementById('fEstoque').value = p ? p.ESTOQUE_ATUAL : 0;
@@ -207,6 +214,7 @@
 
     const dados = {
       NOME: nome, SKU: document.getElementById('fSku').value.trim(), CODIGO_BARRAS: document.getElementById('fBarras').value.trim(),
+      CATEGORIA: document.getElementById('fCategoria').value.trim() || 'Geral',
       PRECO_CUSTO: Number(document.getElementById('fCusto').value)||0, PRECO_VENDA: Number(document.getElementById('fVenda').value)||0,
       ESTOQUE_ATUAL: Number(document.getElementById('fEstoque').value)||0, ESTOQUE_MINIMO: Number(document.getElementById('fEstoqueMin').value)||0,
       GARANTIA_PADRAO_DIAS: Number(document.getElementById('fGarantia').value)||90

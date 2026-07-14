@@ -28,7 +28,7 @@
     <option value="baixo">Só estoque baixo</option>
     <option value="ok">Só estoque OK</option>
   </select>
-  <input id="busca" placeholder="Buscar por nome…" style="min-width:200px;">
+  <input id="busca" placeholder="Nome, SKU ou código de barras…" style="min-width:220px;">
 </div>
 
 <table class="dt">
@@ -45,13 +45,16 @@
   function valorProduto(p, campo){ return (Number(p.ESTOQUE_ATUAL)||0) * (Number(p[campo])||0); }
 
   function carregarChartJs(){
-    return new Promise((resolve) => {
-      if (window.Chart) return resolve();
+    if (window.__promessaChartJs) return window.__promessaChartJs;
+    window.__promessaChartJs = new Promise((resolve) => {
+      if (window.Chart) { resolve(); return; }
       const s = document.createElement('script');
       s.src = 'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js';
-      s.onload = resolve; s.onerror = resolve;
+      s.onload = () => resolve();
+      s.onerror = () => { console.error('Não consegui carregar o Chart.js (CDN bloqueado ou sem internet).'); resolve(); };
       document.head.appendChild(s);
     });
+    return window.__promessaChartJs;
   }
 
   async function carregar(){
@@ -79,7 +82,10 @@
       const baixo = Number(p.ESTOQUE_ATUAL) <= Number(p.ESTOQUE_MINIMO);
       if (situacao === 'baixo' && !baixo) return false;
       if (situacao === 'ok' && baixo) return false;
-      if (termo && !(p.NOME||'').toLowerCase().includes(termo)) return false;
+      if (termo){
+        const corresponde = (p.NOME||'').toLowerCase().includes(termo) || (p.SKU||'').toLowerCase().includes(termo) || (p.CODIGO_BARRAS||'').toLowerCase().includes(termo);
+        if (!corresponde) return false;
+      }
       return true;
     });
 
@@ -113,34 +119,40 @@
 
   async function renderGraficos(){
     await carregarChartJs();
-    if (!window.Chart) return;
+    if (!window.Chart) { console.error('Chart.js não carregou — gráficos não vão aparecer.'); return; }
 
-    // ---------- Valor em estoque por loja ----------
-    const lojasComValor = empresas.length ? empresas : [{ ID:'', NOME:'Sem loja' }];
-    const labelsLoja = lojasComValor.map(e => e.NOME);
-    const valoresCustoLoja = lojasComValor.map(e => produtosTodos.filter(p => p.EMPRESA_ID === e.ID).reduce((s,p)=>s+valorProduto(p,'PRECO_CUSTO'),0));
-    const valoresVendaLoja = lojasComValor.map(e => produtosTodos.filter(p => p.EMPRESA_ID === e.ID).reduce((s,p)=>s+valorProduto(p,'PRECO_VENDA'),0));
+    try {
+      // ---------- Valor em estoque por loja ----------
+      const lojasComValor = empresas.length ? empresas : [{ ID:'', NOME:'Sem loja' }];
+      const labelsLoja = lojasComValor.map(e => e.NOME);
+      const valoresCustoLoja = lojasComValor.map(e => produtosTodos.filter(p => p.EMPRESA_ID === e.ID).reduce((s,p)=>s+valorProduto(p,'PRECO_CUSTO'),0));
+      const valoresVendaLoja = lojasComValor.map(e => produtosTodos.filter(p => p.EMPRESA_ID === e.ID).reduce((s,p)=>s+valorProduto(p,'PRECO_VENDA'),0));
 
-    if (window.__chartLojas) window.__chartLojas.destroy();
-    window.__chartLojas = new Chart(document.getElementById('chartLojas').getContext('2d'), {
-      type: 'bar',
-      data: { labels: labelsLoja, datasets: [
-        { label:'Valor de custo', data: valoresCustoLoja, backgroundColor:'rgba(76,141,255,0.6)', borderRadius:5 },
-        { label:'Valor de venda', data: valoresVendaLoja, backgroundColor:'rgba(47,225,168,0.6)', borderRadius:5 }
-      ] },
-      options: { plugins:{ legend:{ labels:{ color:'#8891A3', font:{ size:10.5 } } } }, scales:{ x:{ grid:{ display:false }, ticks:{ color:'#8891A3' } }, y:{ grid:{ color:'rgba(255,255,255,0.05)' }, ticks:{ color:'#8891A3' } } } }
-    });
+      const chartLojasExistente = Chart.getChart('chartLojas');
+      if (chartLojasExistente) chartLojasExistente.destroy();
+      new Chart(document.getElementById('chartLojas').getContext('2d'), {
+        type: 'bar',
+        data: { labels: labelsLoja, datasets: [
+          { label:'Valor de custo', data: valoresCustoLoja, backgroundColor:'rgba(76,141,255,0.6)', borderRadius:5 },
+          { label:'Valor de venda', data: valoresVendaLoja, backgroundColor:'rgba(47,225,168,0.6)', borderRadius:5 }
+        ] },
+        options: { plugins:{ legend:{ labels:{ color:'#8891A3', font:{ size:10.5 } } } }, scales:{ x:{ grid:{ display:false }, ticks:{ color:'#8891A3' } }, y:{ grid:{ color:'rgba(255,255,255,0.05)' }, ticks:{ color:'#8891A3' } } } }
+      });
+    } catch (e) { console.error('Erro no gráfico de lojas:', e); }
 
-    // ---------- Distribuição por categoria ----------
-    const porCategoria = {};
-    produtosTodos.forEach(p => { const cat = p.CATEGORIA || 'Geral'; porCategoria[cat] = (porCategoria[cat]||0) + valorProduto(p,'PRECO_CUSTO'); });
+    try {
+      // ---------- Distribuição por categoria ----------
+      const porCategoria = {};
+      produtosTodos.forEach(p => { const cat = p.CATEGORIA || 'Geral'; porCategoria[cat] = (porCategoria[cat]||0) + valorProduto(p,'PRECO_CUSTO'); });
 
-    if (window.__chartCategoria) window.__chartCategoria.destroy();
-    window.__chartCategoria = new Chart(document.getElementById('chartCategoria').getContext('2d'), {
-      type: 'doughnut',
-      data: { labels: Object.keys(porCategoria), datasets: [{ data: Object.values(porCategoria), backgroundColor:['#2FE1A8','#4C8DFF','#F5A623','#FF5C5C','#8891A3'] }] },
-      options: { plugins:{ legend:{ position:'bottom', labels:{ color:'#8891A3', font:{ size:10.5 } } } } }
-    });
+      const chartCategoriaExistente = Chart.getChart('chartCategoria');
+      if (chartCategoriaExistente) chartCategoriaExistente.destroy();
+      new Chart(document.getElementById('chartCategoria').getContext('2d'), {
+        type: 'doughnut',
+        data: { labels: Object.keys(porCategoria), datasets: [{ data: Object.values(porCategoria), backgroundColor:['#2FE1A8','#4C8DFF','#F5A623','#FF5C5C','#8891A3'] }] },
+        options: { plugins:{ legend:{ position:'bottom', labels:{ color:'#8891A3', font:{ size:10.5 } } } } }
+      });
+    } catch (e) { console.error('Erro no gráfico de categoria:', e); }
   }
 
   window.__ajustar = async (id, nome, atual) => {

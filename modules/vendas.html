@@ -27,8 +27,8 @@
 <div class="pdv-grid">
   <div class="card">
     <div class="ffield">
-      <label>Buscar produto (nome ou SKU)</label>
-      <input id="buscaProduto" placeholder="Digite para buscar…" autocomplete="off">
+      <label>Buscar produto (nome, SKU ou código de barras)</label>
+      <input id="buscaProduto" placeholder="Nome, SKU ou código de barras…" autocomplete="off">
       <div class="dropdown-results" id="resultadosProduto"></div>
     </div>
     <table class="dt" style="margin-top:16px;">
@@ -123,7 +123,7 @@
   inputProduto.addEventListener('input', () => {
     const termo = inputProduto.value.trim().toLowerCase();
     if (termo.length < 2){ resProduto.classList.remove('open'); return; }
-    const lista = produtosDaLoja.filter(p => p.NOME.toLowerCase().includes(termo) || (p.SKU||'').toLowerCase().includes(termo)).slice(0, 20);
+    const lista = produtosDaLoja.filter(p => p.NOME.toLowerCase().includes(termo) || (p.SKU||'').toLowerCase().includes(termo) || (p.CODIGO_BARRAS||'').toLowerCase().includes(termo)).slice(0, 20);
     mostrarResultadosProduto(lista);
   });
 

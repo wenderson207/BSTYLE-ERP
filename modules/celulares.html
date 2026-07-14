@@ -135,6 +135,7 @@
         <div class="ffield"><label>IMEI</label><input id="fImei"></div>
         <div class="ffield"><label>Número de série</label><input id="fSerie"></div>
       </div>
+      <div class="ffield"><label>Código de barras (se tiver etiqueta na caixa)</label><input id="fCodigoBarras"></div>
       <div class="frow2">
         <div class="ffield"><label>Bateria (%) — se usado</label><input id="fBateria" type="number" min="0" max="100"></div>
         <div class="ffield"><label>Garantia padrão (dias)</label><input id="fGarantia" type="number" value="90"></div>
@@ -203,7 +204,7 @@
 
   document.getElementById('busca').addEventListener('input', e => {
     const t = e.target.value.toLowerCase();
-    renderLinhas(aparelhos.filter(a => (a.MARCA||'').toLowerCase().includes(t) || (a.MODELO||'').toLowerCase().includes(t) || (a.IMEI||'').includes(t)));
+    renderLinhas(aparelhos.filter(a => (a.MARCA||'').toLowerCase().includes(t) || (a.MODELO||'').toLowerCase().includes(t) || (a.IMEI||'').includes(t) || (a.CODIGO_BARRAS||'').toLowerCase().includes(t)));
   });
 
   const modal = document.getElementById('modal');
@@ -217,6 +218,7 @@
     document.getElementById('fTipo').value = a ? a.TIPO_APARELHO||'Novo' : 'Novo';
     document.getElementById('fImei').value = a ? a.IMEI||'' : '';
     document.getElementById('fSerie').value = a ? a.NUMERO_SERIE||'' : '';
+    document.getElementById('fCodigoBarras').value = a ? a.CODIGO_BARRAS||'' : '';
     document.getElementById('fBateria').value = a ? a.BATERIA_PERCENTUAL||'' : '';
     document.getElementById('fGarantia').value = a ? a.GARANTIA_PADRAO_DIAS||90 : 90;
     document.getElementById('fPrecoCompra').value = a ? a.PRECO_CUSTO||'' : '';
@@ -234,7 +236,7 @@
       MARCA: document.getElementById('fMarca').value.trim(), MODELO: document.getElementById('fModelo').value.trim(),
       COR: document.getElementById('fCor').value.trim(), MEMORIA: document.getElementById('fMemoria').value.trim(),
       TIPO_APARELHO: document.getElementById('fTipo').value, IMEI: document.getElementById('fImei').value.trim(),
-      NUMERO_SERIE: document.getElementById('fSerie').value.trim(), BATERIA_PERCENTUAL: document.getElementById('fBateria').value,
+      NUMERO_SERIE: document.getElementById('fSerie').value.trim(), CODIGO_BARRAS: document.getElementById('fCodigoBarras').value.trim(), BATERIA_PERCENTUAL: document.getElementById('fBateria').value,
       GARANTIA_PADRAO_DIAS: Number(document.getElementById('fGarantia').value)||90,
       PRECO_CUSTO: Number(document.getElementById('fPrecoCompra').value)||0, PRECO_VENDA: Number(document.getElementById('fPrecoVenda').value)||0,
       ACESSORIOS_INCLUSOS: document.getElementById('fAcessorios').value.trim(), ESTADO_APARELHO: document.getElementById('fEstado').value.trim()
@@ -330,7 +332,7 @@
     const termo = inputBuscaAparelho.value.trim().toLowerCase();
     if (termo.length < 1){ resAparelho.classList.remove('open'); return; }
     const lista = aparelhosDisponiveis().filter(a =>
-      (a.MARCA+' '+a.MODELO).toLowerCase().includes(termo) || (a.IMEI||'').toLowerCase().includes(termo)
+      (a.MARCA+' '+a.MODELO).toLowerCase().includes(termo) || (a.IMEI||'').toLowerCase().includes(termo) || (a.CODIGO_BARRAS||'').toLowerCase().includes(termo)
     ).slice(0, 20);
     mostrarResultadosAparelho(lista);
   });

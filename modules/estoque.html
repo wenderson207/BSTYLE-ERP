@@ -17,7 +17,10 @@
 </div>
 
 <div class="chart-grid">
-  <div class="chart-card"><h4 style="font-family:var(--font-display); font-size:14px; margin:0 0 14px;">🏬 Valor em estoque por loja</h4><canvas id="chartLojas" height="140"></canvas></div>
+  <div class="chart-card"><h4 style="font-family:var(--font-display); font-size:14px; margin:0 0 14px;">🏬 Valor em estoque por loja</h4>
+    <div id="avisoSemDadosLojas" style="display:none; color:var(--text-tertiary); font-size:12.5px; padding:20px 0; text-align:center;"></div>
+    <canvas id="chartLojas" height="140"></canvas>
+  </div>
   <div class="chart-card"><h4 style="font-family:var(--font-display); font-size:14px; margin:0 0 14px;">Distribuição por categoria</h4><canvas id="chartCategoria" height="140"></canvas></div>
 </div>
 
@@ -38,7 +41,7 @@
 
 <script>
 (async function(){
-  let produtosTodos = [], produtos = [], empresas = [];
+  let produtosTodos = [], produtosParaComparacaoLojas = [], produtos = [], empresas = [];
 
   function moeda(v){ return (Number(v)||0).toLocaleString('pt-BR', { style:'currency', currency:'BRL' }); }
   function nomeLoja(id){ if (!id) return 'Sem loja'; const e = empresas.find(x=>x.ID===id); return e?e.NOME:'—'; }
@@ -63,6 +66,7 @@
       empresas = await dbGetAll('EMPRESAS');
       let todos = (await dbGetAll('PRODUTOS')).filter(p => p.STATUS === 'Ativo');
       produtosTodos = window.lojaAtivaId ? todos.filter(p => p.EMPRESA_ID === window.lojaAtivaId) : todos;
+      produtosParaComparacaoLojas = todos; // este gráfico compara TODAS as lojas, mesmo com um filtro ativo
 
       const categorias = [...new Set(produtosTodos.map(p => p.CATEGORIA || 'Geral'))];
       setHTML('filtroCategoria', '<option value="">Todas as categorias</option>' + categorias.map(c => `<option value="${c}">${c}</option>`).join(''));
@@ -125,12 +129,21 @@
       // ---------- Valor em estoque por loja ----------
       const lojasComValor = empresas.length ? empresas : [{ ID:'', NOME:'Sem loja' }];
       const labelsLoja = lojasComValor.map(e => e.NOME);
-      const valoresCustoLoja = lojasComValor.map(e => produtosTodos.filter(p => p.EMPRESA_ID === e.ID).reduce((s,p)=>s+valorProduto(p,'PRECO_CUSTO'),0));
-      const valoresVendaLoja = lojasComValor.map(e => produtosTodos.filter(p => p.EMPRESA_ID === e.ID).reduce((s,p)=>s+valorProduto(p,'PRECO_VENDA'),0));
+      const valoresCustoLoja = lojasComValor.map(e => produtosParaComparacaoLojas.filter(p => p.EMPRESA_ID === e.ID).reduce((s,p)=>s+valorProduto(p,'PRECO_CUSTO'),0));
+      const valoresVendaLoja = lojasComValor.map(e => produtosParaComparacaoLojas.filter(p => p.EMPRESA_ID === e.ID).reduce((s,p)=>s+valorProduto(p,'PRECO_VENDA'),0));
+
+      const semDados = !empresas.length || (valoresCustoLoja.every(v=>v===0) && valoresVendaLoja.every(v=>v===0));
+      document.getElementById('avisoSemDadosLojas').style.display = semDados ? 'block' : 'none';
+      document.getElementById('chartLojas').style.display = semDados ? 'none' : 'block';
+      if (semDados) {
+        document.getElementById('avisoSemDadosLojas').textContent = !empresas.length
+          ? 'Cadastre suas lojas em Empresas pra ver essa comparação.'
+          : 'Nenhum produto com estoque cadastrado ainda.';
+      }
 
       const chartLojasExistente = Chart.getChart('chartLojas');
       if (chartLojasExistente) chartLojasExistente.destroy();
-      new Chart(document.getElementById('chartLojas').getContext('2d'), {
+      if (!semDados) new Chart(document.getElementById('chartLojas').getContext('2d'), {
         type: 'bar',
         data: { labels: labelsLoja, datasets: [
           { label:'Valor de custo', data: valoresCustoLoja, backgroundColor:'rgba(76,141,255,0.6)', borderRadius:5 },

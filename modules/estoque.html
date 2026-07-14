@@ -1,33 +1,146 @@
-<div class="toolbar"><div><h1 style="font-family:var(--font-display); font-size:22px; margin:0 0 4px;">Estoque</h1></div></div>
+<style>
+  .chart-card{ background:var(--bg-surface); border:1px solid var(--hairline); border-radius:12px; padding:18px 20px; }
+  .chart-grid{ display:grid; grid-template-columns:1.4fr 1fr; gap:16px; margin-bottom:20px; }
+  @media (max-width: 980px){ .chart-grid{ grid-template-columns:1fr; } }
+  .filtros{ display:flex; gap:10px; flex-wrap:wrap; margin-bottom:16px; align-items:center; }
+  .filtros select, .filtros input{ background:var(--bg-surface); border:1px solid var(--hairline); color:var(--text-primary); padding:8px 12px; border-radius:8px; font-size:12.5px; }
+</style>
+
+<div class="toolbar"><div><h1 style="font-family:var(--font-display); font-size:22px; margin:0 0 4px;">Estoque</h1>
+<p style="color:var(--text-secondary); font-size:13px; margin:0;">Quanto você tem parado em mercadoria, por loja e no total.</p></div></div>
+
+<div class="kpi-grid" id="kpiGrid">
+  <div class="kpi"><div class="lbl">Valor em custo</div><div class="val">—</div></div>
+  <div class="kpi"><div class="lbl">Valor em venda (potencial)</div><div class="val">—</div></div>
+  <div class="kpi"><div class="lbl">Lucro potencial</div><div class="val">—</div></div>
+  <div class="kpi"><div class="lbl">Itens em estoque</div><div class="val">—</div></div>
+</div>
+
+<div class="chart-grid">
+  <div class="chart-card"><h4 style="font-family:var(--font-display); font-size:14px; margin:0 0 14px;">🏬 Valor em estoque por loja</h4><canvas id="chartLojas" height="140"></canvas></div>
+  <div class="chart-card"><h4 style="font-family:var(--font-display); font-size:14px; margin:0 0 14px;">Distribuição por categoria</h4><canvas id="chartCategoria" height="140"></canvas></div>
+</div>
+
+<div class="filtros">
+  <select id="filtroCategoria"><option value="">Todas as categorias</option></select>
+  <select id="filtroSituacao">
+    <option value="">Todas as situações</option>
+    <option value="baixo">Só estoque baixo</option>
+    <option value="ok">Só estoque OK</option>
+  </select>
+  <input id="busca" placeholder="Buscar por nome…" style="min-width:200px;">
+</div>
 
 <table class="dt">
-  <thead><tr><th>Produto</th><th>Loja</th><th>Estoque atual</th><th>Mínimo</th><th>Situação</th><th></th></tr></thead>
-  <tbody id="linhas"><tr class="empty-row"><td colspan="6">Carregando…</td></tr></tbody>
+  <thead><tr><th>Produto</th><th>Categoria</th><th>Loja</th><th>Estoque atual</th><th>Mínimo</th><th>Valor em custo</th><th>Situação</th><th></th></tr></thead>
+  <tbody id="linhas"><tr class="empty-row"><td colspan="8">Carregando…</td></tr></tbody>
 </table>
 
 <script>
 (async function(){
-  let produtos = [], empresas = [];
-  function nomeLoja(id){ if (!id) return '—'; const e = empresas.find(x=>x.ID===id); return e?e.NOME:'—'; }
+  let produtosTodos = [], produtos = [], empresas = [];
+
+  function moeda(v){ return (Number(v)||0).toLocaleString('pt-BR', { style:'currency', currency:'BRL' }); }
+  function nomeLoja(id){ if (!id) return 'Sem loja'; const e = empresas.find(x=>x.ID===id); return e?e.NOME:'—'; }
+  function valorProduto(p, campo){ return (Number(p.ESTOQUE_ATUAL)||0) * (Number(p[campo])||0); }
+
+  function carregarChartJs(){
+    return new Promise((resolve) => {
+      if (window.Chart) return resolve();
+      const s = document.createElement('script');
+      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js';
+      s.onload = resolve; s.onerror = resolve;
+      document.head.appendChild(s);
+    });
+  }
 
   async function carregar(){
     try {
-      if (!(await checarPermissao('ESTOQUE','VISUALIZAR'))){ setHTML('linhas', '<tr class="empty-row"><td colspan="6">Sem permissão.</td></tr>'); return; }
+      if (!(await checarPermissao('ESTOQUE','VISUALIZAR'))){ setHTML('linhas', '<tr class="empty-row"><td colspan="8">Sem permissão.</td></tr>'); return; }
       empresas = await dbGetAll('EMPRESAS');
       let todos = (await dbGetAll('PRODUTOS')).filter(p => p.STATUS === 'Ativo');
-      produtos = window.lojaAtivaId ? todos.filter(p => p.EMPRESA_ID === window.lojaAtivaId) : todos;
-      renderLinhas();
+      produtosTodos = window.lojaAtivaId ? todos.filter(p => p.EMPRESA_ID === window.lojaAtivaId) : todos;
+
+      const categorias = [...new Set(produtosTodos.map(p => p.CATEGORIA || 'Geral'))];
+      setHTML('filtroCategoria', '<option value="">Todas as categorias</option>' + categorias.map(c => `<option value="${c}">${c}</option>`).join(''));
+
+      aplicarFiltros();
+      await renderGraficos();
     } catch (e) { mostrarToast('Erro: ' + e.message, 'erro'); }
   }
 
+  function aplicarFiltros(){
+    const categoria = document.getElementById('filtroCategoria').value;
+    const situacao = document.getElementById('filtroSituacao').value;
+    const termo = document.getElementById('busca').value.toLowerCase();
+
+    produtos = produtosTodos.filter(p => {
+      if (categoria && (p.CATEGORIA||'Geral') !== categoria) return false;
+      const baixo = Number(p.ESTOQUE_ATUAL) <= Number(p.ESTOQUE_MINIMO);
+      if (situacao === 'baixo' && !baixo) return false;
+      if (situacao === 'ok' && baixo) return false;
+      if (termo && !(p.NOME||'').toLowerCase().includes(termo)) return false;
+      return true;
+    });
+
+    renderKpis();
+    renderLinhas();
+  }
+  ['filtroCategoria','filtroSituacao'].forEach(id => document.getElementById(id).addEventListener('change', aplicarFiltros));
+  document.getElementById('busca').addEventListener('input', aplicarFiltros);
+
+  function renderKpis(){
+    const valorCusto = produtos.reduce((s,p) => s + valorProduto(p,'PRECO_CUSTO'), 0);
+    const valorVenda = produtos.reduce((s,p) => s + valorProduto(p,'PRECO_VENDA'), 0);
+    const totalItens = produtos.reduce((s,p) => s + (Number(p.ESTOQUE_ATUAL)||0), 0);
+    const kpis = document.querySelectorAll('#kpiGrid .kpi .val');
+    kpis[0].textContent = moeda(valorCusto);
+    kpis[1].textContent = moeda(valorVenda);
+    kpis[2].textContent = moeda(valorVenda - valorCusto);
+    kpis[3].textContent = totalItens;
+  }
+
   function renderLinhas(){
-    if (!produtos.length){ setHTML('linhas', '<tr class="empty-row"><td colspan="6">Nenhum produto ativo.</td></tr>'); return; }
+    if (!produtos.length){ setHTML('linhas', '<tr class="empty-row"><td colspan="8">Nenhum produto encontrado.</td></tr>'); return; }
     setHTML('linhas', produtos.map(p => {
       const baixo = Number(p.ESTOQUE_ATUAL) <= Number(p.ESTOQUE_MINIMO);
-      return `<tr><td><b>${p.NOME}</b></td><td>${nomeLoja(p.EMPRESA_ID)}</td><td>${p.ESTOQUE_ATUAL}</td><td>${p.ESTOQUE_MINIMO}</td>
+      return `<tr><td><b>${p.NOME}</b></td><td>${p.CATEGORIA||'Geral'}</td><td>${nomeLoja(p.EMPRESA_ID)}</td><td>${p.ESTOQUE_ATUAL}</td><td>${p.ESTOQUE_MINIMO}</td>
+        <td>${moeda(valorProduto(p,'PRECO_CUSTO'))}</td>
         <td>${baixo?'<span class="badge warn">Baixo</span>':'<span class="badge ok">OK</span>'}</td>
         <td><button class="btn" style="padding:6px 10px;font-size:11.5px;" onclick="window.__ajustar('${p.ID}','${p.NOME.replace(/'/g,"\\'")}',${p.ESTOQUE_ATUAL})">Ajustar</button></td></tr>`;
     }).join(''));
+  }
+
+  async function renderGraficos(){
+    await carregarChartJs();
+    if (!window.Chart) return;
+
+    // ---------- Valor em estoque por loja ----------
+    const lojasComValor = empresas.length ? empresas : [{ ID:'', NOME:'Sem loja' }];
+    const labelsLoja = lojasComValor.map(e => e.NOME);
+    const valoresCustoLoja = lojasComValor.map(e => produtosTodos.filter(p => p.EMPRESA_ID === e.ID).reduce((s,p)=>s+valorProduto(p,'PRECO_CUSTO'),0));
+    const valoresVendaLoja = lojasComValor.map(e => produtosTodos.filter(p => p.EMPRESA_ID === e.ID).reduce((s,p)=>s+valorProduto(p,'PRECO_VENDA'),0));
+
+    if (window.__chartLojas) window.__chartLojas.destroy();
+    window.__chartLojas = new Chart(document.getElementById('chartLojas').getContext('2d'), {
+      type: 'bar',
+      data: { labels: labelsLoja, datasets: [
+        { label:'Valor de custo', data: valoresCustoLoja, backgroundColor:'rgba(76,141,255,0.6)', borderRadius:5 },
+        { label:'Valor de venda', data: valoresVendaLoja, backgroundColor:'rgba(47,225,168,0.6)', borderRadius:5 }
+      ] },
+      options: { plugins:{ legend:{ labels:{ color:'#8891A3', font:{ size:10.5 } } } }, scales:{ x:{ grid:{ display:false }, ticks:{ color:'#8891A3' } }, y:{ grid:{ color:'rgba(255,255,255,0.05)' }, ticks:{ color:'#8891A3' } } } }
+    });
+
+    // ---------- Distribuição por categoria ----------
+    const porCategoria = {};
+    produtosTodos.forEach(p => { const cat = p.CATEGORIA || 'Geral'; porCategoria[cat] = (porCategoria[cat]||0) + valorProduto(p,'PRECO_CUSTO'); });
+
+    if (window.__chartCategoria) window.__chartCategoria.destroy();
+    window.__chartCategoria = new Chart(document.getElementById('chartCategoria').getContext('2d'), {
+      type: 'doughnut',
+      data: { labels: Object.keys(porCategoria), datasets: [{ data: Object.values(porCategoria), backgroundColor:['#2FE1A8','#4C8DFF','#F5A623','#FF5C5C','#8891A3'] }] },
+      options: { plugins:{ legend:{ position:'bottom', labels:{ color:'#8891A3', font:{ size:10.5 } } } } }
+    });
   }
 
   window.__ajustar = async (id, nome, atual) => {

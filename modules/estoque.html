@@ -168,17 +168,18 @@
     } catch (e) { console.error('Erro no gráfico de categoria:', e); }
   }
 
-  window.__ajustar = async (id, nome, atual) => {
-    const delta = prompt('Ajuste de estoque para "' + nome + '" (atual: ' + atual + ').\nDigite a quantidade (use negativo para reduzir):', '0');
+  window.__ajustar = async (id, nome, atualExibido) => {
+    const delta = prompt('Ajuste de estoque para "' + nome + '" (atual: ' + atualExibido + ').\nDigite a quantidade (use negativo para reduzir):', '0');
     if (delta === null) return;
     const motivo = prompt('Motivo do ajuste:');
     if (!motivo){ mostrarToast('Informe o motivo.', 'erro'); return; }
     try {
       if (!(await checarPermissao('ESTOQUE','EDITAR'))){ mostrarToast('Sem permissão.', 'erro'); return; }
-      const novoEstoque = atual + Number(delta);
+      const produtoAtual = await dbGetById('PRODUTOS', id); // valor fresco, direto do banco
+      const novoEstoque = Number(produtoAtual.ESTOQUE_ATUAL||0) + Number(delta);
       await dbUpdate('PRODUTOS', id, { ESTOQUE_ATUAL: novoEstoque });
       await dbInsert('MOVIMENTOS_ESTOQUE', { PRODUTO_ID: id, TIPO:'AJUSTE_MANUAL', QUANTIDADE: Number(delta), MOTIVO: motivo, USUARIO_ID: usuarioAtual.ID, DATA: new Date().toISOString() });
-      mostrarToast('Estoque ajustado.');
+      mostrarToast('Estoque ajustado. Agora: ' + novoEstoque + ' unidades.');
       carregar();
     } catch (e) { mostrarToast('Erro: ' + e.message, 'erro'); }
   };

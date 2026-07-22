@@ -52,7 +52,13 @@
         <div class="ffield"><label>Preço de venda (R$)</label><input id="fVenda" type="number" step="0.01"></div>
       </div>
       <div class="frow2">
-        <div class="ffield"><label>Estoque atual</label><input id="fEstoque" type="number"></div>
+        <div class="ffield">
+          <label>Estoque atual <span id="labelSomenteLeitura" style="display:none; color:var(--text-tertiary); font-weight:400;">(use "Ajustar" pra mudar)</span></label>
+          <div style="display:flex; gap:8px;">
+            <input id="fEstoque" type="number" style="flex:1;">
+            <button class="btn" type="button" id="btnAjustarNoModal" style="display:none; white-space:nowrap;">🔧 Ajustar</button>
+          </div>
+        </div>
         <div class="ffield"><label>Estoque mínimo</label><input id="fEstoqueMin" type="number"></div>
       </div>
       <div class="ffield"><label>Garantia padrão (dias)</label><input id="fGarantia" type="number" value="90"></div>
@@ -151,6 +157,12 @@
     document.getElementById('fEstoqueMin').value = p ? p.ESTOQUE_MINIMO : 0;
     document.getElementById('fGarantia').value = p ? p.GARANTIA_PADRAO_DIAS : 90;
     document.getElementById('avisoDuplicado').style.display = 'none';
+
+    // Editando: trava o campo de estoque (só muda via "Ajustar", nunca sobrescrevendo).
+    document.getElementById('fEstoque').disabled = !!p;
+    document.getElementById('labelSomenteLeitura').style.display = p ? 'inline' : 'none';
+    document.getElementById('btnAjustarNoModal').style.display = p ? 'inline-flex' : 'none';
+
     modal.classList.add('open');
   }
   document.getElementById('btnNovo').addEventListener('click', () => abrirModal(null));
@@ -193,19 +205,27 @@
   }
   ['fNome','fSku','fBarras'].forEach(id => document.getElementById(id).addEventListener('input', verificarDuplicado));
 
-  /** Repor estoque rapidamente num produto já existente, sem duplicar cadastro. */
+  /** Repor estoque rapidamente num produto já existente, sem duplicar cadastro. Sempre busca o valor mais atual do banco antes de somar. */
   window.__ajustarEstoqueRapido = async (p) => {
-    const quantidade = prompt('Quantas unidades você está repondo de "' + p.NOME + '" (estoque atual: ' + p.ESTOQUE_ATUAL + ')?', '1');
+    const quantidade = prompt('Quantas unidades você está repondo de "' + p.NOME + '"?', '1');
     if (quantidade === null || !Number(quantidade)) return;
     try {
       if (!(await checarPermissao('PRODUTOS','EDITAR'))){ mostrarToast('Sem permissão.', 'erro'); return; }
-      const novoEstoque = Number(p.ESTOQUE_ATUAL) + Number(quantidade);
+      const atual = await dbGetById('PRODUTOS', p.ID); // valor fresco, direto do banco
+      const novoEstoque = Number(atual.ESTOQUE_ATUAL||0) + Number(quantidade);
       await dbUpdate('PRODUTOS', p.ID, { ESTOQUE_ATUAL: novoEstoque });
       await dbInsert('MOVIMENTOS_ESTOQUE', { EMPRESA_ID: p.EMPRESA_ID||'', PRODUTO_ID: p.ID, TIPO:'REPOSICAO', QUANTIDADE: Number(quantidade), MOTIVO:'Reposição de estoque', USUARIO_ID: usuarioAtual.ID, DATA: new Date().toISOString() });
       mostrarToast('Estoque reposto: ' + p.NOME + ' agora tem ' + novoEstoque + ' unidades.');
+      modal.classList.remove('open');
       carregar();
     } catch (e) { mostrarToast('Erro: ' + e.message, 'erro'); }
   };
+
+  document.getElementById('btnAjustarNoModal').addEventListener('click', () => {
+    const id = document.getElementById('fId').value;
+    const p = produtos.find(x => x.ID === id);
+    if (p) window.__ajustarEstoqueRapido(p);
+  });
 
   document.getElementById('btnSalvar').addEventListener('click', async () => {
     const id = document.getElementById('fId').value;
@@ -216,9 +236,10 @@
       NOME: nome, SKU: document.getElementById('fSku').value.trim(), CODIGO_BARRAS: document.getElementById('fBarras').value.trim(),
       CATEGORIA: document.getElementById('fCategoria').value.trim() || 'Geral',
       PRECO_CUSTO: Number(document.getElementById('fCusto').value)||0, PRECO_VENDA: Number(document.getElementById('fVenda').value)||0,
-      ESTOQUE_ATUAL: Number(document.getElementById('fEstoque').value)||0, ESTOQUE_MINIMO: Number(document.getElementById('fEstoqueMin').value)||0,
+      ESTOQUE_MINIMO: Number(document.getElementById('fEstoqueMin').value)||0,
       GARANTIA_PADRAO_DIAS: Number(document.getElementById('fGarantia').value)||90
     };
+    if (!id) dados.ESTOQUE_ATUAL = Number(document.getElementById('fEstoque').value)||0; // só na criação — editar nunca sobrescreve o estoque
 
     try {
       if (id) {

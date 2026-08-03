@@ -111,8 +111,8 @@
       <input id="buscaHistoricoCelular" placeholder="Buscar por cliente…" style="max-width:220px; background:var(--bg-elevated); border:1px solid var(--hairline); color:var(--text-primary); padding:7px 10px; border-radius:8px; font-size:12px;">
     </div>
     <table class="dt">
-      <thead><tr><th>Data/Hora</th><th>Cliente</th><th>Loja</th><th>Pagamento</th><th>Valor</th><th>Status</th><th></th></tr></thead>
-      <tbody id="linhasHistoricoCelular"><tr class="empty-row"><td colspan="7">Carregando…</td></tr></tbody>
+      <thead><tr><th>Data/Hora</th><th>Cliente</th><th>Vendedor</th><th>Loja</th><th>Pagamento</th><th>Valor</th><th>Status</th><th></th></tr></thead>
+      <tbody id="linhasHistoricoCelular"><tr class="empty-row"><td colspan="8">Carregando…</td></tr></tbody>
     </table>
   </div>
 </div>
@@ -157,7 +157,7 @@
 
 <script>
 (async function(){
-  let aparelhos = [], empresas = [], clientes = [];
+  let aparelhos = [], empresas = [], clientes = [], usuariosCel = [];
   let configFidelidade = { ATIVO: false, VALOR_MINIMO: 0, PERCENTUAL_DESCONTO: 0 };
   let carrinhoVenda = [], clienteSelecionadoVenda = null;
   let ultimaGarantiaGerada = null;
@@ -572,10 +572,12 @@
   let historicoVendasCelular = [];
   function dataHoraBR(v){ return v ? new Date(v).toLocaleString('pt-BR', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' }) : '—'; }
   function nomeClienteHist(id){ const c = clientes.find(x=>x.ID===id); return c?c.NOME:'Sem cliente'; }
+  function nomeVendedorHist(id){ const u = usuariosCel.find(x=>x.ID===id); return u?u.NOME:'—'; }
 
   async function carregarHistoricoCelular(){
     try {
-      if (!(await checarPermissao('VENDAS','VISUALIZAR'))){ setHTML('linhasHistoricoCelular', '<tr class="empty-row"><td colspan="7">Sem permissão.</td></tr>'); return; }
+      if (!(await checarPermissao('VENDAS','VISUALIZAR'))){ setHTML('linhasHistoricoCelular', '<tr class="empty-row"><td colspan="8">Sem permissão.</td></tr>'); return; }
+      usuariosCel = await dbGetAll('USUARIOS');
       let todas = (await dbGetAll('VENDAS')).filter(v => v.ORIGEM === 'CELULARES');
       if (window.lojaAtivaId) todas = todas.filter(v => v.EMPRESA_ID === window.lojaAtivaId);
       historicoVendasCelular = todas.sort((a,b) => new Date(b.DATA) - new Date(a.DATA)).slice(0, 50);
@@ -584,9 +586,9 @@
   }
 
   function renderHistoricoCelular(lista){
-    if (!lista.length){ setHTML('linhasHistoricoCelular', '<tr class="empty-row"><td colspan="7">Nenhuma venda de celular ainda.</td></tr>'); return; }
+    if (!lista.length){ setHTML('linhasHistoricoCelular', '<tr class="empty-row"><td colspan="8">Nenhuma venda de celular ainda.</td></tr>'); return; }
     setHTML('linhasHistoricoCelular', lista.map(v => `<tr>
-      <td>${dataHoraBR(v.DATA)}</td><td>${nomeClienteHist(v.CLIENTE_ID)}</td><td>${nomeLoja(v.EMPRESA_ID)}</td>
+      <td>${dataHoraBR(v.DATA)}</td><td>${nomeClienteHist(v.CLIENTE_ID)}</td><td>${nomeVendedorHist(v.USUARIO_ID)}</td><td>${nomeLoja(v.EMPRESA_ID)}</td>
       <td>${v.FORMA_PAGAMENTO||'—'}</td><td>${moeda(v.VALOR_TOTAL)}</td>
       <td><span class="badge ${v.STATUS==='Cancelada'?'info':'ok'}">${v.STATUS}</span></td>
       <td>${v.STATUS!=='Cancelada' ? `<button class="btn" style="padding:6px 10px; font-size:11.5px; color:var(--red);" onclick="window.__excluirVendaCelular('${v.ID}')">Excluir</button>` : ''}</td>

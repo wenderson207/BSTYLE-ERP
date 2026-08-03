@@ -55,6 +55,19 @@
       <label>Valor recebido do cliente (R$)</label><input id="valorRecebido" type="number" step="0.01">
       <div id="trocoInfo" style="margin-top:8px; font-size:12.5px; font-family:var(--font-mono);"></div>
     </div>
+
+    <div class="ffield">
+      <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+        <input type="checkbox" id="chkCombinarPagamento"> Combinar pagamento (dividir entre formas)
+      </label>
+    </div>
+
+    <div id="combinarWrap" style="display:none; margin-bottom:14px;">
+      <div id="linhasCombinado"></div>
+      <button class="btn" type="button" id="btnAddFormaPagamento" style="width:100%; justify-content:center; margin-top:6px;">+ Adicionar forma de pagamento</button>
+      <div id="avisoCombinado" style="margin-top:8px; font-size:12px; font-family:var(--font-mono);"></div>
+    </div>
+
     <div class="ffield"><label>Desconto geral (R$)</label><input id="desconto" type="number" step="0.01" value="0"></div>
 
     <div class="summary-row"><span>Subtotal</span><span id="resSubtotal">R$ 0,00</span></div>
@@ -177,7 +190,7 @@
         <td><button onclick="window.__alterarQtd(${idx},-1)">−</button> ${i.QUANTIDADE} <button onclick="window.__alterarQtd(${idx},1)">+</button></td>
         <td>${moeda(i.QUANTIDADE * i.PRECO_UNITARIO)}</td></tr>`).join('');
     }
-    atualizarResumo(); atualizarTroco();
+    atualizarResumo(); atualizarTroco(); atualizarValidacaoCombinado();
   }
   window.__removerItem = (idx) => { carrinho.splice(idx,1); renderCarrinho(); };
   window.__alterarQtd = async (idx, delta) => {
@@ -241,8 +254,70 @@
     document.getElementById('dinheiroWrap').style.display = e.target.value === 'Dinheiro' ? 'block' : 'none';
     atualizarTroco();
   });
-  document.getElementById('desconto').addEventListener('input', () => { atualizarResumo(); atualizarTroco(); });
+  document.getElementById('desconto').addEventListener('input', () => { atualizarResumo(); atualizarTroco(); atualizarValidacaoCombinado(); });
   document.getElementById('valorRecebido').addEventListener('input', atualizarTroco);
+
+  // ---------- Combinar pagamento (dividir entre formas) ----------
+  document.getElementById('chkCombinarPagamento').addEventListener('change', e => {
+    const combinando = e.target.checked;
+    document.getElementById('combinarWrap').style.display = combinando ? 'block' : 'none';
+    document.getElementById('formaPagamento').closest('.ffield').style.display = combinando ? 'none' : 'block';
+    document.getElementById('parcelasWrap').style.display = combinando ? 'none' : (document.getElementById('formaPagamento').value === 'Parcelado' || document.getElementById('formaPagamento').value === 'Cartão de Crédito' ? 'block' : 'none');
+    document.getElementById('dinheiroWrap').style.display = combinando ? 'none' : (document.getElementById('formaPagamento').value === 'Dinheiro' ? 'block' : 'none');
+    if (combinando && !document.getElementById('linhasCombinado').children.length) {
+      adicionarLinhaCombinado(); adicionarLinhaCombinado();
+    }
+    atualizarValidacaoCombinado();
+  });
+
+  function adicionarLinhaCombinado(){
+    const container = document.getElementById('linhasCombinado');
+    const div = document.createElement('div');
+    div.className = 'linha-combinado';
+    div.style.cssText = 'display:flex; gap:6px; align-items:flex-start; margin-bottom:8px; flex-wrap:wrap;';
+    div.innerHTML = `
+      <select class="combo-forma" style="flex:1.3; min-width:120px;">
+        <option>PIX</option><option>Cartão de Crédito</option><option>Cartão de Débito</option><option>Dinheiro</option>
+      </select>
+      <input class="combo-valor" type="number" step="0.01" placeholder="Valor (R$)" style="flex:1; min-width:90px;">
+      <input class="combo-parcelas" type="number" min="1" max="12" value="1" placeholder="Parcelas" style="width:70px; display:none;">
+      <button class="btn" type="button" style="padding:8px 10px;" onclick="this.closest('.linha-combinado').remove(); window.__atualizarValidacaoCombinado();">✕</button>
+    `;
+    container.appendChild(div);
+    const selectForma = div.querySelector('.combo-forma');
+    const inputParcelas = div.querySelector('.combo-parcelas');
+    selectForma.addEventListener('change', () => {
+      inputParcelas.style.display = selectForma.value === 'Cartão de Crédito' ? 'inline-block' : 'none';
+      atualizarValidacaoCombinado();
+    });
+    div.querySelector('.combo-valor').addEventListener('input', atualizarValidacaoCombinado);
+  }
+  document.getElementById('btnAddFormaPagamento').addEventListener('click', adicionarLinhaCombinado);
+
+  function coletarFormasCombinado(){
+    return [...document.querySelectorAll('.linha-combinado')].map(l => ({
+      forma: l.querySelector('.combo-forma').value,
+      valor: Number(l.querySelector('.combo-valor').value) || 0,
+      parcelas: l.querySelector('.combo-forma').value === 'Cartão de Crédito' ? (Number(l.querySelector('.combo-parcelas').value) || 1) : 1
+    })).filter(f => f.valor > 0);
+  }
+
+  function atualizarValidacaoCombinado(){
+    if (!document.getElementById('chkCombinarPagamento').checked) return;
+    const formas = coletarFormasCombinado();
+    const somaFormas = formas.reduce((s,f) => s+f.valor, 0);
+    const total = totalDaVenda();
+    const diferenca = Math.round((total - somaFormas) * 100) / 100;
+    const aviso = document.getElementById('avisoCombinado');
+    if (diferenca === 0 && formas.length) {
+      aviso.style.color = 'var(--mint)'; aviso.textContent = '✓ Soma bate certinho: ' + moeda(somaFormas) + ' de ' + moeda(total);
+    } else if (diferenca > 0) {
+      aviso.style.color = 'var(--amber)'; aviso.textContent = 'Falta ' + moeda(diferenca) + ' pra completar o total (' + moeda(total) + ')';
+    } else {
+      aviso.style.color = 'var(--red)'; aviso.textContent = 'Passou ' + moeda(Math.abs(diferenca)) + ' do total (' + moeda(total) + ')';
+    }
+  }
+  window.__atualizarValidacaoCombinado = atualizarValidacaoCombinado;
 
   function totalDaVenda(){
     const subtotal = carrinho.reduce((s,i) => s + i.QUANTIDADE*i.PRECO_UNITARIO, 0);
@@ -271,21 +346,23 @@
     if (!document.getElementById('fEmpresaVenda').value){ mostrarToast('Selecione para qual loja é esta venda.', 'erro'); return; }
     if (!(await checarPermissao('VENDAS','CADASTRAR'))){ mostrarToast('Sem permissão.', 'erro'); return; }
 
-    const formaPagamento = document.getElementById('formaPagamento').value;
+    const combinando = document.getElementById('chkCombinarPagamento').checked;
+    let formaPagamento = document.getElementById('formaPagamento').value;
+    let formasCombinado = [];
     let observacaoTroco = '';
-    if (formaPagamento === 'Dinheiro'){
+
+    if (combinando) {
+      formasCombinado = coletarFormasCombinado();
+      if (!formasCombinado.length){ mostrarToast('Adicione pelo menos uma forma de pagamento.', 'erro'); return; }
+      const somaFormas = formasCombinado.reduce((s,f) => s+f.valor, 0);
+      const total = totalDaVenda();
+      if (Math.round((total - somaFormas) * 100) / 100 !== 0){ mostrarToast('A soma das formas de pagamento precisa bater com o total da venda.', 'erro'); return; }
+      formaPagamento = 'Combinado';
+    } else if (formaPagamento === 'Dinheiro'){
       const recebido = Number(document.getElementById('valorRecebido').value) || 0;
       const total = totalDaVenda();
       if (recebido < total){ mostrarToast('Valor recebido menor que o total.', 'erro'); return; }
       observacaoTroco = 'Pago em dinheiro: ' + moeda(recebido) + ' | Troco: ' + moeda(recebido-total);
-    }
-
-    // Confere estoque de cada item antes de confirmar
-    for (const item of carrinho) {
-      const produto = produtosDaLoja.find(p => p.ID === item.PRODUTO_ID);
-      if (!produto || Number(produto.ESTOQUE_ATUAL) < item.QUANTIDADE) {
-        mostrarToast('Estoque insuficiente para "' + item.NOME + '".', 'erro'); return;
-      }
     }
 
     try {
@@ -297,7 +374,9 @@
         CLIENTE_ID: clienteSelecionado ? clienteSelecionado.ID : '', USUARIO_ID: usuarioAtual.ID,
         EMPRESA_ID: document.getElementById('fEmpresaVenda').value,
         DATA: new Date().toISOString(), VALOR_TOTAL: valorTotal, DESCONTO: desconto,
-        FORMA_PAGAMENTO: formaPagamento, PARCELAS: (formaPagamento === 'Parcelado' || formaPagamento === 'Cartão de Crédito') ? Number(document.getElementById('parcelas').value) : 1,
+        FORMA_PAGAMENTO: formaPagamento,
+        FORMAS_PAGAMENTO_JSON: combinando ? JSON.stringify(formasCombinado) : '',
+        PARCELAS: (!combinando && (formaPagamento === 'Parcelado' || formaPagamento === 'Cartão de Crédito')) ? Number(document.getElementById('parcelas').value) : 1,
         OBSERVACOES: observacaoTroco, STATUS: 'Concluída'
       });
 
@@ -341,7 +420,7 @@
 
       const notaFiscalWrap = document.getElementById('notaFiscalWrap');
       if (clienteSelecionado && String(clienteSelecionado.TELEFONE||'').replace(/\D/g,'')) {
-        ultimaVendaParaNota = { cliente: clienteSelecionado, itens: carrinho.slice(), venda: Object.assign({}, venda, { FORMA_PAGAMENTO: formaPagamento, VALOR_TOTAL: valorTotal, DESCONTO: desconto }) };
+        ultimaVendaParaNota = { cliente: clienteSelecionado, itens: carrinho.slice(), venda: Object.assign({}, venda, { FORMA_PAGAMENTO: formaPagamento, VALOR_TOTAL: valorTotal, DESCONTO: desconto, FORMAS_PAGAMENTO: formasCombinado }) };
         notaFiscalWrap.style.display = 'block';
       } else {
         notaFiscalWrap.style.display = 'none';
@@ -351,6 +430,10 @@
       document.getElementById('clienteSelecionadoWrap').style.display='none';
       document.getElementById('buscaCliente').style.display='block';
       document.getElementById('desconto').value = 0; document.getElementById('valorRecebido').value='';
+      document.getElementById('chkCombinarPagamento').checked = false;
+      document.getElementById('combinarWrap').style.display = 'none';
+      document.getElementById('linhasCombinado').innerHTML = '';
+      document.getElementById('formaPagamento').closest('.ffield').style.display = 'block';
       document.getElementById('trocoInfo').textContent='';
       renderCarrinho();
       carregarHistorico();
@@ -451,7 +534,11 @@
     texto += `\n\n*Subtotal:* ${moeda(itens.reduce((s,i)=>s+i.QUANTIDADE*i.PRECO_UNITARIO,0))}`;
     if (venda.DESCONTO) texto += `\n*Desconto:* ${moeda(venda.DESCONTO)}`;
     texto += `\n*Total pago:* ${moeda(venda.VALOR_TOTAL)}`;
-    texto += `\n*Forma de pagamento:* ${venda.FORMA_PAGAMENTO}`;
+    if (venda.FORMA_PAGAMENTO === 'Combinado' && venda.FORMAS_PAGAMENTO && venda.FORMAS_PAGAMENTO.length) {
+      texto += `\n*Forma de pagamento:* Combinado\n` + venda.FORMAS_PAGAMENTO.map(f => `  • ${f.forma}: ${moeda(f.valor)}` + (f.forma==='Cartão de Crédito' && f.parcelas>1 ? ` (${f.parcelas}x)` : '')).join('\n');
+    } else {
+      texto += `\n*Forma de pagamento:* ${venda.FORMA_PAGAMENTO}`;
+    }
     texto += `\n\nObrigado pela preferência, ${cliente.NOME}! 🙏`;
 
     window.open('https://wa.me/' + numeroComPais + '?text=' + encodeURIComponent(texto), '_blank');

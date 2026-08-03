@@ -35,7 +35,7 @@
     <canvas id="chartLojas" height="140"></canvas>
   </div>
   <div class="chart-card"><h4 style="font-family:var(--font-display); font-size:14px; margin:0 0 4px;">Valor por categoria</h4>
-    <p class="chart-sub" id="chartCategoriaSub">Categorias com maior valor em estoque (custo).</p>
+    <p class="chart-sub" id="chartCategoriaSub">Categorias com maior valor em estoque (preço de venda).</p>
     <div id="avisoSemDadosCategoria" style="display:none; color:var(--text-tertiary); font-size:12.5px; padding:20px 0; text-align:center;"></div>
     <canvas id="chartCategoria"></canvas>
   </div>
@@ -192,7 +192,7 @@
     // ---------- Valor por categoria (barra horizontal — lê muito melhor com muitas categorias) ----------
     try {
       const porCategoria = {};
-      produtos.forEach(p => { const cat = p.CATEGORIA || 'Geral'; porCategoria[cat] = (porCategoria[cat]||0) + valorProduto(p,'PRECO_CUSTO'); });
+      produtos.forEach(p => { const cat = p.CATEGORIA || 'Geral'; porCategoria[cat] = (porCategoria[cat]||0) + valorProduto(p,'PRECO_VENDA'); });
 
       let entradas = Object.entries(porCategoria).sort((a,b) => b[1]-a[1]);
       const LIMITE = 10;
@@ -200,9 +200,9 @@
         const principais = entradas.slice(0, LIMITE);
         const outros = entradas.slice(LIMITE).reduce((s,[,v]) => s+v, 0);
         entradas = [...principais, ['Outros ('+(entradas.length-LIMITE)+' categorias)', outros]];
-        document.getElementById('chartCategoriaSub').textContent = 'Top ' + LIMITE + ' categorias por valor — as demais somadas em "Outros".';
+        document.getElementById('chartCategoriaSub').textContent = 'Top ' + LIMITE + ' categorias por valor de venda — as demais somadas em "Outros".';
       } else {
-        document.getElementById('chartCategoriaSub').textContent = 'Categorias com maior valor em estoque (custo).';
+        document.getElementById('chartCategoriaSub').textContent = 'Categorias com maior valor em estoque (preço de venda).';
       }
 
       const semDadosCategoria = entradas.every(([,v]) => v === 0) || !entradas.length;

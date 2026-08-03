@@ -98,7 +98,12 @@
     document.getElementById('relResult').style.display = 'block';
     setHTML('relTbody', '<tr class="empty-row"><td colspan="10">Carregando…</td></tr>');
     try {
-      dadosCompletos = await dbGetAll(relAtivo.colecao);
+      let bruto = await dbGetAll(relAtivo.colecao);
+      // PRODUTOS e CLIENTES usam exclusão lógica (STATUS='Excluído') — nunca deve aparecer em relatório.
+      if (relAtivo.colecao === 'PRODUTOS' || relAtivo.colecao === 'CLIENTES') {
+        bruto = bruto.filter(item => item.STATUS !== 'Excluído');
+      }
+      dadosCompletos = bruto;
       renderFiltros();
       aplicarFiltros();
     } catch (e) { mostrarToast('Erro: ' + e.message, 'erro'); }

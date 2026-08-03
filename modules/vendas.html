@@ -137,9 +137,33 @@
     }));
   }
 
-  function adicionarAoCarrinho(produto){
+  /**
+   * Confere se dá pra aumentar a quantidade sem passar do estoque. Se passar,
+   * pergunta se quer vender mesmo assim — e se disser que sim, registra a
+   * divergência na aba administrativa, pra não sumir sem rastro.
+   */
+  async function podeUsarQuantidade(produto, quantidadeDesejada){
+    const disponivel = Number(produto.ESTOQUE_ATUAL) || 0;
+    if (quantidadeDesejada <= disponivel) return true;
+
+    const confirma = confirm(`Em estoque só tem ${disponivel} unidade(s) de "${produto.NOME}".\nDeseja vender ${quantidadeDesejada} mesmo assim?`);
+    if (!confirma) return false;
+
+    try {
+      await dbInsert('DIVERGENCIAS_ESTOQUE', {
+        PRODUTO_ID: produto.ID, NOME_PRODUTO: produto.NOME, EMPRESA_ID: produto.EMPRESA_ID||'',
+        ESTOQUE_DISPONIVEL: disponivel, QUANTIDADE_SOLICITADA: quantidadeDesejada, DIFERENCA: quantidadeDesejada - disponivel,
+        USUARIO_ID: usuarioAtual.ID, DATA: new Date().toISOString()
+      });
+    } catch (e) { console.error('Erro ao registrar divergência de estoque:', e); }
+    return true;
+  }
+
+  async function adicionarAoCarrinho(produto){
     const existente = carrinho.find(i => i.PRODUTO_ID === produto.ID);
-    if (existente) existente.QUANTIDADE += 1;
+    const novaQuantidade = existente ? existente.QUANTIDADE + 1 : 1;
+    if (!(await podeUsarQuantidade(produto, novaQuantidade))) return;
+    if (existente) existente.QUANTIDADE = novaQuantidade;
     else carrinho.push({ PRODUTO_ID: produto.ID, NOME: produto.NOME, QUANTIDADE: 1, PRECO_UNITARIO: Number(produto.PRECO_VENDA) });
     renderCarrinho();
   }
@@ -156,7 +180,16 @@
     atualizarResumo(); atualizarTroco();
   }
   window.__removerItem = (idx) => { carrinho.splice(idx,1); renderCarrinho(); };
-  window.__alterarQtd = (idx, delta) => { carrinho[idx].QUANTIDADE = Math.max(1, carrinho[idx].QUANTIDADE + delta); renderCarrinho(); };
+  window.__alterarQtd = async (idx, delta) => {
+    const item = carrinho[idx];
+    const novaQuantidade = Math.max(1, item.QUANTIDADE + delta);
+    if (delta > 0) {
+      const produto = produtosDaLoja.find(p => p.ID === item.PRODUTO_ID);
+      if (produto && !(await podeUsarQuantidade(produto, novaQuantidade))) return;
+    }
+    item.QUANTIDADE = novaQuantidade;
+    renderCarrinho();
+  };
 
   // ---------- Busca de cliente ----------
   const inputCliente = document.getElementById('buscaCliente');

@@ -85,11 +85,11 @@
 <div class="card" style="margin-top:20px;">
   <div class="toolbar" style="margin-bottom:12px;">
     <h3 style="font-family:var(--font-display); font-size:15px; margin:0;">Vendas recentes</h3>
-    <input id="buscaHistorico" placeholder="Buscar por cliente…" style="max-width:220px; background:var(--bg-elevated); border:1px solid var(--hairline); color:var(--text-primary); padding:7px 10px; border-radius:8px; font-size:12px;">
+    <input id="buscaHistorico" placeholder="Buscar por cliente ou vendedor…" style="max-width:220px; background:var(--bg-elevated); border:1px solid var(--hairline); color:var(--text-primary); padding:7px 10px; border-radius:8px; font-size:12px;">
   </div>
   <table class="dt">
-    <thead><tr><th>Data/Hora</th><th>Cliente</th><th>Loja</th><th>Pagamento</th><th>Valor</th><th>Status</th><th></th></tr></thead>
-    <tbody id="linhasHistorico"><tr class="empty-row"><td colspan="7">Carregando…</td></tr></tbody>
+    <thead><tr><th>Data/Hora</th><th>Cliente</th><th>Vendedor</th><th>Loja</th><th>Pagamento</th><th>Valor</th><th>Status</th><th></th></tr></thead>
+    <tbody id="linhasHistorico"><tr class="empty-row"><td colspan="8">Carregando…</td></tr></tbody>
   </table>
 </div>
 
@@ -450,15 +450,17 @@
   });
 
   // ---------- Histórico de vendas + excluir venda errada ----------
-  let historicoVendas = [], empresasHistorico = [];
+  let historicoVendas = [], empresasHistorico = [], usuariosHistorico = [];
   function dataHoraBR(v){ return v ? new Date(v).toLocaleString('pt-BR', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' }) : '—'; }
   function nomeClienteHist(id){ const c = todosClientes.find(x=>x.ID===id); return c?c.NOME:'Sem cliente'; }
   function nomeLojaHist(id){ if (!id) return '—'; const e = empresasHistorico.find(x=>x.ID===id); return e?e.NOME:'—'; }
+  function nomeVendedorHist(id){ const u = usuariosHistorico.find(x=>x.ID===id); return u?u.NOME:'—'; }
 
   async function carregarHistorico(){
     try {
-      if (!(await checarPermissao('VENDAS','VISUALIZAR'))){ setHTML('linhasHistorico', '<tr class="empty-row"><td colspan="7">Sem permissão.</td></tr>'); return; }
+      if (!(await checarPermissao('VENDAS','VISUALIZAR'))){ setHTML('linhasHistorico', '<tr class="empty-row"><td colspan="8">Sem permissão.</td></tr>'); return; }
       empresasHistorico = await dbGetAll('EMPRESAS');
+      usuariosHistorico = await dbGetAll('USUARIOS');
       let todas = await dbGetAll('VENDAS');
       if (window.lojaAtivaId) todas = todas.filter(v => v.EMPRESA_ID === window.lojaAtivaId);
       historicoVendas = todas.sort((a,b) => new Date(b.DATA) - new Date(a.DATA)).slice(0, 50);
@@ -467,9 +469,9 @@
   }
 
   function renderHistorico(lista){
-    if (!lista.length){ setHTML('linhasHistorico', '<tr class="empty-row"><td colspan="7">Nenhuma venda ainda.</td></tr>'); return; }
+    if (!lista.length){ setHTML('linhasHistorico', '<tr class="empty-row"><td colspan="8">Nenhuma venda ainda.</td></tr>'); return; }
     setHTML('linhasHistorico', lista.map(v => `<tr>
-      <td>${dataHoraBR(v.DATA)}</td><td>${nomeClienteHist(v.CLIENTE_ID)}</td><td>${nomeLojaHist(v.EMPRESA_ID)}</td>
+      <td>${dataHoraBR(v.DATA)}</td><td>${nomeClienteHist(v.CLIENTE_ID)}</td><td>${nomeVendedorHist(v.USUARIO_ID)}</td><td>${nomeLojaHist(v.EMPRESA_ID)}</td>
       <td>${v.FORMA_PAGAMENTO||'—'}</td><td>${moeda(v.VALOR_TOTAL)}</td>
       <td><span class="badge ${v.STATUS==='Cancelada'?'neutral':'ok'}">${v.STATUS}</span></td>
       <td>${v.STATUS!=='Cancelada' ? `<button class="btn" style="padding:6px 10px; font-size:11.5px; color:var(--red);" onclick="window.__excluirVenda('${v.ID}')">Excluir</button>` : ''}</td>
@@ -478,7 +480,7 @@
 
   document.getElementById('buscaHistorico').addEventListener('input', e => {
     const t = e.target.value.toLowerCase();
-    renderHistorico(historicoVendas.filter(v => nomeClienteHist(v.CLIENTE_ID).toLowerCase().includes(t)));
+    renderHistorico(historicoVendas.filter(v => nomeClienteHist(v.CLIENTE_ID).toLowerCase().includes(t) || nomeVendedorHist(v.USUARIO_ID).toLowerCase().includes(t)));
   });
 
   /**

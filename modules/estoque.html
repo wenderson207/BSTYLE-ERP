@@ -47,15 +47,32 @@
   function nomeLoja(id){ if (!id) return 'Sem loja'; const e = empresas.find(x=>x.ID===id); return e?e.NOME:'—'; }
   function valorProduto(p, campo){ return (Number(p.ESTOQUE_ATUAL)||0) * (Number(p[campo])||0); }
 
-  function carregarChartJs(){
+  /** Tenta carregar um script; resolve true/false conforme sucesso, com um tempo limite. */
+  function tentarCarregarScript(src, timeoutMs){
     return new Promise((resolve) => {
-      if (window.Chart) { resolve(); return; }
+      let resolvido = false;
+      const finalizar = (ok) => { if (!resolvido) { resolvido = true; resolve(ok); } };
       const s = document.createElement('script');
-      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js';
-      s.onload = () => resolve();
-      s.onerror = () => { console.error('Não consegui carregar o Chart.js (CDN bloqueado ou sem internet).'); resolve(); };
+      s.src = src;
+      s.onload = () => finalizar(true);
+      s.onerror = () => finalizar(false);
       document.head.appendChild(s);
+      setTimeout(() => finalizar(false), timeoutMs);
     });
+  }
+
+  /** Carrega o Chart.js tentando dois provedores diferentes, caso um esteja bloqueado nesse aparelho/rede. */
+  async function carregarChartJs(){
+    if (window.Chart) return;
+    const provedores = [
+      'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js',
+      'https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js'
+    ];
+    for (const url of provedores) {
+      const ok = await tentarCarregarScript(url, 6000);
+      if (ok && window.Chart) return;
+    }
+    console.error('Não consegui carregar o Chart.js por nenhum dos dois provedores (rede bloqueando ambos?).');
   }
 
   async function carregar(){
@@ -123,7 +140,7 @@
     await carregarChartJs();
     if (!window.Chart) {
       console.error('Chart.js não carregou — gráficos não vão aparecer.');
-      const aviso = '<div style="text-align:center; color:var(--amber); font-size:12.5px; padding:30px 0;">⚠️ Não consegui carregar a biblioteca de gráficos agora. Verifique sua internet e recarregue a página.</div>';
+      const aviso = '<div style="text-align:center; color:var(--amber); font-size:12.5px; padding:30px 0;">⚠️ Não consegui carregar a biblioteca de gráficos (tentei 2 endereços diferentes). Pode ser algum bloqueador de anúncio ou modo de privacidade ativo no seu navegador — tente desativar e recarregar.</div>';
       document.getElementById('chartLojas').closest('.chart-card').insertAdjacentHTML('beforeend', aviso);
       document.getElementById('chartCategoria').closest('.chart-card').insertAdjacentHTML('beforeend', aviso);
       return;

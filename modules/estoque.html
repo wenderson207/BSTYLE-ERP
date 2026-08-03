@@ -48,8 +48,7 @@
   function valorProduto(p, campo){ return (Number(p.ESTOQUE_ATUAL)||0) * (Number(p[campo])||0); }
 
   function carregarChartJs(){
-    if (window.__promessaChartJs) return window.__promessaChartJs;
-    window.__promessaChartJs = new Promise((resolve) => {
+    return new Promise((resolve) => {
       if (window.Chart) { resolve(); return; }
       const s = document.createElement('script');
       s.src = 'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js';
@@ -57,7 +56,6 @@
       s.onerror = () => { console.error('Não consegui carregar o Chart.js (CDN bloqueado ou sem internet).'); resolve(); };
       document.head.appendChild(s);
     });
-    return window.__promessaChartJs;
   }
 
   async function carregar(){
@@ -123,7 +121,13 @@
 
   async function renderGraficos(){
     await carregarChartJs();
-    if (!window.Chart) { console.error('Chart.js não carregou — gráficos não vão aparecer.'); return; }
+    if (!window.Chart) {
+      console.error('Chart.js não carregou — gráficos não vão aparecer.');
+      const aviso = '<div style="text-align:center; color:var(--amber); font-size:12.5px; padding:30px 0;">⚠️ Não consegui carregar a biblioteca de gráficos agora. Verifique sua internet e recarregue a página.</div>';
+      document.getElementById('chartLojas').closest('.chart-card').insertAdjacentHTML('beforeend', aviso);
+      document.getElementById('chartCategoria').closest('.chart-card').insertAdjacentHTML('beforeend', aviso);
+      return;
+    }
 
     try {
       // ---------- Valor em estoque por loja ----------

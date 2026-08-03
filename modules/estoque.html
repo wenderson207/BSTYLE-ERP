@@ -1,9 +1,10 @@
 <style>
   .chart-card{ background:var(--bg-surface); border:1px solid var(--hairline); border-radius:12px; padding:18px 20px; }
-  .chart-grid{ display:grid; grid-template-columns:1.4fr 1fr; gap:16px; margin-bottom:20px; }
+  .chart-grid{ display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:20px; align-items:start; }
   @media (max-width: 980px){ .chart-grid{ grid-template-columns:1fr; } }
   .filtros{ display:flex; gap:10px; flex-wrap:wrap; margin-bottom:16px; align-items:center; }
   .filtros select, .filtros input{ background:var(--bg-surface); border:1px solid var(--hairline); color:var(--text-primary); padding:8px 12px; border-radius:8px; font-size:12.5px; }
+  .chart-sub{ font-size:11px; color:var(--text-tertiary); margin:-8px 0 12px; }
 </style>
 
 <div class="toolbar"><div><h1 style="font-family:var(--font-display); font-size:22px; margin:0 0 4px;">Estoque</h1>
@@ -16,14 +17,6 @@
   <div class="kpi"><div class="lbl">Itens em estoque</div><div class="val">—</div></div>
 </div>
 
-<div class="chart-grid">
-  <div class="chart-card"><h4 style="font-family:var(--font-display); font-size:14px; margin:0 0 14px;">🏬 Valor em estoque por loja</h4>
-    <div id="avisoSemDadosLojas" style="display:none; color:var(--text-tertiary); font-size:12.5px; padding:20px 0; text-align:center;"></div>
-    <canvas id="chartLojas" height="140"></canvas>
-  </div>
-  <div class="chart-card"><h4 style="font-family:var(--font-display); font-size:14px; margin:0 0 14px;">Distribuição por categoria</h4><canvas id="chartCategoria" height="140"></canvas></div>
-</div>
-
 <div class="filtros">
   <select id="filtroCategoria"><option value="">Todas as categorias</option></select>
   <select id="filtroSituacao">
@@ -32,6 +25,20 @@
     <option value="ok">Só estoque OK</option>
   </select>
   <input id="busca" placeholder="Nome, SKU ou código de barras…" style="min-width:220px;">
+  <span style="font-size:11.5px; color:var(--text-tertiary);">↓ os filtros acima também mudam os gráficos e a tabela</span>
+</div>
+
+<div class="chart-grid">
+  <div class="chart-card"><h4 style="font-family:var(--font-display); font-size:14px; margin:0 0 4px;">🏬 Valor em estoque por loja</h4>
+    <p class="chart-sub">Sempre mostra todas as lojas, mesmo com uma loja específica selecionada lá em cima.</p>
+    <div id="avisoSemDadosLojas" style="display:none; color:var(--text-tertiary); font-size:12.5px; padding:20px 0; text-align:center;"></div>
+    <canvas id="chartLojas" height="140"></canvas>
+  </div>
+  <div class="chart-card"><h4 style="font-family:var(--font-display); font-size:14px; margin:0 0 4px;">Valor por categoria</h4>
+    <p class="chart-sub" id="chartCategoriaSub">Categorias com maior valor em estoque (custo).</p>
+    <div id="avisoSemDadosCategoria" style="display:none; color:var(--text-tertiary); font-size:12.5px; padding:20px 0; text-align:center;"></div>
+    <canvas id="chartCategoria"></canvas>
+  </div>
 </div>
 
 <table class="dt">
@@ -87,16 +94,15 @@
       setHTML('filtroCategoria', '<option value="">Todas as categorias</option>' + categorias.map(c => `<option value="${c}">${c}</option>`).join(''));
 
       aplicarFiltros();
-      await renderGraficos();
     } catch (e) { mostrarToast('Erro: ' + e.message, 'erro'); }
   }
 
-  function aplicarFiltros(){
+  function aplicarFiltrosLocais(lista){
     const categoria = document.getElementById('filtroCategoria').value;
     const situacao = document.getElementById('filtroSituacao').value;
     const termo = document.getElementById('busca').value.toLowerCase();
 
-    produtos = produtosTodos.filter(p => {
+    return lista.filter(p => {
       if (categoria && (p.CATEGORIA||'Geral') !== categoria) return false;
       const baixo = Number(p.ESTOQUE_ATUAL) <= Number(p.ESTOQUE_MINIMO);
       if (situacao === 'baixo' && !baixo) return false;
@@ -107,9 +113,13 @@
       }
       return true;
     });
+  }
 
+  function aplicarFiltros(){
+    produtos = aplicarFiltrosLocais(produtosTodos);
     renderKpis();
     renderLinhas();
+    renderGraficos();
   }
   ['filtroCategoria','filtroSituacao'].forEach(id => document.getElementById(id).addEventListener('change', aplicarFiltros));
   document.getElementById('busca').addEventListener('input', aplicarFiltros);
@@ -146,12 +156,13 @@
       return;
     }
 
+    // ---------- Valor em estoque por loja (sempre todas as lojas, respeita os outros filtros) ----------
     try {
-      // ---------- Valor em estoque por loja ----------
+      const produtosComparacaoFiltrados = aplicarFiltrosLocais(produtosParaComparacaoLojas);
       const lojasComValor = empresas.length ? empresas : [{ ID:'', NOME:'Sem loja' }];
       const labelsLoja = lojasComValor.map(e => e.NOME);
-      const valoresCustoLoja = lojasComValor.map(e => produtosParaComparacaoLojas.filter(p => p.EMPRESA_ID === e.ID).reduce((s,p)=>s+valorProduto(p,'PRECO_CUSTO'),0));
-      const valoresVendaLoja = lojasComValor.map(e => produtosParaComparacaoLojas.filter(p => p.EMPRESA_ID === e.ID).reduce((s,p)=>s+valorProduto(p,'PRECO_VENDA'),0));
+      const valoresCustoLoja = lojasComValor.map(e => produtosComparacaoFiltrados.filter(p => p.EMPRESA_ID === e.ID).reduce((s,p)=>s+valorProduto(p,'PRECO_CUSTO'),0));
+      const valoresVendaLoja = lojasComValor.map(e => produtosComparacaoFiltrados.filter(p => p.EMPRESA_ID === e.ID).reduce((s,p)=>s+valorProduto(p,'PRECO_VENDA'),0));
 
       const semDados = !empresas.length || (valoresCustoLoja.every(v=>v===0) && valoresVendaLoja.every(v=>v===0));
       document.getElementById('avisoSemDadosLojas').style.display = semDados ? 'block' : 'none';
@@ -159,7 +170,7 @@
       if (semDados) {
         document.getElementById('avisoSemDadosLojas').textContent = !empresas.length
           ? 'Cadastre suas lojas em Empresas pra ver essa comparação.'
-          : 'Nenhum produto com estoque cadastrado ainda.';
+          : 'Nenhum produto com valor de custo cadastrado ainda (confira se o "Preço de custo" foi preenchido nos produtos).';
       }
 
       const chartLojasExistente = Chart.getChart('chartLojas');
@@ -167,24 +178,53 @@
       if (!semDados) new Chart(document.getElementById('chartLojas').getContext('2d'), {
         type: 'bar',
         data: { labels: labelsLoja, datasets: [
-          { label:'Valor de custo', data: valoresCustoLoja, backgroundColor:'rgba(76,141,255,0.6)', borderRadius:5 },
-          { label:'Valor de venda', data: valoresVendaLoja, backgroundColor:'rgba(47,225,168,0.6)', borderRadius:5 }
+          { label:'Valor de custo', data: valoresCustoLoja, backgroundColor:'rgba(76,141,255,0.75)', borderRadius:5 },
+          { label:'Valor de venda', data: valoresVendaLoja, backgroundColor:'rgba(47,225,168,0.75)', borderRadius:5 }
         ] },
-        options: { plugins:{ legend:{ labels:{ color:'#8891A3', font:{ size:10.5 } } } }, scales:{ x:{ grid:{ display:false }, ticks:{ color:'#8891A3' } }, y:{ grid:{ color:'rgba(255,255,255,0.05)' }, ticks:{ color:'#8891A3' } } } }
+        options: {
+          plugins:{ legend:{ labels:{ color:'#8891A3', font:{ size:10.5 } } },
+            tooltip:{ callbacks:{ label: (ctx) => ctx.dataset.label + ': ' + moeda(ctx.parsed.y) } } },
+          scales:{ x:{ grid:{ display:false }, ticks:{ color:'#8891A3' } }, y:{ grid:{ color:'rgba(255,255,255,0.05)' }, ticks:{ color:'#8891A3', callback: v => moeda(v) } } }
+        }
       });
     } catch (e) { console.error('Erro no gráfico de lojas:', e); }
 
+    // ---------- Valor por categoria (barra horizontal — lê muito melhor com muitas categorias) ----------
     try {
-      // ---------- Distribuição por categoria ----------
       const porCategoria = {};
-      produtosTodos.forEach(p => { const cat = p.CATEGORIA || 'Geral'; porCategoria[cat] = (porCategoria[cat]||0) + valorProduto(p,'PRECO_CUSTO'); });
+      produtos.forEach(p => { const cat = p.CATEGORIA || 'Geral'; porCategoria[cat] = (porCategoria[cat]||0) + valorProduto(p,'PRECO_CUSTO'); });
+
+      let entradas = Object.entries(porCategoria).sort((a,b) => b[1]-a[1]);
+      const LIMITE = 10;
+      if (entradas.length > LIMITE) {
+        const principais = entradas.slice(0, LIMITE);
+        const outros = entradas.slice(LIMITE).reduce((s,[,v]) => s+v, 0);
+        entradas = [...principais, ['Outros ('+(entradas.length-LIMITE)+' categorias)', outros]];
+        document.getElementById('chartCategoriaSub').textContent = 'Top ' + LIMITE + ' categorias por valor — as demais somadas em "Outros".';
+      } else {
+        document.getElementById('chartCategoriaSub').textContent = 'Categorias com maior valor em estoque (custo).';
+      }
+
+      const semDadosCategoria = entradas.every(([,v]) => v === 0) || !entradas.length;
+      document.getElementById('avisoSemDadosCategoria').style.display = semDadosCategoria ? 'block' : 'none';
+      document.getElementById('chartCategoria').style.display = semDadosCategoria ? 'none' : 'block';
+      if (semDadosCategoria) document.getElementById('avisoSemDadosCategoria').textContent = 'Nenhum produto encontrado com os filtros atuais.';
+
+      // altura dinâmica: mais categorias, mais espaço, pra não ficar espremido
+      document.getElementById('chartCategoria').height = Math.max(140, entradas.length * 32);
 
       const chartCategoriaExistente = Chart.getChart('chartCategoria');
       if (chartCategoriaExistente) chartCategoriaExistente.destroy();
-      new Chart(document.getElementById('chartCategoria').getContext('2d'), {
-        type: 'doughnut',
-        data: { labels: Object.keys(porCategoria), datasets: [{ data: Object.values(porCategoria), backgroundColor:['#2FE1A8','#4C8DFF','#F5A623','#FF5C5C','#8891A3'] }] },
-        options: { plugins:{ legend:{ position:'bottom', labels:{ color:'#8891A3', font:{ size:10.5 } } } } }
+      if (!semDadosCategoria) new Chart(document.getElementById('chartCategoria').getContext('2d'), {
+        type: 'bar',
+        data: { labels: entradas.map(([nome])=>nome), datasets: [{ data: entradas.map(([,v])=>v),
+          backgroundColor: entradas.map((_,i) => ['#2FE1A8','#4C8DFF','#F5A623','#FF5C5C','#8891A3','#9B7EDE','#22c093','#e2401c','#5B6472','#F5C542','#4dd0e1'][i % 11]),
+          borderRadius:4 }] },
+        options: {
+          indexAxis: 'y',
+          plugins:{ legend:{ display:false }, tooltip:{ callbacks:{ label: (ctx) => moeda(ctx.parsed.x) } } },
+          scales:{ x:{ grid:{ color:'rgba(255,255,255,0.05)' }, ticks:{ color:'#8891A3', callback: v => moeda(v) } }, y:{ grid:{ display:false }, ticks:{ color:'#8891A3', font:{ size:11 } } } }
+        }
       });
     } catch (e) { console.error('Erro no gráfico de categoria:', e); }
   }

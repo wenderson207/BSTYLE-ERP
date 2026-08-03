@@ -56,14 +56,30 @@
 <script>
 (async function(){
   function moeda(v){ return (Number(v)||0).toLocaleString('pt-BR', { style:'currency', currency:'BRL' }); }
-  function carregarChartJs(){
+  function tentarCarregarScript(src, timeoutMs){
     return new Promise((resolve) => {
-      if (window.Chart) return resolve();
+      let resolvido = false;
+      const finalizar = (ok) => { if (!resolvido) { resolvido = true; resolve(ok); } };
       const s = document.createElement('script');
-      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js';
-      s.onload = resolve; s.onerror = resolve;
+      s.src = src;
+      s.onload = () => finalizar(true);
+      s.onerror = () => finalizar(false);
       document.head.appendChild(s);
+      setTimeout(() => finalizar(false), timeoutMs);
     });
+  }
+
+  async function carregarChartJs(){
+    if (window.Chart) return;
+    const provedores = [
+      'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js',
+      'https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js'
+    ];
+    for (const url of provedores) {
+      const ok = await tentarCarregarScript(url, 6000);
+      if (ok && window.Chart) return;
+    }
+    console.error('Não consegui carregar o Chart.js por nenhum dos dois provedores (rede bloqueando ambos?).');
   }
 
   document.getElementById('dataHoje').textContent = new Date().toLocaleDateString('pt-BR', { weekday:'long', day:'2-digit', month:'long' });
@@ -112,7 +128,14 @@
       : '<li>Nenhuma venda registrada ainda.</li>');
 
     await carregarChartJs();
-    if (!window.Chart) return; // sem internet pro CDN — segue sem os gráficos, o resto da tela já funciona
+    if (!window.Chart) {
+      const aviso = '<div style="text-align:center; color:var(--amber); font-size:12.5px; padding:20px 0;">⚠️ Gráficos não carregaram (tentei 2 fontes diferentes) — pode ser bloqueador de anúncio ativo.</div>';
+      ['chartVendas14','chartFinanceiro','chartPagamento'].forEach(cid => {
+        const el = document.getElementById(cid);
+        if (el) el.closest('.chart-card').insertAdjacentHTML('beforeend', aviso);
+      });
+      return;
+    }
 
     // ---------- Gráfico: vendas últimos 14 dias ----------
     const dias14 = [];

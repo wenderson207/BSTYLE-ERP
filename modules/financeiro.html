@@ -29,12 +29,20 @@
 <div class="tabs">
   <div class="tab active" data-tab="pagar">Contas a pagar</div>
   <div class="tab" data-tab="receber">Contas a receber</div>
+  <div class="tab" data-tab="historico">Histórico completo</div>
   <div class="tab" data-tab="caixa">Caixa diário</div>
 </div>
 
 <div id="painelContas">
   <table class="dt"><thead><tr><th>Descrição</th><th>Categoria</th><th>Vencimento</th><th>Valor</th><th>Status</th><th></th></tr></thead>
     <tbody id="linhas"><tr class="empty-row"><td colspan="6">Carregando…</td></tr></tbody>
+  </table>
+</div>
+
+<div id="painelHistorico" style="display:none;">
+  <p style="color:var(--text-secondary); font-size:13px; margin:0 0 14px;">Todos os lançamentos (pagos e pendentes). Use pra limpar lançamento de teste que ficou perdido — o "Saldo" acima soma tudo que está marcado como Pago aqui.</p>
+  <table class="dt"><thead><tr><th>Descrição</th><th>Categoria</th><th>Tipo</th><th>Valor</th><th>Status</th><th></th></tr></thead>
+    <tbody id="linhasHistorico"><tr class="empty-row"><td colspan="6">Carregando…</td></tr></tbody>
   </table>
 </div>
 
@@ -77,7 +85,7 @@
       document.getElementById('kpiEntradas').textContent = moeda(entradas);
       document.getElementById('kpiSaidas').textContent = moeda(saidas);
       document.getElementById('kpiSaldo').textContent = moeda(entradas-saidas);
-      renderLista();
+      if (abaAtual === 'historico') renderHistoricoCompleto(); else renderLista();
     } catch (e) { mostrarToast('Erro: ' + e.message, 'erro'); }
   }
 
@@ -95,10 +103,32 @@
   document.querySelectorAll('.tab').forEach(tab => tab.addEventListener('click', () => {
     document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active')); tab.classList.add('active');
     abaAtual = tab.dataset.tab;
-    document.getElementById('painelContas').style.display = abaAtual === 'caixa' ? 'none' : 'block';
+    document.getElementById('painelContas').style.display = abaAtual==='pagar'||abaAtual==='receber' ? 'block' : 'none';
+    document.getElementById('painelHistorico').style.display = abaAtual === 'historico' ? 'block' : 'none';
     document.getElementById('painelCaixa').style.display = abaAtual === 'caixa' ? 'block' : 'none';
-    if (abaAtual === 'caixa') carregarCaixa(); else renderLista();
+    if (abaAtual === 'caixa') carregarCaixa();
+    else if (abaAtual === 'historico') renderHistoricoCompleto();
+    else renderLista();
   }));
+
+  function renderHistoricoCompleto(){
+    const ordenado = todos.slice().sort((a,b) => new Date(b.DATA_PAGAMENTO||b.DATA_VENCIMENTO||0) - new Date(a.DATA_PAGAMENTO||a.DATA_VENCIMENTO||0));
+    setHTML('linhasHistorico', ordenado.length ? ordenado.map(l => `<tr>
+      <td>${l.DESCRICAO||'—'}</td><td>${l.CATEGORIA||'—'}</td><td>${l.TIPO}</td><td>${moeda(l.VALOR)}</td>
+      <td><span class="badge ${l.STATUS==='Pago'?'ok':'warn'}">${l.STATUS}</span></td>
+      <td><button class="btn" style="padding:6px 10px; font-size:11.5px; color:var(--red);" onclick="window.__excluirLancamento('${l.ID}')">Excluir</button></td></tr>`).join('')
+      : '<tr class="empty-row"><td colspan="6">Nenhum lançamento ainda.</td></tr>');
+  }
+
+  window.__excluirLancamento = async (id) => {
+    if (!confirm('Excluir este lançamento? Isso não desfaz nenhuma venda/compra — só remove o registro financeiro.')) return;
+    try {
+      if (!(await checarPermissao('FINANCEIRO','EXCLUIR'))){ mostrarToast('Sem permissão.', 'erro'); return; }
+      await dbDelete('FINANCEIRO', id);
+      mostrarToast('Lançamento excluído.');
+      carregar();
+    } catch (e) { mostrarToast('Erro: ' + e.message, 'erro'); }
+  };
 
   // ---------- Caixa diário ----------
   function chaveDoDiaCaixa(lojaId){ return (lojaId||'sem-loja') + '_' + new Date().toISOString().substring(0,10); }

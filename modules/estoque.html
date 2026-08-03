@@ -29,10 +29,17 @@
 </div>
 
 <div class="chart-grid">
-  <div class="chart-card"><h4 style="font-family:var(--font-display); font-size:14px; margin:0 0 4px;">🏬 Valor em estoque por loja</h4>
-    <p class="chart-sub">Sempre mostra todas as lojas, mesmo com uma loja específica selecionada lá em cima.</p>
-    <div id="avisoSemDadosLojas" style="display:none; color:var(--text-tertiary); font-size:12.5px; padding:20px 0; text-align:center;"></div>
-    <canvas id="chartLojas" height="140"></canvas>
+  <div>
+    <div class="chart-card" style="margin-bottom:16px;"><h4 style="font-family:var(--font-display); font-size:14px; margin:0 0 4px;">🏬 Valor em estoque por loja</h4>
+      <p class="chart-sub">Sempre mostra todas as lojas, mesmo com uma loja específica selecionada lá em cima.</p>
+      <div id="avisoSemDadosLojas" style="display:none; color:var(--text-tertiary); font-size:12.5px; padding:20px 0; text-align:center;"></div>
+      <canvas id="chartLojas" height="130"></canvas>
+    </div>
+    <div class="chart-card"><h4 style="font-family:var(--font-display); font-size:14px; margin:0 0 4px;">🚨 Produtos com estoque baixo por loja</h4>
+      <p class="chart-sub">Quantos itens estão abaixo do mínimo em cada loja — ajuda a saber onde repor primeiro.</p>
+      <div id="avisoSemDadosBaixo" style="display:none; color:var(--text-tertiary); font-size:12.5px; padding:20px 0; text-align:center;"></div>
+      <canvas id="chartEstoqueBaixo" height="110"></canvas>
+    </div>
   </div>
   <div class="chart-card"><h4 style="font-family:var(--font-display); font-size:14px; margin:0 0 4px;">Valor por categoria</h4>
     <p class="chart-sub" id="chartCategoriaSub">Categorias com maior valor em estoque (preço de venda).</p>
@@ -189,13 +196,33 @@
       });
     } catch (e) { console.error('Erro no gráfico de lojas:', e); }
 
+    // ---------- Estoque baixo por loja ----------
+    try {
+      const produtosComparacaoFiltrados = aplicarFiltrosLocais(produtosParaComparacaoLojas);
+      const lojasComValor = empresas.length ? empresas : [{ ID:'', NOME:'Sem loja' }];
+      const qtdBaixoPorLoja = lojasComValor.map(e => produtosComparacaoFiltrados.filter(p => p.EMPRESA_ID === e.ID && Number(p.ESTOQUE_ATUAL) <= Number(p.ESTOQUE_MINIMO)).length);
+
+      const semDadosBaixo = !empresas.length || qtdBaixoPorLoja.every(v => v === 0);
+      document.getElementById('avisoSemDadosBaixo').style.display = semDadosBaixo ? 'block' : 'none';
+      document.getElementById('chartEstoqueBaixo').style.display = semDadosBaixo ? 'none' : 'block';
+      if (semDadosBaixo) document.getElementById('avisoSemDadosBaixo').textContent = !empresas.length ? 'Cadastre suas lojas em Empresas.' : 'Nenhum produto em estoque baixo — tudo certo! 🎉';
+
+      const chartBaixoExistente = Chart.getChart('chartEstoqueBaixo');
+      if (chartBaixoExistente) chartBaixoExistente.destroy();
+      if (!semDadosBaixo) new Chart(document.getElementById('chartEstoqueBaixo').getContext('2d'), {
+        type: 'bar',
+        data: { labels: lojasComValor.map(e=>e.NOME), datasets: [{ data: qtdBaixoPorLoja, backgroundColor:'rgba(255,92,92,0.7)', borderRadius:5 }] },
+        options: { plugins:{ legend:{ display:false } }, scales:{ x:{ grid:{ display:false }, ticks:{ color:'#8891A3' } }, y:{ grid:{ color:'rgba(255,255,255,0.05)' }, ticks:{ color:'#8891A3', precision:0 } } } }
+      });
+    } catch (e) { console.error('Erro no gráfico de estoque baixo:', e); }
+
     // ---------- Valor por categoria (barra horizontal — lê muito melhor com muitas categorias) ----------
     try {
       const porCategoria = {};
       produtos.forEach(p => { const cat = p.CATEGORIA || 'Geral'; porCategoria[cat] = (porCategoria[cat]||0) + valorProduto(p,'PRECO_VENDA'); });
 
       let entradas = Object.entries(porCategoria).sort((a,b) => b[1]-a[1]);
-      const LIMITE = 10;
+      const LIMITE = 6;
       if (entradas.length > LIMITE) {
         const principais = entradas.slice(0, LIMITE);
         const outros = entradas.slice(LIMITE).reduce((s,[,v]) => s+v, 0);
@@ -211,7 +238,7 @@
       if (semDadosCategoria) document.getElementById('avisoSemDadosCategoria').textContent = 'Nenhum produto encontrado com os filtros atuais.';
 
       // altura dinâmica: mais categorias, mais espaço, pra não ficar espremido
-      document.getElementById('chartCategoria').height = Math.max(140, entradas.length * 32);
+      document.getElementById('chartCategoria').height = Math.min(240, Math.max(140, entradas.length * 20));
 
       const chartCategoriaExistente = Chart.getChart('chartCategoria');
       if (chartCategoriaExistente) chartCategoriaExistente.destroy();

@@ -36,9 +36,8 @@
   .tabela-pecas input{ width:100%; background:var(--bg-elevated); border:1px solid var(--hairline); color:var(--text-primary); padding:8px 10px; border-radius:6px; font-size:12.5px; font-family:inherit; box-sizing:border-box; }
   .tabela-pecas tfoot td{ padding-top:10px; border-top:1px solid var(--hairline); font-size:12.5px; }
   .pattern-grid{ display:grid; grid-template-columns:repeat(3,40px); grid-template-rows:repeat(3,40px); gap:16px; margin:10px auto; width:fit-content; }
-  .pattern-dot{ width:40px; height:40px; border-radius:50%; border:2px solid var(--hairline); background:var(--bg-elevated); cursor:pointer; position:relative; }
-  .pattern-dot.active{ border-color:var(--mint); background:rgba(47,225,168,0.15); }
-  .pattern-dot.active::after{ content:''; position:absolute; inset:15px; border-radius:50%; background:var(--mint); }
+  .pattern-dot{ width:40px; height:40px; border-radius:50%; border:2px solid var(--hairline); background:var(--bg-elevated); cursor:pointer; position:relative; display:flex; align-items:center; justify-content:center; font-size:14px; font-weight:700; color:transparent; font-family:var(--font-mono); }
+  .pattern-dot.active{ border-color:var(--mint); background:rgba(47,225,168,0.15); color:var(--mint); }
 
   .diagramas-wrap{ display:flex; gap:24px; justify-content:center; flex-wrap:wrap; }
   .diagrama-col{ text-align:center; }
@@ -119,9 +118,10 @@
         <button type="button" data-tipo="TEXTO">Senha texto</button>
         <button type="button" data-tipo="PADRAO">Padrão</button>
       </div>
-      <div id="senhaPinWrap"><input id="fSenhaPin" placeholder="Ex.: 1234"></div>
-      <div id="senhaTextoWrap" style="display:none;"><input id="fSenhaTexto"></div>
-      <div id="senhaPadraoWrap" style="display:none; text-align:center;">
+      <div class="ffield" id="senhaPinWrap"><label>PIN numérico</label><input id="fSenhaPin" placeholder="Ex.: 1234" inputmode="numeric"></div>
+      <div class="ffield" id="senhaTextoWrap" style="display:none;"><label>Senha / texto</label><input id="fSenhaTexto" placeholder="Digite a senha informada pelo cliente"></div>
+      <div class="ffield" id="senhaPadraoWrap" style="display:none; text-align:center;">
+        <label style="text-align:left;">Padrão de desbloqueio — clique os pontos na ordem certa</label>
         <div class="pattern-grid" id="patternGrid"></div>
         <div style="font-size:11px; color:var(--text-tertiary); font-family:var(--font-mono);" id="patternSeq">—</div>
       </div>
@@ -372,6 +372,7 @@
     dot.addEventListener('click', () => {
       if (sequenciaPadrao.includes(i)) return;
       sequenciaPadrao.push(i); dot.classList.add('active');
+      dot.textContent = sequenciaPadrao.length;
       document.getElementById('patternSeq').textContent = sequenciaPadrao.join(' → ');
     });
     gridNovo.appendChild(dot);
@@ -389,6 +390,7 @@
     defeitosFrenteNova = []; defeitosVersoNova = [];
     ['fCliente','fTecnico','fMarca','fModelo','fImei','fAcessorios','fDefeito','fDiagnostico','fValor','fPrazo','fSenhaPin','fSenhaTexto'].forEach(id => document.getElementById(id).value = '');
     sequenciaPadrao = []; document.getElementById('patternSeq').textContent = '—';
+    document.querySelectorAll('#patternGrid .pattern-dot').forEach(d => { d.classList.remove('active'); d.textContent = ''; });
     gerarLinhasPecas('linhasPecasNova', 'totalPecasNova', []);
     renderDiagrama('diagramaFrenteNova', defeitosFrenteNova, true);
     renderDiagrama('diagramaVersoNova', defeitosVersoNova, true);

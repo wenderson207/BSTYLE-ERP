@@ -197,6 +197,34 @@
     return { itens, texto, total };
   }
 
+  /** Mostra de volta a senha/PIN/padrão cadastrado na abertura da OS — clara e legível. */
+  function montarVisualizacaoSenha(tipo, valor){
+    if (!tipo || !valor) return '<span style="color:var(--text-tertiary); font-size:12.5px;">Nenhum desbloqueio informado na abertura desta OS.</span>';
+
+    if (tipo === 'PADRAO') {
+      const sequencia = valor.split(',').map(Number);
+      const pontos = Array.from({length:9}, (_, i) => {
+        const numero = i + 1;
+        const ordem = sequencia.indexOf(numero);
+        const ativo = ordem !== -1;
+        return `<div style="width:34px; height:34px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700;
+          background:${ativo ? 'rgba(47,225,168,0.18)' : 'var(--bg-surface)'}; border:2px solid ${ativo ? 'var(--mint)' : 'var(--hairline)'}; color:${ativo ? 'var(--mint)' : 'var(--text-tertiary)'};">
+          ${ativo ? ordem + 1 : ''}
+        </div>`;
+      }).join('');
+      return `
+        <div style="font-size:11px; color:var(--text-tertiary); font-family:var(--font-mono); margin-bottom:10px;">TIPO: PADRÃO DE DESENHO</div>
+        <div style="display:grid; grid-template-columns:repeat(3,34px); grid-template-rows:repeat(3,34px); gap:12px; margin-bottom:10px;">${pontos}</div>
+        <div style="font-size:12px; color:var(--text-secondary); font-family:var(--font-mono);">Sequência: ${sequencia.join(' → ')}</div>
+      `;
+    }
+
+    return `
+      <div style="font-size:11px; color:var(--text-tertiary); font-family:var(--font-mono); margin-bottom:6px;">TIPO: ${tipo === 'PIN' ? 'PIN NUMÉRICO' : 'SENHA / TEXTO'}</div>
+      <div style="font-size:22px; font-weight:800; font-family:var(--font-mono); letter-spacing:2px; color:var(--text-primary);">${valor}</div>
+    `;
+  }
+
   /** Mantém o espelho público (OS_PUBLICO) sincronizado — é o que a página consulta.html lê, sem exigir login. */
   async function atualizarEspelhoPublico(os){
     try {
@@ -427,6 +455,8 @@
         <div class="ffield"><label>Status</label><select id="vStatus">${STATUS_COLUNAS.map(s => `<option value="${s}" ${s===osAtual.STATUS?'selected':''}>${s}</option>`).join('')}</select></div>
         <div class="ffield"><label>Previsão de entrega</label><input id="vPrazo" type="date" value="${osAtual.PRAZO||''}"></div>
       </div>
+      <div class="section-title">🔒 Desbloqueio do aparelho</div>
+      <div id="visualizacaoSenha" style="background:var(--bg-elevated); border:1px solid var(--hairline); border-radius:10px; padding:14px 16px; margin-bottom:16px;"></div>
       <div class="section-title">Aparelho</div>
       <div class="frow3">
         <div class="ffield"><label>Marca</label><input id="vMarca" value="${osAtual.MARCA||''}"></div>
@@ -456,6 +486,7 @@
 
     renderDiagrama('diagramaFrenteVer', defFrente, false);
     renderDiagrama('diagramaVersoVer', defVerso, false);
+    setHTML('visualizacaoSenha', montarVisualizacaoSenha(osAtual.SENHA_TIPO, osAtual.SENHA_VALOR));
 
     let itensPecasExistentes = [];
     try { itensPecasExistentes = JSON.parse(osAtual.PECAS_ITENS || '[]'); } catch (e) { itensPecasExistentes = []; }

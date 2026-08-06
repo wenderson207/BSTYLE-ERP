@@ -123,7 +123,8 @@
       <div class="ffield" id="senhaPadraoWrap" style="display:none; text-align:center;">
         <label style="text-align:left;">Padrão de desbloqueio — clique os pontos na ordem certa</label>
         <div class="pattern-grid" id="patternGrid"></div>
-        <div style="font-size:11px; color:var(--text-tertiary); font-family:var(--font-mono);" id="patternSeq">—</div>
+        <div style="font-size:11px; color:var(--text-tertiary); font-family:var(--font-mono); margin-bottom:8px;" id="patternSeq">—</div>
+        <button type="button" class="btn" id="btnLimparPadrao" style="font-size:11.5px; padding:6px 12px;">🔄 Limpar padrão</button>
       </div>
 
       <div class="section-title">Estado do aparelho na entrada (marque avarias já existentes)</div>
@@ -377,6 +378,7 @@
     });
     gridNovo.appendChild(dot);
   }
+  document.getElementById('btnLimparPadrao').addEventListener('click', limparPadraoDesenho);
   document.querySelectorAll('.senha-tabs button').forEach(btn => btn.addEventListener('click', () => {
     document.querySelectorAll('.senha-tabs button').forEach(b=>b.classList.remove('active'));
     btn.classList.add('active'); senhaTipoAtual = btn.dataset.tipo;
@@ -386,11 +388,17 @@
   }));
 
   const modalNova = document.getElementById('modalNova');
+  /** Limpa a sequência do padrão de desenho — usada ao abrir um cadastro novo e no botão "Limpar padrão". */
+  function limparPadraoDesenho(){
+    sequenciaPadrao = [];
+    document.getElementById('patternSeq').textContent = '—';
+    document.querySelectorAll('#patternGrid .pattern-dot').forEach(d => { d.classList.remove('active'); d.textContent = ''; });
+  }
+
   document.getElementById('btnNovaOS').addEventListener('click', () => {
     defeitosFrenteNova = []; defeitosVersoNova = [];
     ['fCliente','fTecnico','fMarca','fModelo','fImei','fAcessorios','fDefeito','fDiagnostico','fValor','fPrazo','fSenhaPin','fSenhaTexto'].forEach(id => document.getElementById(id).value = '');
-    sequenciaPadrao = []; document.getElementById('patternSeq').textContent = '—';
-    document.querySelectorAll('#patternGrid .pattern-dot').forEach(d => { d.classList.remove('active'); d.textContent = ''; });
+    limparPadraoDesenho();
     gerarLinhasPecas('linhasPecasNova', 'totalPecasNova', []);
     renderDiagrama('diagramaFrenteNova', defeitosFrenteNova, true);
     renderDiagrama('diagramaVersoNova', defeitosVersoNova, true);

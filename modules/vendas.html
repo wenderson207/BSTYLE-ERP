@@ -208,12 +208,22 @@
   const inputCliente = document.getElementById('buscaCliente');
   const resCliente = document.getElementById('resultadosCliente');
   inputCliente.addEventListener('input', () => {
-    const termo = inputCliente.value.trim().toLowerCase();
+    const termoOriginal = inputCliente.value.trim();
+    const termo = termoOriginal.toLowerCase();
     if (termo.length < 2){ resCliente.classList.remove('open'); return; }
     const lista = todosClientes.filter(c => c.NOME.toLowerCase().includes(termo) || (c.CPF||'').includes(termo)).slice(0, 20);
-    if (!lista.length){ resCliente.innerHTML = '<div class="opt">Nenhum cliente encontrado.</div>'; resCliente.classList.add('open'); return; }
-    resCliente.innerHTML = lista.map(c => `<div class="opt" data-id="${c.ID}">${c.NOME}</div>`).join('');
+
+    // Só oferece "cadastrar rápido" quando parece nome e sobrenome (2+ palavras) e ninguém já cadastrado bate exatamente.
+    const pareceNomeCompleto = termoOriginal.split(/\s+/).filter(Boolean).length >= 2;
+    const jaExisteExato = lista.some(c => c.NOME.toLowerCase() === termo);
+    const opcaoCadastrarRapido = (pareceNomeCompleto && !jaExisteExato)
+      ? `<div class="opt" data-cadastrar-rapido="1" style="color:var(--mint); font-weight:600;">+ Cadastrar "${termoOriginal}" como novo cliente</div>` : '';
+
+    const opcoesEncontradas = lista.map(c => `<div class="opt" data-id="${c.ID}">${c.NOME}</div>`).join('');
+    const semNada = !lista.length && !opcaoCadastrarRapido;
+    resCliente.innerHTML = semNada ? '<div class="opt">Nenhum cliente encontrado.</div>' : (opcoesEncontradas + opcaoCadastrarRapido);
     resCliente.classList.add('open');
+
     resCliente.querySelectorAll('.opt[data-id]').forEach(el => el.addEventListener('click', () => {
       clienteSelecionado = lista.find(c => c.ID === el.getAttribute('data-id'));
       document.getElementById('clienteSelecionadoNome').textContent = clienteSelecionado.NOME;
@@ -222,6 +232,21 @@
       resCliente.classList.remove('open');
       verificarFidelidade();
     }));
+
+    const optRapido = resCliente.querySelector('[data-cadastrar-rapido]');
+    if (optRapido) optRapido.addEventListener('click', async () => {
+      try {
+        if (!(await checarPermissao('CLIENTES','CADASTRAR'))){ mostrarToast('Sem permissão pra cadastrar cliente.', 'erro'); return; }
+        const novoCliente = await dbInsert('CLIENTES', { NOME: termoOriginal, VALOR_GASTO_TOTAL: 0, STATUS: 'Ativo' });
+        todosClientes.push(novoCliente);
+        clienteSelecionado = novoCliente;
+        document.getElementById('clienteSelecionadoNome').textContent = novoCliente.NOME;
+        document.getElementById('clienteSelecionadoWrap').style.display = 'block';
+        inputCliente.style.display = 'none'; inputCliente.value = '';
+        resCliente.classList.remove('open');
+        mostrarToast('Cliente "' + termoOriginal + '" cadastrado rapidinho — pode completar os dados dele depois em Clientes.');
+      } catch (e) { mostrarToast('Erro ao cadastrar cliente: ' + e.message, 'erro'); }
+    });
   });
   document.getElementById('btnRemoverCliente').addEventListener('click', () => {
     clienteSelecionado = null;

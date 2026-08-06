@@ -375,8 +375,6 @@
       listaItens.forEach(i => { doc.text('• ' + i.item, 24, y); doc.text(moeda(i.preco), 170, y, { align:'right' }); y += 5.5; });
       y += 4;
       doc.setDrawColor(200); doc.line(20,y,190,y); y += 6;
-      const subtotal = listaItens.reduce((s,i)=>s+i.preco,0);
-      linha('Subtotal:', moeda(subtotal));
       if (salvo.DESCONTO) linha('Desconto:', moeda(salvo.DESCONTO));
       doc.setFontSize(12); doc.setFont(undefined,'bold'); doc.text('Total: ' + moeda(salvo.VALOR_TOTAL), 20, y); y += 8;
       doc.setFontSize(9.5); doc.setFont(undefined,'normal'); doc.text('Orçamento válido por ' + salvo.VALIDADE_DIAS + ' dias.', 20, y);

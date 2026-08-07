@@ -198,54 +198,18 @@
     return { itens, texto, total };
   }
 
-  /** Mostra se o serviço já foi pago, ou o formulário rápido pra registrar o recebimento agora. */
+  /** Mostra o status de pagamento do serviço — só leitura. O pagamento em si agora é feito na aba Vendas (buscando pelo número da OS). */
   function renderAreaPagamento(os){
-    const area = document.getElementById('areaPagamentoOS');
     if (os.PAGAMENTO_REGISTRADO) {
       setHTML('areaPagamentoOS', `
         <div style="display:flex; align-items:center; gap:8px; color:var(--mint); font-weight:600; font-size:13px;">✅ Pago em ${os.FORMA_PAGAMENTO_SERVICO||'—'} — ${new Date(os.DATA_PAGAMENTO_SERVICO).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})}</div>
-        <div style="font-size:11.5px; color:var(--text-tertiary); margin-top:4px;">Já lançado no Financeiro como receita — não precisa fazer nada.</div>
       `);
-      return;
+    } else {
+      setHTML('areaPagamentoOS', `
+        <div style="display:flex; align-items:center; gap:8px; color:var(--amber); font-weight:600; font-size:13px;">⏳ Pendente</div>
+        <div style="font-size:11.5px; color:var(--text-tertiary); margin-top:4px;">Pra receber, vai na aba Vendas e busca pelo número desta OS (${os.NUMERO_OS}).</div>
+      `);
     }
-    setHTML('areaPagamentoOS', `
-      <div style="font-size:12.5px; color:var(--amber); margin-bottom:10px;">⚠️ Pagamento ainda não registrado — o valor do serviço não aparece no Financeiro até você confirmar aqui.</div>
-      <div style="display:flex; gap:8px; align-items:flex-end; flex-wrap:wrap;">
-        <div style="flex:1; min-width:140px;">
-          <label style="display:block; font-size:11px; color:var(--text-secondary); margin-bottom:6px;">Forma de pagamento</label>
-          <select id="selFormaPagamentoOS" style="width:100%; background:var(--bg-surface); border:1px solid var(--hairline); color:var(--text-primary); padding:9px 10px; border-radius:8px; font-size:12.5px;">
-            <option>PIX</option><option>Cartão de Crédito</option><option>Cartão de Débito</option><option>Dinheiro</option>
-          </select>
-        </div>
-        <button class="btn btn-primary" type="button" id="btnRegistrarPagamentoOS">💰 Registrar pagamento recebido</button>
-      </div>
-    `);
-    document.getElementById('btnRegistrarPagamentoOS').addEventListener('click', () => registrarPagamentoOS(os));
-  }
-
-  async function registrarPagamentoOS(os){
-    const valor = Number(document.getElementById('vValor').value) || 0;
-    if (!valor){ mostrarToast('Informe o valor do serviço antes de registrar o pagamento.', 'erro'); return; }
-    const forma = document.getElementById('selFormaPagamentoOS').value;
-    if (!confirm(`Confirmar recebimento de ${valor.toLocaleString('pt-BR',{style:'currency',currency:'BRL'})} via ${forma}?`)) return;
-
-    try {
-      if (!(await checarPermissao('FINANCEIRO','CADASTRAR'))){ mostrarToast('Sem permissão pra lançar no Financeiro.', 'erro'); return; }
-      if (!(await checarPermissao('ASSISTENCIA','EDITAR'))){ mostrarToast('Sem permissão pra editar a OS.', 'erro'); return; }
-      const empresaId = window.lojaAtivaId || (empresas[0] && empresas[0].ID) || '';
-      await dbInsert('FINANCEIRO', {
-        DESCRICAO: 'Assistência técnica ' + os.NUMERO_OS, CATEGORIA: 'Assistência Técnica', TIPO: 'Receita',
-        VALOR: valor, FORMA_PAGAMENTO: forma, EMPRESA_ID: empresaId,
-        DATA_VENCIMENTO: new Date().toISOString(), DATA_PAGAMENTO: new Date().toISOString(), STATUS: 'Pago',
-        ORIGEM_TIPO: 'ASSISTENCIA', ORIGEM_ID: os.ID
-      });
-      const dadosPagamento = { PAGAMENTO_REGISTRADO: true, FORMA_PAGAMENTO_SERVICO: forma, DATA_PAGAMENTO_SERVICO: new Date().toISOString(), VALOR_SERVICO: valor };
-      await dbUpdate('ASSISTENCIAS', os.ID, dadosPagamento);
-      Object.assign(os, dadosPagamento);
-      mostrarToast('Pagamento registrado e lançado no Financeiro.');
-      renderAreaPagamento(os);
-      carregar();
-    } catch (e) { mostrarToast('Erro ao registrar pagamento: ' + e.message, 'erro'); }
   }
 
   /** Mostra de volta a senha/PIN/padrão cadastrado na abertura da OS — clara e legível. */
@@ -537,7 +501,7 @@
         <div class="ffield"><label>Valor do serviço (R$)</label><input id="vValor" type="number" step="0.01" value="${osAtual.VALOR_SERVICO||0}"></div>
         <div class="ffield"><label>Técnico responsável</label><input id="vTecnico" value="${osAtual.TECNICO_RESPONSAVEL||''}"></div>
       </div>
-      <div class="section-title">💰 Pagamento do serviço</div>
+      <div class="section-title">💰 Status do pagamento</div>
       <div id="areaPagamentoOS" style="background:var(--bg-elevated); border:1px solid var(--hairline); border-radius:10px; padding:14px 16px; margin-bottom:16px;"></div>
       <div class="section-title">Estado do aparelho na entrada (registrado na abertura)</div>
       <div class="diagramas-wrap">

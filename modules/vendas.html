@@ -203,6 +203,22 @@
       NOME: 'OS ' + os.NUMERO_OS + ' — ' + (os.MARCA||'') + ' ' + (os.MODELO||''),
       QUANTIDADE: 1, PRECO_UNITARIO: Number(os.VALOR_SERVICO) || 0
     });
+
+    // Traz o cliente já vinculado na OS, pra não precisar buscar de novo.
+    if (os.CLIENTE_ID) {
+      const clienteDaOS = todosClientes.find(c => c.ID === os.CLIENTE_ID);
+      if (clienteDaOS && (!clienteSelecionado || clienteSelecionado.ID !== clienteDaOS.ID)) {
+        const trocandoCliente = !!clienteSelecionado;
+        clienteSelecionado = clienteDaOS;
+        document.getElementById('clienteSelecionadoNome').textContent = clienteDaOS.NOME;
+        document.getElementById('clienteSelecionadoWrap').style.display = 'block';
+        document.getElementById('buscaCliente').style.display = 'none';
+        document.getElementById('buscaCliente').value = '';
+        if (trocandoCliente) mostrarToast('Cliente trocado pra "' + clienteDaOS.NOME + '" (é quem está vinculado a essa OS).');
+        verificarFidelidade();
+      }
+    }
+
     renderCarrinho();
   }
   window.__alterarPrecoServico = (idx, valor) => { carrinho[idx].PRECO_UNITARIO = Number(valor) || 0; atualizarResumo(); atualizarTroco(); atualizarValidacaoCombinado(); };

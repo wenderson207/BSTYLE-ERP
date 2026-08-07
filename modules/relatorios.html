@@ -47,7 +47,7 @@
       <h4 id="tituloChartExtra">—</h4>
       <p class="chart-sub" id="subChartExtra"></p>
       <div id="avisoSemDadosRelExtra" style="display:none; color:var(--text-tertiary); font-size:12.5px; padding:30px 0; text-align:center;"></div>
-      <canvas id="chartRelExtra"></canvas>
+      <div style="max-height:260px; position:relative;"><canvas id="chartRelExtra"></canvas></div>
     </div>
   </div>
 
@@ -346,14 +346,13 @@
     document.getElementById('avisoSemDadosRelExtra').style.display = semDados ? 'block':'none';
     document.getElementById('chartRelExtra').style.display = semDados ? 'none':'block';
     if (semDados) document.getElementById('avisoSemDadosRelExtra').textContent = 'Nenhum registro com os filtros atuais.';
-    document.getElementById('chartRelExtra').height = Math.min(220, Math.max(120, entradas.length*26));
 
     const ch = Chart.getChart('chartRelExtra'); if (ch) ch.destroy();
     if (!semDados) new Chart(document.getElementById('chartRelExtra').getContext('2d'), {
       type:'bar',
       data:{ labels: entradas.map(([n])=>n), datasets:[{ data: entradas.map(([,v])=>v),
         backgroundColor: entradas.map((_,i)=>['#2FE1A8','#4C8DFF','#F5A623','#FF5C5C','#9B7EDE','#22c093','#e2401c','#5B6472','#4dd0e1'][i%9]), borderRadius:4 }] },
-      options:{ indexAxis:'y', plugins:{ legend:{display:false}, tooltip:{ callbacks:{ label: c => ehMoeda ? moeda(c.parsed.x) : c.parsed.x+' OS' } } },
+      options:{ indexAxis:'y', maintainAspectRatio:false, plugins:{ legend:{display:false}, tooltip:{ callbacks:{ label: c => ehMoeda ? moeda(c.parsed.x) : c.parsed.x+' OS' } } },
         scales:{ x:{ grid:{ color:'rgba(255,255,255,0.05)' }, ticks:{ color:'#8891A3', callback: v => ehMoeda ? moeda(v) : v } }, y:{ grid:{display:false}, ticks:{ color:'#8891A3', font:{size:11} } } } }
     });
   }

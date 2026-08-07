@@ -10,18 +10,41 @@
   .rel-filtros{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-bottom:16px; }
   .rel-filtros select, .rel-filtros input{ background:var(--bg-surface); border:1px solid var(--hairline); color:var(--text-primary); padding:8px 12px; border-radius:8px; font-size:12.5px; }
   .rel-filtros label{ display:flex; align-items:center; gap:6px; font-size:12.5px; color:var(--text-secondary); cursor:pointer; }
+  .rel-filtros .grupo{ display:flex; flex-direction:column; gap:4px; }
+  .rel-filtros .grupo span{ font-size:10.5px; color:var(--text-tertiary); }
   table.dt th{ cursor:pointer; user-select:none; white-space:nowrap; }
   table.dt th:hover{ color:var(--text-primary); }
   table.dt th .seta{ font-size:9px; margin-left:3px; color:var(--mint); }
+  .chart-grid{ display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:20px; }
+  @media (max-width: 980px){ .chart-grid{ grid-template-columns:1fr; } }
+  .chart-card{ background:var(--bg-surface); border:1px solid var(--hairline); border-radius:12px; padding:18px 20px; }
+  .chart-card h4{ font-family:var(--font-display); font-size:14px; margin:0 0 4px; }
+  .chart-sub{ font-size:11px; color:var(--text-tertiary); margin:0 0 12px; }
 </style>
 
 <div class="toolbar"><div><h1 style="font-family:var(--font-display); font-size:22px; margin:0 0 4px;">Relatórios</h1>
-<p style="color:var(--text-secondary); font-size:13px; margin:0;">Clique numa coluna pra ordenar por ela.</p></div></div>
+<p style="color:var(--text-secondary); font-size:13px; margin:0;">Filtra por período e categoria, clica numa coluna pra ordenar.</p></div></div>
 
 <div class="rel-grid" id="relGrid"></div>
 
 <div id="relResult" style="display:none;">
   <div class="rel-filtros" id="relFiltros"></div>
+
+  <div class="chart-grid" id="relChartsWrap" style="display:none;">
+    <div class="chart-card">
+      <h4 id="tituloChartCategoria">Por categoria</h4>
+      <p class="chart-sub" id="subChartCategoria"></p>
+      <div id="avisoSemDadosRelCat" style="display:none; color:var(--text-tertiary); font-size:12.5px; padding:30px 0; text-align:center;"></div>
+      <canvas id="chartRelCategoria"></canvas>
+    </div>
+    <div class="chart-card" id="cardChartHora" style="display:none;">
+      <h4>🕐 Por hora do dia</h4>
+      <p class="chart-sub">Em qual horário concentra mais movimento.</p>
+      <div id="avisoSemDadosRelHora" style="display:none; color:var(--text-tertiary); font-size:12.5px; padding:30px 0; text-align:center;"></div>
+      <canvas id="chartRelHora" height="150"></canvas>
+    </div>
+  </div>
+
   <div class="toolbar">
     <div class="rel-resumo" id="relResumo"></div>
     <div style="display:flex; gap:8px;">
@@ -44,11 +67,29 @@
   function dataHoraBR(v){ return v ? new Date(v).toLocaleString('pt-BR', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' }) : '—'; }
   function dataBR(v){ return v ? new Date(v).toLocaleDateString('pt-BR') : '—'; }
 
+  function tentarCarregarScript(src, timeoutMs){
+    return new Promise((resolve) => {
+      let resolvido = false;
+      const finalizar = (ok) => { if (!resolvido) { resolvido = true; resolve(ok); } };
+      const s = document.createElement('script');
+      s.src = src; s.onload = () => finalizar(true); s.onerror = () => finalizar(false);
+      document.head.appendChild(s);
+      setTimeout(() => finalizar(false), timeoutMs);
+    });
+  }
+  async function carregarChartJs(){
+    if (window.Chart) return;
+    const provedores = ['https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js', 'https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js'];
+    for (const url of provedores) { const ok = await tentarCarregarScript(url, 6000); if (ok && window.Chart) return; }
+    console.error('Não consegui carregar o Chart.js.');
+  }
+
   const RELATORIOS = [
     { id:'vendas', nome:'Vendas', colecao:'VENDAS',
       colunas: ['Data/Hora','Cliente','Vendedor','Pagamento','Valor','Status'],
       linha: v => [dataHoraBR(v.DATA), nomeCliente(v.CLIENTE_ID) || 'Sem cliente', nomeUsuario(v.USUARIO_ID), v.FORMA_PAGAMENTO + (v.PARCELAS>1?' ('+v.PARCELAS+'x)':''), moeda(v.VALOR_TOTAL), v.STATUS],
-      resumo: lista => [ ['Total de vendas', lista.length], ['Valor total', moeda(lista.reduce((s,v)=>s+Number(v.VALOR_TOTAL||0),0))] ]
+      resumo: lista => [ ['Total de vendas', lista.length], ['Valor total', moeda(lista.reduce((s,v)=>s+Number(v.VALOR_TOTAL||0),0))] ],
+      campoData: 'DATA', campoCategoria: v => v.FORMA_PAGAMENTO || 'Sem forma', rotuloCategoria: 'Por forma de pagamento', campoValor: v => Number(v.VALOR_TOTAL)||0, mostrarHora: true
     },
     { id:'clientes', nome:'Clientes', colecao:'CLIENTES',
       colunas: ['Nome','CPF','Telefone','Valor gasto','Última compra'],
@@ -59,17 +100,20 @@
       colunas: ['Nome','SKU','Categoria','Loja','Custo','Venda','Estoque'],
       linha: p => [p.NOME, p.SKU||'—', p.CATEGORIA||'Geral', nomeLoja(p.EMPRESA_ID), moeda(p.PRECO_CUSTO), moeda(p.PRECO_VENDA), p.ESTOQUE_ATUAL],
       resumo: lista => [ ['Total de produtos', lista.length], ['Estoque baixo', lista.filter(p=>Number(p.ESTOQUE_ATUAL)<=Number(p.ESTOQUE_MINIMO)).length], ['Loja no filtro', window.lojaAtivaId ? nomeLoja(window.lojaAtivaId) : 'Todas'] ],
-      filtros: true
+      filtrosProduto: true,
+      campoCategoria: p => p.CATEGORIA || 'Geral', rotuloCategoria: 'Por categoria (valor de venda em estoque)', campoValor: p => Number(p.ESTOQUE_ATUAL||0)*Number(p.PRECO_VENDA||0)
     },
     { id:'garantias', nome:'Garantias', colecao:'GARANTIAS',
       colunas: ['Número','Produto','Cliente','Emitida em','Prazo','Status'],
       linha: g => [g.NUMERO_GARANTIA, g.PRODUTO_DESCRICAO, nomeCliente(g.CLIENTE_ID), dataBR(g.DATA_EMISSAO), g.PRAZO_DIAS+' dias', g.STATUS],
-      resumo: lista => [ ['Total emitidas', lista.length] ]
+      resumo: lista => [ ['Total emitidas', lista.length] ],
+      campoData: 'DATA_EMISSAO', campoCategoria: g => g.TIPO === 'MANUTENCAO' ? 'Manutenção' : 'Produto usado', rotuloCategoria: 'Por tipo', campoValor: null
     },
     { id:'assistencias', nome:'Assistências', colecao:'ASSISTENCIAS',
       colunas: ['Nº OS','Cliente','Marca/Modelo','Status','Entrega prevista'],
       linha: o => [o.NUMERO_OS, nomeCliente(o.CLIENTE_ID), (o.MARCA||'')+' '+(o.MODELO||''), o.STATUS, dataBR(o.PRAZO)],
-      resumo: lista => [ ['Total de OS', lista.length], ['Em aberto', lista.filter(o=>o.STATUS!=='Entregue').length] ]
+      resumo: lista => [ ['Total de OS', lista.length], ['Em aberto', lista.filter(o=>o.STATUS!=='Entregue').length] ],
+      campoData: 'DATA_ABERTURA', campoCategoria: o => o.STATUS || 'Sem status', rotuloCategoria: 'Por status', campoValor: null, mostrarHora: true
     },
     { id:'financeiro', nome:'Financeiro', colecao:'FINANCEIRO',
       colunas: ['Descrição','Categoria','Tipo','Valor','Vencimento','Status'],
@@ -77,12 +121,14 @@
       resumo: lista => [
         ['Receitas', moeda(lista.filter(f=>f.TIPO==='Receita' && f.STATUS==='Pago').reduce((s,f)=>s+Number(f.VALOR||0),0))],
         ['Despesas', moeda(lista.filter(f=>f.TIPO==='Despesa' && f.STATUS==='Pago').reduce((s,f)=>s+Number(f.VALOR||0),0))]
-      ]
+      ],
+      campoData: v => v.DATA_PAGAMENTO || v.DATA_VENCIMENTO, campoCategoria: f => f.CATEGORIA || 'Sem categoria', rotuloCategoria: 'Por categoria', campoValor: f => Number(f.VALOR)||0, mostrarHora: true
     },
     { id:'compras', nome:'Compras', colecao:'COMPRAS',
       colunas: ['Data','Valor total','Status'],
       linha: c => [dataBR(c.DATA), moeda(c.VALOR_TOTAL), c.STATUS],
-      resumo: lista => [ ['Total de compras', lista.length], ['Valor total', moeda(lista.reduce((s,c)=>s+Number(c.VALOR_TOTAL||0),0))] ]
+      resumo: lista => [ ['Total de compras', lista.length], ['Valor total', moeda(lista.reduce((s,c)=>s+Number(c.VALOR_TOTAL||0),0))] ],
+      campoData: 'DATA', campoCategoria: c => c.STATUS || 'Sem status', rotuloCategoria: 'Por status', campoValor: c => Number(c.VALOR_TOTAL)||0
     }
   ];
 
@@ -100,48 +146,73 @@
     setHTML('relTbody', '<tr class="empty-row"><td colspan="10">Carregando…</td></tr>');
     try {
       let bruto = await dbGetAll(relAtivo.colecao);
-      // PRODUTOS e CLIENTES usam exclusão lógica (STATUS='Excluído') — nunca deve aparecer em relatório.
-      if (relAtivo.colecao === 'PRODUTOS' || relAtivo.colecao === 'CLIENTES') {
-        bruto = bruto.filter(item => item.STATUS !== 'Excluído');
-      }
-      // Produtos respeitam a loja ativa do filtro geral (navbar) — evita relatório misturando lojas.
-      if (relAtivo.colecao === 'PRODUTOS' && window.lojaAtivaId) {
-        bruto = bruto.filter(p => p.EMPRESA_ID === window.lojaAtivaId);
-      }
+      if (relAtivo.colecao === 'PRODUTOS' || relAtivo.colecao === 'CLIENTES') bruto = bruto.filter(item => item.STATUS !== 'Excluído');
+      if (relAtivo.colecao === 'PRODUTOS' && window.lojaAtivaId) bruto = bruto.filter(p => p.EMPRESA_ID === window.lojaAtivaId);
       dadosCompletos = bruto;
       renderFiltros();
       aplicarFiltros();
     } catch (e) { mostrarToast('Erro: ' + e.message, 'erro'); }
   }));
 
-  // ---------- Filtros (só aparecem quando fazem sentido — hoje, Produtos) ----------
-  function renderFiltros(){
-    if (!relAtivo.filtros) { setHTML('relFiltros', ''); return; }
+  function valorData(item){
+    if (!relAtivo.campoData) return null;
+    return typeof relAtivo.campoData === 'function' ? relAtivo.campoData(item) : item[relAtivo.campoData];
+  }
 
-    const categorias = [...new Set(dadosCompletos.map(p => p.CATEGORIA || 'Geral'))];
-    setHTML('relFiltros', `
-      <select id="filtroCategoriaRel"><option value="">Todas as categorias</option>${categorias.map(c=>`<option value="${c}">${c}</option>`).join('')}</select>
-      <label><input type="checkbox" id="filtroEstoqueBaixoRel"> Só estoque baixo</label>
-      <input id="filtroPrecoMinRel" type="number" step="0.01" placeholder="Preço mín. (R$)" style="width:140px;">
-      <input id="filtroPrecoMaxRel" type="number" step="0.01" placeholder="Preço máx. (R$)" style="width:140px;">
-    `);
-    ['filtroCategoriaRel','filtroEstoqueBaixoRel','filtroPrecoMinRel','filtroPrecoMaxRel'].forEach(id => {
-      document.getElementById(id).addEventListener('input', aplicarFiltros);
-      document.getElementById(id).addEventListener('change', aplicarFiltros);
+  function renderFiltros(){
+    let html = '';
+    if (relAtivo.campoData) {
+      html += `<div class="grupo"><span>De</span><input type="date" id="filtroDeRel"></div>
+                <div class="grupo"><span>Até</span><input type="date" id="filtroAteRel"></div>`;
+    }
+    if (relAtivo.campoCategoria) {
+      const categorias = [...new Set(dadosCompletos.map(relAtivo.campoCategoria))].filter(Boolean);
+      html += `<div class="grupo"><span>${relAtivo.rotuloCategoria||'Categoria'}</span>
+        <select id="filtroCategoriaRelGenerico"><option value="">Todas</option>${categorias.map(c=>`<option value="${c}">${c}</option>`).join('')}</select></div>`;
+    }
+    if (relAtivo.filtrosProduto) {
+      html += `<label><input type="checkbox" id="filtroEstoqueBaixoRel"> Só estoque baixo</label>
+        <input id="filtroPrecoMinRel" type="number" step="0.01" placeholder="Preço mín. (R$)" style="width:130px;">
+        <input id="filtroPrecoMaxRel" type="number" step="0.01" placeholder="Preço máx. (R$)" style="width:130px;">`;
+    }
+    if (html) html += `<button class="btn" id="btnLimparFiltroRel" style="padding:8px 12px;">Limpar</button>`;
+    setHTML('relFiltros', html);
+
+    ['filtroDeRel','filtroAteRel','filtroCategoriaRelGenerico','filtroEstoqueBaixoRel','filtroPrecoMinRel','filtroPrecoMaxRel'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) { el.addEventListener('input', aplicarFiltros); el.addEventListener('change', aplicarFiltros); }
+    });
+    const btnLimpar = document.getElementById('btnLimparFiltroRel');
+    if (btnLimpar) btnLimpar.addEventListener('click', () => {
+      ['filtroDeRel','filtroAteRel','filtroCategoriaRelGenerico','filtroPrecoMinRel','filtroPrecoMaxRel'].forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
+      const chk = document.getElementById('filtroEstoqueBaixoRel'); if (chk) chk.checked = false;
+      aplicarFiltros();
     });
   }
 
   function aplicarFiltros(){
     let lista = dadosCompletos.slice();
 
-    if (relAtivo.filtros) {
-      const categoria = document.getElementById('filtroCategoriaRel')?.value;
+    if (relAtivo.campoData) {
+      const de = document.getElementById('filtroDeRel')?.value;
+      const ate = document.getElementById('filtroAteRel')?.value;
+      if (de || ate) lista = lista.filter(item => {
+        const v = valorData(item); if (!v) return false;
+        const d = new Date(v);
+        if (de && d < new Date(de+'T00:00:00')) return false;
+        if (ate && d > new Date(ate+'T23:59:59')) return false;
+        return true;
+      });
+    }
+    if (relAtivo.campoCategoria) {
+      const cat = document.getElementById('filtroCategoriaRelGenerico')?.value;
+      if (cat) lista = lista.filter(item => relAtivo.campoCategoria(item) === cat);
+    }
+    if (relAtivo.filtrosProduto) {
       const soBaixo = document.getElementById('filtroEstoqueBaixoRel')?.checked;
       const precoMin = Number(document.getElementById('filtroPrecoMinRel')?.value) || null;
       const precoMax = Number(document.getElementById('filtroPrecoMaxRel')?.value) || null;
-
       lista = lista.filter(p => {
-        if (categoria && (p.CATEGORIA||'Geral') !== categoria) return false;
         if (soBaixo && !(Number(p.ESTOQUE_ATUAL) <= Number(p.ESTOQUE_MINIMO))) return false;
         if (precoMin !== null && Number(p.PRECO_VENDA) < precoMin) return false;
         if (precoMax !== null && Number(p.PRECO_VENDA) > precoMax) return false;
@@ -151,9 +222,73 @@
 
     dadosFiltrados = lista;
     renderTabela();
+    renderGraficosRelatorio();
   }
 
-  // ---------- Ordenação genérica por coluna (detecta moeda/data/número/texto) ----------
+  async function renderGraficosRelatorio(){
+    const wrap = document.getElementById('relChartsWrap');
+    if (!relAtivo.campoCategoria) { wrap.style.display = 'none'; return; }
+    wrap.style.display = 'grid';
+    await carregarChartJs();
+    if (!window.Chart) { console.error('Chart.js não carregou.'); return; }
+
+    document.getElementById('tituloChartCategoria').textContent = relAtivo.rotuloCategoria || 'Por categoria';
+    document.getElementById('subChartCategoria').textContent = relAtivo.campoValor ? 'Somando o valor de cada grupo.' : 'Contando quantos registros em cada grupo.';
+
+    try {
+      const porCat = {};
+      dadosFiltrados.forEach(item => {
+        const cat = relAtivo.campoCategoria(item) || 'Outros';
+        porCat[cat] = (porCat[cat]||0) + (relAtivo.campoValor ? relAtivo.campoValor(item) : 1);
+      });
+      let entradas = Object.entries(porCat).sort((a,b)=>b[1]-a[1]);
+      const LIMITE = 8;
+      if (entradas.length > LIMITE) {
+        const principais = entradas.slice(0,LIMITE);
+        const outros = entradas.slice(LIMITE).reduce((s,[,v])=>s+v,0);
+        entradas = [...principais, ['Outros ('+(entradas.length-LIMITE)+')', outros]];
+      }
+      const semDados = !entradas.length;
+      document.getElementById('avisoSemDadosRelCat').style.display = semDados ? 'block':'none';
+      document.getElementById('chartRelCategoria').style.display = semDados ? 'none':'block';
+      if (semDados) document.getElementById('avisoSemDadosRelCat').textContent = 'Nenhum registro com os filtros atuais.';
+      document.getElementById('chartRelCategoria').height = Math.min(240, Math.max(140, entradas.length*24));
+
+      const ch = Chart.getChart('chartRelCategoria'); if (ch) ch.destroy();
+      if (!semDados) new Chart(document.getElementById('chartRelCategoria').getContext('2d'), {
+        type:'bar',
+        data:{ labels: entradas.map(([n])=>n), datasets:[{ data: entradas.map(([,v])=>v),
+          backgroundColor: entradas.map((_,i)=>['#2FE1A8','#4C8DFF','#F5A623','#FF5C5C','#9B7EDE','#22c093','#e2401c','#5B6472','#4dd0e1'][i%9]), borderRadius:4 }] },
+        options:{ indexAxis:'y', plugins:{ legend:{display:false}, tooltip:{ callbacks:{ label: c => relAtivo.campoValor ? moeda(c.parsed.x) : c.parsed.x+' registro(s)' } } },
+          scales:{ x:{ grid:{ color:'rgba(255,255,255,0.05)' }, ticks:{ color:'#8891A3', callback: v => relAtivo.campoValor ? moeda(v) : v } }, y:{ grid:{display:false}, ticks:{ color:'#8891A3', font:{size:11} } } } }
+      });
+    } catch(e) { console.error('Erro gráfico categoria:', e); }
+
+    const cardHora = document.getElementById('cardChartHora');
+    if (!relAtivo.mostrarHora || !relAtivo.campoData) { cardHora.style.display = 'none'; return; }
+    cardHora.style.display = 'block';
+    try {
+      const porHora = Array(24).fill(0);
+      dadosFiltrados.forEach(item => {
+        const v = valorData(item); if (!v) return;
+        const h = new Date(v).getHours();
+        porHora[h] += (relAtivo.campoValor ? relAtivo.campoValor(item) : 1);
+      });
+      const semDados = !dadosFiltrados.length;
+      document.getElementById('avisoSemDadosRelHora').style.display = semDados ? 'block':'none';
+      document.getElementById('chartRelHora').style.display = semDados ? 'none':'block';
+      if (semDados) document.getElementById('avisoSemDadosRelHora').textContent = 'Nenhum registro com os filtros atuais.';
+
+      const ch2 = Chart.getChart('chartRelHora'); if (ch2) ch2.destroy();
+      if (!semDados) new Chart(document.getElementById('chartRelHora').getContext('2d'), {
+        type:'bar',
+        data:{ labels: porHora.map((_,h)=>h+'h'), datasets:[{ data: porHora, backgroundColor:'rgba(76,141,255,0.75)', borderRadius:3 }] },
+        options:{ plugins:{ legend:{display:false}, tooltip:{ callbacks:{ label: c => relAtivo.campoValor ? moeda(c.parsed.y) : c.parsed.y+' registro(s)' } } },
+          scales:{ x:{ grid:{display:false}, ticks:{ color:'#8891A3', font:{size:10} } }, y:{ grid:{ color:'rgba(255,255,255,0.05)' }, ticks:{ color:'#8891A3', callback: v => relAtivo.campoValor ? moeda(v) : v } } } }
+      });
+    } catch(e) { console.error('Erro gráfico por hora:', e); }
+  }
+
   function valorOrdenavel(texto){
     if (texto == null) return '';
     const t = String(texto).trim();

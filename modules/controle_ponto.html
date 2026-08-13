@@ -16,6 +16,17 @@
   .filtros .grupo{ display:flex; flex-direction:column; gap:4px; }
   .filtros .grupo span{ font-size:10.5px; color:var(--text-tertiary); }
   .filtros select, .filtros input{ background:var(--bg-surface); border:1px solid var(--hairline); color:var(--text-primary); padding:8px 12px; border-radius:8px; font-size:12.5px; }
+  .status-tabs{ display:flex; gap:8px; flex-wrap:wrap; }
+  .status-tab{ flex:1; min-width:100px; padding:9px 10px; border-radius:8px; border:1px solid var(--hairline); background:var(--bg-elevated); color:var(--text-secondary); font-size:12.5px; cursor:pointer; }
+  .status-tab.active[data-status="PRESENCA"]{ background:rgba(47,225,168,0.14); border-color:var(--mint); color:var(--mint); }
+  .status-tab.active[data-status="FOLGA"]{ background:rgba(76,141,255,0.14); border-color:var(--blue); color:var(--blue); }
+  .status-tab.active[data-status="FALTA"]{ background:rgba(255,92,92,0.14); border-color:var(--red); color:var(--red); }
+  .status-tab.active[data-status="ABONO"]{ background:rgba(245,166,35,0.14); border-color:var(--amber); color:var(--amber); }
+  .badge-status{ display:inline-flex; align-items:center; gap:4px; padding:3px 9px; border-radius:20px; font-size:11px; font-weight:600; }
+  .badge-status.PRESENCA{ background:rgba(47,225,168,0.12); color:var(--mint); }
+  .badge-status.FOLGA{ background:rgba(76,141,255,0.12); color:var(--blue); }
+  .badge-status.FALTA{ background:rgba(255,92,92,0.12); color:var(--red); }
+  .badge-status.ABONO{ background:rgba(245,166,35,0.12); color:var(--amber); }
 </style>
 
 <div class="toolbar">
@@ -33,14 +44,15 @@
 </div>
 
 <div class="kpi-grid" style="margin-bottom:20px;">
-  <div class="kpi"><div class="lbl">Dias registrados</div><div class="val" id="kpiDias">—</div></div>
+  <div class="kpi"><div class="lbl">Dias com presença</div><div class="val" id="kpiDias">—</div></div>
   <div class="kpi"><div class="lbl">Total de horas</div><div class="val" id="kpiHoras">—</div></div>
   <div class="kpi"><div class="lbl">Média por dia</div><div class="val" id="kpiMedia">—</div></div>
+  <div class="kpi"><div class="lbl">Faltas / Folgas / Abonos</div><div class="val" id="kpiOutros" style="font-size:16px;">—</div></div>
 </div>
 
 <table class="dt">
-  <thead><tr><th>Data</th><th>Funcionário</th><th>Entrada</th><th>Início almoço</th><th>Fim almoço</th><th>Saída</th><th>Horas</th><th></th></tr></thead>
-  <tbody id="linhas"><tr class="empty-row"><td colspan="8">Carregando…</td></tr></tbody>
+  <thead><tr><th>Data</th><th>Funcionário</th><th>Status</th><th>Entrada</th><th>Início almoço</th><th>Fim almoço</th><th>Saída</th><th>Horas</th><th></th></tr></thead>
+  <tbody id="linhas"><tr class="empty-row"><td colspan="9">Carregando…</td></tr></tbody>
 </table>
 
 <div class="modal-overlay" id="modal">
@@ -52,14 +64,25 @@
         <div class="ffield"><label>Funcionário *</label><select id="fFuncionario"></select></div>
         <div class="ffield"><label>Data *</label><input id="fData" type="date"></div>
       </div>
-      <div class="frow4">
-        <div class="ffield"><label>Entrada</label><input id="fEntrada" type="time"></div>
-        <div class="ffield"><label>Início almoço</label><input id="fInicioAlmoco" type="time"></div>
-        <div class="ffield"><label>Fim almoço</label><input id="fFimAlmoco" type="time"></div>
-        <div class="ffield"><label>Saída</label><input id="fSaida" type="time"></div>
+      <div class="ffield">
+        <label>Status do dia</label>
+        <div class="status-tabs" id="statusTabs">
+          <button type="button" class="status-tab active" data-status="PRESENCA">✅ Presença</button>
+          <button type="button" class="status-tab" data-status="FOLGA">🌴 Folga</button>
+          <button type="button" class="status-tab" data-status="FALTA">❌ Falta</button>
+          <button type="button" class="status-tab" data-status="ABONO">📄 Abono</button>
+        </div>
       </div>
-      <div id="previaHoras" style="font-size:12.5px; color:var(--mint); font-weight:600; margin-bottom:14px;"></div>
-      <div class="ffield"><label>Observações</label><textarea id="fObs" style="min-height:60px;" placeholder="Ex.: falta justificada, hora extra autorizada..."></textarea></div>
+      <div id="camposHorario">
+        <div class="frow4">
+          <div class="ffield"><label>Entrada</label><input id="fEntrada" type="time"></div>
+          <div class="ffield"><label>Início almoço</label><input id="fInicioAlmoco" type="time"></div>
+          <div class="ffield"><label>Fim almoço</label><input id="fFimAlmoco" type="time"></div>
+          <div class="ffield"><label>Saída</label><input id="fSaida" type="time"></div>
+        </div>
+        <div id="previaHoras" style="font-size:12.5px; color:var(--mint); font-weight:600; margin-bottom:14px;"></div>
+      </div>
+      <div class="ffield"><label>Observações</label><textarea id="fObs" style="min-height:60px;" placeholder="Ex.: folga combinada, atestado médico, falta justificada..."></textarea></div>
     </div>
     <div class="modal-foot"><button class="btn" id="btnCancelar">Cancelar</button><button class="btn btn-primary" id="btnSalvar">Salvar</button></div>
   </div>
@@ -73,6 +96,7 @@
   function moeda(v){ return (Number(v)||0).toLocaleString('pt-BR', { style:'currency', currency:'BRL' }); }
   function dataBR(v){ return v ? new Date(v+'T00:00:00').toLocaleDateString('pt-BR') : '—'; }
   function nomeFuncionario(id){ const f = funcionarios.find(x=>x.ID===id); return f?f.NOME:'—'; }
+  const STATUS_LABEL = { PRESENCA:'✅ Presença', FOLGA:'🌴 Folga', FALTA:'❌ Falta', ABONO:'📄 Abono' };
   function horaOuTraco(v){ return v || '—'; }
 
   /** Calcula horas trabalhadas: (saída - entrada) menos o intervalo de almoço, se informado. */
@@ -123,26 +147,46 @@
   });
 
   function renderKpis(){
-    const totalHoras = registrosFiltrados.reduce((s,r) => s + Number(r.HORAS_TRABALHADAS||0), 0);
-    document.getElementById('kpiDias').textContent = registrosFiltrados.length;
+    const presencas = registrosFiltrados.filter(r => (r.STATUS||'PRESENCA') === 'PRESENCA');
+    const totalHoras = presencas.reduce((s,r) => s + Number(r.HORAS_TRABALHADAS||0), 0);
+    const qtdFaltas = registrosFiltrados.filter(r => r.STATUS === 'FALTA').length;
+    const qtdFolgas = registrosFiltrados.filter(r => r.STATUS === 'FOLGA').length;
+    const qtdAbonos = registrosFiltrados.filter(r => r.STATUS === 'ABONO').length;
+
+    document.getElementById('kpiDias').textContent = presencas.length;
     document.getElementById('kpiHoras').textContent = formatarHoras(totalHoras);
-    document.getElementById('kpiMedia').textContent = registrosFiltrados.length ? formatarHoras(totalHoras / registrosFiltrados.length) : '—';
+    document.getElementById('kpiMedia').textContent = presencas.length ? formatarHoras(totalHoras / presencas.length) : '—';
+    document.getElementById('kpiOutros').textContent = qtdFaltas + ' / ' + qtdFolgas + ' / ' + qtdAbonos;
   }
 
   function renderLinhas(){
-    if (!registrosFiltrados.length){ setHTML('linhas', '<tr class="empty-row"><td colspan="8">Nenhum registro de ponto ainda.</td></tr>'); return; }
-    setHTML('linhas', registrosFiltrados.map(r => `<tr>
+    if (!registrosFiltrados.length){ setHTML('linhas', '<tr class="empty-row"><td colspan="9">Nenhum registro de ponto ainda.</td></tr>'); return; }
+    setHTML('linhas', registrosFiltrados.map(r => {
+      const status = r.STATUS || 'PRESENCA';
+      const ehPresenca = status === 'PRESENCA';
+      return `<tr>
       <td>${dataBR(r.DATA)}</td><td>${nomeFuncionario(r.FUNCIONARIO_ID)}</td>
-      <td>${horaOuTraco(r.HORA_ENTRADA)}</td><td>${horaOuTraco(r.HORA_INICIO_ALMOCO)}</td><td>${horaOuTraco(r.HORA_FIM_ALMOCO)}</td><td>${horaOuTraco(r.HORA_SAIDA)}</td>
-      <td><b>${formatarHoras(r.HORAS_TRABALHADAS||0)}</b></td>
+      <td><span class="badge-status ${status}">${STATUS_LABEL[status]}</span></td>
+      <td>${ehPresenca ? horaOuTraco(r.HORA_ENTRADA) : '—'}</td><td>${ehPresenca ? horaOuTraco(r.HORA_INICIO_ALMOCO) : '—'}</td><td>${ehPresenca ? horaOuTraco(r.HORA_FIM_ALMOCO) : '—'}</td><td>${ehPresenca ? horaOuTraco(r.HORA_SAIDA) : '—'}</td>
+      <td><b>${ehPresenca ? formatarHoras(r.HORAS_TRABALHADAS||0) : '—'}</b></td>
       <td style="display:flex; gap:6px;">
         <button class="btn" style="padding:6px 10px; font-size:11.5px;" onclick="window.__editarPonto('${r.ID}')">Editar</button>
         <button class="btn" style="padding:6px 10px; font-size:11.5px; color:var(--red);" onclick="window.__excluirPonto('${r.ID}')">Excluir</button>
-      </td></tr>`).join(''));
+      </td></tr>`;
+    }).join(''));
   }
 
   // ---------- Modal ----------
   const modal = document.getElementById('modal');
+  let statusSelecionado = 'PRESENCA';
+
+  function selecionarStatus(status){
+    statusSelecionado = status;
+    document.querySelectorAll('.status-tab').forEach(b => b.classList.toggle('active', b.dataset.status === status));
+    document.getElementById('camposHorario').style.display = status === 'PRESENCA' ? 'block' : 'none';
+  }
+  document.querySelectorAll('.status-tab').forEach(btn => btn.addEventListener('click', () => selecionarStatus(btn.dataset.status)));
+
   function atualizarPreviaHoras(){
     const h = calcularHoras(document.getElementById('fEntrada').value, document.getElementById('fSaida').value, document.getElementById('fInicioAlmoco').value, document.getElementById('fFimAlmoco').value);
     document.getElementById('previaHoras').textContent = h > 0 ? '≈ ' + formatarHoras(h) + ' trabalhadas nesse dia' : '';
@@ -157,6 +201,7 @@
     document.getElementById('fData').value = new Date().toISOString().substring(0,10);
     ['fEntrada','fInicioAlmoco','fFimAlmoco','fSaida','fObs'].forEach(id => document.getElementById(id).value = '');
     document.getElementById('previaHoras').textContent = '';
+    selecionarStatus('PRESENCA');
     modal.classList.add('open');
   });
   document.getElementById('fecharModal').addEventListener('click', () => modal.classList.remove('open'));
@@ -174,6 +219,7 @@
     document.getElementById('fFimAlmoco').value = registroAtual.HORA_FIM_ALMOCO || '';
     document.getElementById('fSaida').value = registroAtual.HORA_SAIDA || '';
     document.getElementById('fObs').value = registroAtual.OBSERVACOES || '';
+    selecionarStatus(registroAtual.STATUS || 'PRESENCA');
     atualizarPreviaHoras();
     modal.classList.add('open');
   };
@@ -183,14 +229,15 @@
     const data = document.getElementById('fData').value;
     if (!funcionarioId || !data){ mostrarToast('Escolha o funcionário e a data.', 'erro'); return; }
 
-    const entrada = document.getElementById('fEntrada').value;
-    const saida = document.getElementById('fSaida').value;
-    const inicioAlmoco = document.getElementById('fInicioAlmoco').value;
-    const fimAlmoco = document.getElementById('fFimAlmoco').value;
-    const horas = calcularHoras(entrada, saida, inicioAlmoco, fimAlmoco);
+    const ehPresenca = statusSelecionado === 'PRESENCA';
+    const entrada = ehPresenca ? document.getElementById('fEntrada').value : '';
+    const saida = ehPresenca ? document.getElementById('fSaida').value : '';
+    const inicioAlmoco = ehPresenca ? document.getElementById('fInicioAlmoco').value : '';
+    const fimAlmoco = ehPresenca ? document.getElementById('fFimAlmoco').value : '';
+    const horas = ehPresenca ? calcularHoras(entrada, saida, inicioAlmoco, fimAlmoco) : 0;
 
     const dados = {
-      FUNCIONARIO_ID: funcionarioId, DATA: data,
+      FUNCIONARIO_ID: funcionarioId, DATA: data, STATUS: statusSelecionado,
       HORA_ENTRADA: entrada, HORA_SAIDA: saida, HORA_INICIO_ALMOCO: inicioAlmoco, HORA_FIM_ALMOCO: fimAlmoco,
       HORAS_TRABALHADAS: horas, OBSERVACOES: document.getElementById('fObs').value.trim()
     };
@@ -240,25 +287,36 @@
       doc.text('Período: ' + (de?dataBR(de):'início') + ' até ' + (ate?dataBR(ate):'hoje'), 20, y); y += 8;
 
       doc.setDrawColor(220); doc.setFontSize(9); doc.setFont(undefined,'bold'); doc.setTextColor(20);
-      doc.text('Data', 20, y); doc.text('Entrada', 55, y); doc.text('Almoço', 80, y); doc.text('Saída', 115, y); doc.text('Horas', 145, y); doc.text('Obs.', 165, y);
+      doc.text('Data', 20, y); doc.text('Status', 45, y); doc.text('Entrada', 70, y); doc.text('Almoço', 95, y); doc.text('Saída', 125, y); doc.text('Horas', 150, y); doc.text('Obs.', 170, y);
       y += 2; doc.line(20, y, 190, y); y += 5;
 
+      const STATUS_TEXTO_PDF = { PRESENCA:'Presença', FOLGA:'Folga', FALTA:'Falta', ABONO:'Abono' };
       doc.setFont(undefined,'normal');
       registrosDoFunc.forEach(r => {
         if (y > 270) { doc.addPage(); y = 20; }
+        const status = r.STATUS || 'PRESENCA';
+        const ehPresenca = status === 'PRESENCA';
         doc.text(dataBR(r.DATA), 20, y);
-        doc.text(horaOuTraco(r.HORA_ENTRADA), 55, y);
-        doc.text((r.HORA_INICIO_ALMOCO||'—') + '-' + (r.HORA_FIM_ALMOCO||'—'), 80, y);
-        doc.text(horaOuTraco(r.HORA_SAIDA), 115, y);
-        doc.text(formatarHoras(r.HORAS_TRABALHADAS||0), 145, y);
-        if (r.OBSERVACOES) doc.text(doc.splitTextToSize(r.OBSERVACOES, 28)[0] || '', 165, y);
+        doc.text(STATUS_TEXTO_PDF[status] || status, 45, y);
+        doc.text(ehPresenca ? horaOuTraco(r.HORA_ENTRADA) : '—', 70, y);
+        doc.text(ehPresenca ? ((r.HORA_INICIO_ALMOCO||'—') + '-' + (r.HORA_FIM_ALMOCO||'—')) : '—', 95, y);
+        doc.text(ehPresenca ? horaOuTraco(r.HORA_SAIDA) : '—', 125, y);
+        doc.text(ehPresenca ? formatarHoras(r.HORAS_TRABALHADAS||0) : '—', 150, y);
+        if (r.OBSERVACOES) doc.text(doc.splitTextToSize(r.OBSERVACOES, 25)[0] || '', 170, y);
         y += 6;
       });
 
-      const totalHoras = registrosDoFunc.reduce((s,r) => s + Number(r.HORAS_TRABALHADAS||0), 0);
+      const presencasDoFunc = registrosDoFunc.filter(r => (r.STATUS||'PRESENCA') === 'PRESENCA');
+      const totalHoras = presencasDoFunc.reduce((s,r) => s + Number(r.HORAS_TRABALHADAS||0), 0);
+      const qtdFaltas = registrosDoFunc.filter(r => r.STATUS === 'FALTA').length;
+      const qtdFolgas = registrosDoFunc.filter(r => r.STATUS === 'FOLGA').length;
+      const qtdAbonos = registrosDoFunc.filter(r => r.STATUS === 'ABONO').length;
+
       y += 4; doc.line(20, y, 190, y); y += 7;
-      doc.setFontSize(11); doc.setFont(undefined,'bold');
-      doc.text('Total: ' + registrosDoFunc.length + ' dia(s) trabalhado(s) — ' + formatarHoras(totalHoras) + ' no período', 20, y);
+      doc.setFontSize(11); doc.setFont(undefined,'bold'); doc.setTextColor(20);
+      doc.text('Presenças: ' + presencasDoFunc.length + ' dia(s) — ' + formatarHoras(totalHoras) + ' no período', 20, y); y += 7;
+      doc.setFontSize(10); doc.setFont(undefined,'normal'); doc.setTextColor(80);
+      doc.text('Faltas: ' + qtdFaltas + '   |   Folgas: ' + qtdFolgas + '   |   Abonos: ' + qtdAbonos, 20, y);
 
       doc.save('Ponto_' + funcionario.NOME.replace(/\s+/g,'_') + '.pdf');
       mostrarToast('PDF gerado.');

@@ -602,7 +602,14 @@ Ao assinar, o cliente declara estar ciente do serviço a ser realizado e do valo
     const janela = window.open('', '_blank');
     janela.document.write(`<html><head><title>${osAtual.NUMERO_OS}</title></head><body>${bloco('1ª VIA — LOJA')}${bloco('2ª VIA — CLIENTE')}</body></html>`);
     janela.document.close(); janela.focus();
-    setTimeout(() => janela.print(), 400);
+    const imagens = janela.document.images;
+    if (!imagens.length) { janela.print(); }
+    else {
+      let pendentes = imagens.length;
+      const seguir = () => { pendentes--; if (pendentes <= 0) janela.print(); };
+      [...imagens].forEach(img => { if (img.complete) seguir(); else { img.addEventListener('load', seguir); img.addEventListener('error', seguir); } });
+      setTimeout(() => janela.print(), 2000);
+    }
   });
 
   // ---------- Salvar PDF ----------

@@ -193,7 +193,7 @@
     return `
       <div style="display:flex; align-items:flex-start; justify-content:space-between; padding-bottom:12px; flex-wrap:wrap; gap:14px;">
         <div style="display:flex; align-items:center; gap:10px;">
-          <img src="assets/img/Logo.png" style="width:52px; height:52px; object-fit:contain;" onerror="this.style.display='none'">
+          <img src="assets/img/Logo.png" style="height:52px; width:auto; max-width:90px; object-fit:contain;" onerror="this.style.display='none'">
           <div>
             <div style="font-size:19px; font-weight:800; color:#e2401c; letter-spacing:0.4px;">BSTYLE - Eletrônicos & Acessórios</div>
             <div style="font-size:9.5px; color:#666;">📷 ${empresaPrincipal.INSTAGRAM || (empresaPrincipal.EMAIL||'')}</div>
@@ -282,7 +282,8 @@
 
       <h3 style="font-size:12.5px; margin:16px 0 6px;">3. PRAZO DE GARANTIA</h3>
       <p style="font-size:12px; line-height:1.7; margin:0 0 6px;">A garantia para o serviço prestado é de <b>${garantiaAtual.PRAZO_DIAS} (${porExtenso(garantiaAtual.PRAZO_DIAS)}) dias</b>, contados a partir da data de conclusão do serviço.</p>
-      <p style="font-size:12px; line-height:1.7; margin:0 0 4px;">A garantia cobre:</p>
+
+      <h3 style="font-size:12.5px; margin:16px 0 6px;">4. A GARANTIA COBRE</h3>
       <ul style="font-size:12px; line-height:1.7; margin:0; padding-left:18px;">
         <li>Defeitos de fabricação da peça trocada.</li>
         <li>Problemas relacionados à instalação do serviço realizado.</li>
@@ -367,7 +368,7 @@
         // Barra e título coloridos — igual pros dois tipos de termo
         doc.setFillColor(...corDestaque); doc.rect(15, y-6, 180, 1.2, 'F');
         doc.setFontSize(16); doc.setFont(undefined,'bold'); doc.setTextColor(20);
-        doc.text('Termo de Garantia – ' + (ehProdutoUsado ? 'Produto Usado' : 'Manutenção'), 105, y+4, { align:'center' }); y += 8;
+        doc.text(ehProdutoUsado ? 'Termo de Garantia – Produto Usado' : 'TERMO DE GARANTIA', 105, y+4, { align:'center' }); y += 8;
         doc.setDrawColor(...corDestaque); doc.setLineWidth(0.6); doc.line(20, y, 190, y); y += 8;
 
         doc.setFontSize(8.5); doc.setFont(undefined,'normal'); doc.setTextColor(140);
@@ -425,6 +426,8 @@
 
           secao('3. PRAZO DE GARANTIA');
           paragrafo(`A garantia para o serviço prestado é de ${garantiaAtual.PRAZO_DIAS} (${porExtenso(garantiaAtual.PRAZO_DIAS)}) dias, contados a partir da data de conclusão do serviço.`);
+
+          secao('4. A GARANTIA COBRE');
           bullets(['Defeitos de fabricação da peça trocada.', 'Problemas relacionados à instalação do serviço realizado.']);
           doc.setTextColor(180, 40, 30); doc.setFontSize(9);
           const obsPelicula = doc.splitTextToSize('Importante: caso o cliente remova a película de proteção colocada pela Assistência Técnica, a garantia perderá sua validade.', 170);

@@ -316,13 +316,14 @@ window.desenharCabecalhoLoja = async function(doc, empresasList){
   doc.text((lojas[0] && lojas[0].EMAIL) || (lojas[0] && lojas[0].INSTAGRAM) || '', xMarca, 29);
 
   // Lojas cadastradas, lado a lado à direita — mesma info que aparece na impressão.
-  const larguraColuna = 78;
+  // Espaço disponível: da coluna x=100 até a borda direita da caixa (x=193, com margem de segurança).
+  const larguraColuna = 43, espacoEntreColunas = 5;
   lojas.forEach((empresa, idx) => {
-    const x = 100 + idx * (larguraColuna + 4);
+    const x = 100 + idx * (larguraColuna + espacoEntreColunas);
     let ly = 17;
-    doc.setFontSize(8); doc.setFont(undefined, 'bold'); doc.setTextColor(20);
+    doc.setFontSize(7.5); doc.setFont(undefined, 'bold'); doc.setTextColor(20);
     const tituloLoja = doc.splitTextToSize('Loja ' + (idx+1) + ' – ' + [empresa.RUA, empresa.NUMERO].filter(Boolean).join(', '), larguraColuna);
-    doc.text(tituloLoja, x, ly); ly += tituloLoja.length * 3.6;
+    doc.text(tituloLoja, x, ly); ly += tituloLoja.length * 3.3;
     doc.setFontSize(7.5); doc.setFont(undefined, 'normal'); doc.setTextColor(80);
     const bairroCidade = [empresa.BAIRRO, empresa.CIDADE].filter(Boolean).join(' – ');
     if (bairroCidade) { const linhasBC = doc.splitTextToSize(bairroCidade, larguraColuna); doc.text(linhasBC, x, ly); ly += linhasBC.length * 3.4; }

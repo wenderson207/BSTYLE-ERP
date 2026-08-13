@@ -444,7 +444,14 @@
     const janela = window.open('', '_blank');
     janela.document.write(`<html><head><title>${g.NUMERO_GARANTIA}</title></head><body>${html}</body></html>`);
     janela.document.close(); janela.focus();
-    setTimeout(() => janela.print(), 400);
+    const imagens = janela.document.images;
+    if (!imagens.length) { janela.print(); }
+    else {
+      let pendentes = imagens.length;
+      const seguir = () => { pendentes--; if (pendentes <= 0) janela.print(); };
+      [...imagens].forEach(img => { if (img.complete) seguir(); else { img.addEventListener('load', seguir); img.addEventListener('error', seguir); } });
+      setTimeout(() => janela.print(), 2000);
+    }
   });
 
   function verificarFidelidadeVenda(){

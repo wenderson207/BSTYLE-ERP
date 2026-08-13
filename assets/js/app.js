@@ -282,57 +282,84 @@ window.carregarLogoComoDataUrl = function(){
 
 /**
  * Desenha o cabeçalho padrão dos documentos: logo + nome da marca à esquerda,
- * e as lojas cadastradas (até 2) lado a lado à direita — igual ao layout usado
- * na impressão HTML dos termos de garantia, pra ficar tudo padronizado.
+ * as lojas cadastradas (até 2) lado a lado à direita, e uma barra de degradê
+ * embaixo — igual ao layout usado na impressão HTML dos termos, pra ficar tudo
+ * padronizado (sem caixa com borda, visual mais limpo).
  * Retorna a posição Y (em mm) onde o conteúdo do documento pode continuar.
  */
 window.desenharCabecalhoLoja = async function(doc, empresasList){
   const lojas = (empresasList || []).slice(0, 2);
 
-  doc.setDrawColor(30); doc.setLineWidth(0.4);
-  doc.rect(15, 12, 180, 30);
-
   let logoOk = false;
   try {
     const logo = await carregarLogoComoDataUrl();
     if (logo) {
-      // Área reservada pra logo: até 24mm de largura x 20mm de altura — encaixa
+      // Área reservada pra logo: até 30mm de largura x 24mm de altura — encaixa
       // a imagem dentro disso mantendo a proporção real, sem espremer em quadrado.
-      const areaLargura = 24, areaAltura = 20;
+      const areaLargura = 30, areaAltura = 24;
       const proporcao = logo.largura / logo.altura;
       let larguraFinal = areaLargura, alturaFinal = areaLargura / proporcao;
       if (alturaFinal > areaAltura) { alturaFinal = areaAltura; larguraFinal = areaAltura * proporcao; }
-      const x = 18 + (areaLargura - larguraFinal) / 2, y = 15 + (areaAltura - alturaFinal) / 2;
+      const x = 15, y = 10 + (areaAltura - alturaFinal) / 2;
       doc.addImage(logo.url, 'PNG', x, y, larguraFinal, alturaFinal);
       logoOk = true;
     }
   } catch (e) { /* segue sem logo, não trava a geração do PDF */ }
 
-  const xMarca = logoOk ? 45 : 20;
-  doc.setFontSize(11.5); doc.setFont(undefined, 'bold'); doc.setTextColor(226, 64, 28);
-  doc.text('BSTYLE - Eletrônicos', xMarca, 19);
-  doc.text('& Acessórios', xMarca, 24);
-  doc.setFontSize(7.5); doc.setFont(undefined, 'normal'); doc.setTextColor(100);
-  doc.text((lojas[0] && lojas[0].EMAIL) || (lojas[0] && lojas[0].INSTAGRAM) || '', xMarca, 29);
+  const xMarca = logoOk ? 48 : 15;
+  const larguraDisponivelMarca = 97 - xMarca; // até pouco antes da coluna das lojas (x=100)
+  const nomeMarca = 'BSTYLE - Eletrônicos & Acessórios';
+  doc.setFont(undefined, 'bold'); doc.setTextColor(226, 64, 28);
+  let tamanhoFonteMarca = 15;
+  doc.setFontSize(tamanhoFonteMarca);
+  while (tamanhoFonteMarca > 11 && doc.getTextWidth(nomeMarca) > larguraDisponivelMarca) {
+    tamanhoFonteMarca -= 0.5;
+    doc.setFontSize(tamanhoFonteMarca);
+  }
+  if (doc.getTextWidth(nomeMarca) > larguraDisponivelMarca) {
+    // Mesmo no tamanho mínimo não coube numa linha — quebra em duas, garantido que não invade a coluna das lojas.
+    doc.text('BSTYLE - Eletrônicos', xMarca, 16);
+    doc.text('& Acessórios', xMarca, 21);
+    doc.setFontSize(8.5); doc.setFont(undefined, 'normal'); doc.setTextColor(90);
+    doc.text((lojas[0] && lojas[0].EMAIL) || (lojas[0] && lojas[0].INSTAGRAM) || '', xMarca, 27);
+  } else {
+    doc.text(nomeMarca, xMarca, 18);
+    doc.setFontSize(8.5); doc.setFont(undefined, 'normal'); doc.setTextColor(90);
+    doc.text((lojas[0] && lojas[0].EMAIL) || (lojas[0] && lojas[0].INSTAGRAM) || '', xMarca, 24);
+  }
 
   // Lojas cadastradas, lado a lado à direita — mesma info que aparece na impressão.
-  // Espaço disponível: da coluna x=100 até a borda direita da caixa (x=193, com margem de segurança).
   const larguraColuna = 43, espacoEntreColunas = 5;
   lojas.forEach((empresa, idx) => {
     const x = 100 + idx * (larguraColuna + espacoEntreColunas);
-    let ly = 17;
-    doc.setFontSize(7.5); doc.setFont(undefined, 'bold'); doc.setTextColor(20);
+    let ly = 14;
+    doc.setFontSize(8.5); doc.setFont(undefined, 'bold'); doc.setTextColor(20);
     const tituloLoja = doc.splitTextToSize('Loja ' + (idx+1) + ' – ' + [empresa.RUA, empresa.NUMERO].filter(Boolean).join(', '), larguraColuna);
-    doc.text(tituloLoja, x, ly); ly += tituloLoja.length * 3.3;
-    doc.setFontSize(7.5); doc.setFont(undefined, 'normal'); doc.setTextColor(80);
+    doc.text(tituloLoja, x, ly); ly += tituloLoja.length * 3.6;
+    doc.setFontSize(8); doc.setFont(undefined, 'normal'); doc.setTextColor(80);
     const bairroCidade = [empresa.BAIRRO, empresa.CIDADE].filter(Boolean).join(' – ');
-    if (bairroCidade) { const linhasBC = doc.splitTextToSize(bairroCidade, larguraColuna); doc.text(linhasBC, x, ly); ly += linhasBC.length * 3.4; }
+    if (bairroCidade) { const linhasBC = doc.splitTextToSize(bairroCidade, larguraColuna); doc.text(linhasBC, x, ly); ly += linhasBC.length * 3.6; }
     doc.text(empresa.WHATSAPP || '—', x, ly);
   });
-  if (!lojas.length) { doc.setFontSize(8); doc.setTextColor(150); doc.text('Cadastre suas lojas em Empresas.', 100, 20); }
+  if (!lojas.length) { doc.setFontSize(8); doc.setTextColor(150); doc.text('Cadastre suas lojas em Empresas.', 100, 18); }
+
+  // Barra de degradê laranja -> âmbar, separando o cabeçalho do resto do documento
+  // (jsPDF não tem gradiente nativo, então desenha várias faixas finas de cor).
+  const yBarra = 34, alturaBarra = 1.4, xIni = 15, xFim = 195;
+  const corInicio = [226, 64, 28], corFim = [245, 166, 35];
+  const passos = 50, larguraFaixa = (xFim - xIni) / passos;
+  for (let i = 0; i < passos; i++) {
+    const t = i / (passos - 1);
+    doc.setFillColor(
+      Math.round(corInicio[0] + (corFim[0]-corInicio[0])*t),
+      Math.round(corInicio[1] + (corFim[1]-corInicio[1])*t),
+      Math.round(corInicio[2] + (corFim[2]-corInicio[2])*t)
+    );
+    doc.rect(xIni + i*larguraFaixa, yBarra, larguraFaixa + 0.15, alturaBarra, 'F');
+  }
 
   doc.setTextColor(20);
-  return 50;
+  return 44;
 };
 
 window.setHTML = function(id, html){

@@ -298,6 +298,12 @@
     holder.innerHTML = montarCartaoOrcamento(o, logoDataUrl);
     document.body.appendChild(holder);
 
+    // Espera a logo (se tiver) terminar de decodificar antes de tirar o "print" — evita pegar o card pela metade.
+    const imgLogo = holder.querySelector('img');
+    if (imgLogo && !imgLogo.complete) {
+      await new Promise(res => { imgLogo.onload = res; imgLogo.onerror = res; setTimeout(res, 1500); });
+    }
+
     let canvas;
     try {
       canvas = await window.html2canvas(holder.firstElementChild, {

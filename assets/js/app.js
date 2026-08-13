@@ -262,7 +262,9 @@ window.carregarLogoComoDataUrl = function(){
     const finalizar = (valor) => { if (!jaResolveu) { jaResolveu = true; resolve(valor); } };
 
     const img = new Image();
-    img.crossOrigin = 'anonymous';
+    // Sem crossOrigin aqui de propósito: a logo é do mesmo site (mesma origem),
+    // então não precisa de CORS — pedir isso à toa pode até fazer a imagem
+    // falhar em cache, dependendo de como o navegador já carregou ela antes.
     img.onload = () => {
       try {
         const canvas = document.createElement('canvas');
@@ -279,29 +281,24 @@ window.carregarLogoComoDataUrl = function(){
 }
 
 /**
- * Desenha o cabeçalho padrão dos documentos (logo + nome da loja + CNPJ +
- * endereço + telefone/email), igual ao modelo de OS impressa da loja.
- * Usa a loja ativa do filtro global, ou a primeira loja cadastrada.
+ * Desenha o cabeçalho padrão dos documentos: logo + nome da marca à esquerda,
+ * e as lojas cadastradas (até 2) lado a lado à direita — igual ao layout usado
+ * na impressão HTML dos termos de garantia, pra ficar tudo padronizado.
  * Retorna a posição Y (em mm) onde o conteúdo do documento pode continuar.
  */
 window.desenharCabecalhoLoja = async function(doc, empresasList){
-  const empresa = (window.lojaAtivaId && empresasList.find(e => e.ID === window.lojaAtivaId)) || empresasList[0] || {};
-  const endereco = [empresa.RUA, empresa.NUMERO].filter(Boolean).join(', ')
-    + (empresa.BAIRRO ? ' - ' + empresa.BAIRRO : '')
-    + (empresa.CIDADE ? ', ' + empresa.CIDADE : '')
-    + (empresa.ESTADO ? '/' + empresa.ESTADO : '')
-    + (empresa.CEP ? ' - CEP: ' + empresa.CEP : '');
+  const lojas = (empresasList || []).slice(0, 2);
 
   doc.setDrawColor(30); doc.setLineWidth(0.4);
-  doc.rect(15, 12, 180, 28);
+  doc.rect(15, 12, 180, 30);
 
   let logoOk = false;
   try {
     const logo = await carregarLogoComoDataUrl();
     if (logo) {
-      // Área reservada pra logo: até 26mm de largura x 22mm de altura — encaixa
+      // Área reservada pra logo: até 24mm de largura x 20mm de altura — encaixa
       // a imagem dentro disso mantendo a proporção real, sem espremer em quadrado.
-      const areaLargura = 26, areaAltura = 22;
+      const areaLargura = 24, areaAltura = 20;
       const proporcao = logo.largura / logo.altura;
       let larguraFinal = areaLargura, alturaFinal = areaLargura / proporcao;
       if (alturaFinal > areaAltura) { alturaFinal = areaAltura; larguraFinal = areaAltura * proporcao; }
@@ -311,16 +308,30 @@ window.desenharCabecalhoLoja = async function(doc, empresasList){
     }
   } catch (e) { /* segue sem logo, não trava a geração do PDF */ }
 
-  const xTexto = logoOk ? 48 : 20;
-  doc.setFontSize(13); doc.setFont(undefined, 'bold'); doc.setTextColor(20);
-  doc.text('BSTYLE - Eletrônicos & Acessórios', xTexto, 20);
-  doc.setFontSize(8.5); doc.setFont(undefined, 'normal'); doc.setTextColor(70);
-  doc.text('Assistência técnica de eletrônicos e celulares' + (empresa.CNPJ ? ' - CNPJ ' + empresa.CNPJ : ''), xTexto, 25);
-  doc.text(endereco || 'Endereço não cadastrado', xTexto, 29.5);
-  doc.text([empresa.WHATSAPP, empresa.EMAIL].filter(Boolean).join('   ') || ' ', xTexto, 34);
+  const xMarca = logoOk ? 45 : 20;
+  doc.setFontSize(11.5); doc.setFont(undefined, 'bold'); doc.setTextColor(226, 64, 28);
+  doc.text('BSTYLE - Eletrônicos', xMarca, 19);
+  doc.text('& Acessórios', xMarca, 24);
+  doc.setFontSize(7.5); doc.setFont(undefined, 'normal'); doc.setTextColor(100);
+  doc.text((lojas[0] && lojas[0].EMAIL) || (lojas[0] && lojas[0].INSTAGRAM) || '', xMarca, 29);
+
+  // Lojas cadastradas, lado a lado à direita — mesma info que aparece na impressão.
+  const larguraColuna = 78;
+  lojas.forEach((empresa, idx) => {
+    const x = 100 + idx * (larguraColuna + 4);
+    let ly = 17;
+    doc.setFontSize(8); doc.setFont(undefined, 'bold'); doc.setTextColor(20);
+    const tituloLoja = doc.splitTextToSize('Loja ' + (idx+1) + ' – ' + [empresa.RUA, empresa.NUMERO].filter(Boolean).join(', '), larguraColuna);
+    doc.text(tituloLoja, x, ly); ly += tituloLoja.length * 3.6;
+    doc.setFontSize(7.5); doc.setFont(undefined, 'normal'); doc.setTextColor(80);
+    const bairroCidade = [empresa.BAIRRO, empresa.CIDADE].filter(Boolean).join(' – ');
+    if (bairroCidade) { const linhasBC = doc.splitTextToSize(bairroCidade, larguraColuna); doc.text(linhasBC, x, ly); ly += linhasBC.length * 3.4; }
+    doc.text(empresa.WHATSAPP || '—', x, ly);
+  });
+  if (!lojas.length) { doc.setFontSize(8); doc.setTextColor(150); doc.text('Cadastre suas lojas em Empresas.', 100, 20); }
 
   doc.setTextColor(20);
-  return 48;
+  return 50;
 };
 
 window.setHTML = function(id, html){

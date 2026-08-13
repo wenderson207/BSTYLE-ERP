@@ -252,6 +252,8 @@ window.recarregarModuloAtual = () => {
  */
 /**
  * Carrega assets/img/Logo.png como data URL (necessário pro jsPDF.addImage).
+ * Devolve { url, largura, altura } com o tamanho REAL da imagem, pra quem for
+ * desenhar ela saber a proporção certa e não espremer num quadrado.
  * Se a logo não existir/falhar, resolve null — quem chamar deve seguir sem logo.
  */
 window.carregarLogoComoDataUrl = function(){
@@ -266,7 +268,7 @@ window.carregarLogoComoDataUrl = function(){
         const canvas = document.createElement('canvas');
         canvas.width = img.width; canvas.height = img.height;
         canvas.getContext('2d').drawImage(img, 0, 0);
-        finalizar(canvas.toDataURL('image/png'));
+        finalizar({ url: canvas.toDataURL('image/png'), largura: img.width, altura: img.height });
       } catch (e) { finalizar(null); }
     };
     img.onerror = () => finalizar(null);
@@ -295,11 +297,21 @@ window.desenharCabecalhoLoja = async function(doc, empresasList){
 
   let logoOk = false;
   try {
-    const dataUrl = await carregarLogoComoDataUrl();
-    if (dataUrl) { doc.addImage(dataUrl, 'PNG', 18, 15, 22, 22); logoOk = true; }
+    const logo = await carregarLogoComoDataUrl();
+    if (logo) {
+      // Área reservada pra logo: até 26mm de largura x 22mm de altura — encaixa
+      // a imagem dentro disso mantendo a proporção real, sem espremer em quadrado.
+      const areaLargura = 26, areaAltura = 22;
+      const proporcao = logo.largura / logo.altura;
+      let larguraFinal = areaLargura, alturaFinal = areaLargura / proporcao;
+      if (alturaFinal > areaAltura) { alturaFinal = areaAltura; larguraFinal = areaAltura * proporcao; }
+      const x = 18 + (areaLargura - larguraFinal) / 2, y = 15 + (areaAltura - alturaFinal) / 2;
+      doc.addImage(logo.url, 'PNG', x, y, larguraFinal, alturaFinal);
+      logoOk = true;
+    }
   } catch (e) { /* segue sem logo, não trava a geração do PDF */ }
 
-  const xTexto = logoOk ? 44 : 20;
+  const xTexto = logoOk ? 48 : 20;
   doc.setFontSize(13); doc.setFont(undefined, 'bold'); doc.setTextColor(20);
   doc.text('BSTYLE - Eletrônicos & Acessórios', xTexto, 20);
   doc.setFontSize(8.5); doc.setFont(undefined, 'normal'); doc.setTextColor(70);

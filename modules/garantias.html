@@ -375,7 +375,7 @@
         doc.text(rotulo, 190, y, { align: 'right' }); y += 7;
 
         const secao = (titulo) => { doc.setFontSize(11); doc.setFont(undefined,'bold'); doc.setTextColor(20); doc.text(titulo, 20, y); y += 6; };
-        const linha = (label, valor) => { doc.setFontSize(10); doc.setFont(undefined,'bold'); doc.text(label, 20, y); doc.setFont(undefined,'normal'); doc.text(String(valor||''), 65, y); y += 5.5; };
+        const linha = (label, valor) => { doc.setFontSize(10); doc.setFont(undefined,'bold'); doc.text(label, 20, y); const larguraRotulo = doc.getTextWidth(label); doc.setFont(undefined,'normal'); doc.text(String(valor||''), 20 + larguraRotulo + 3, y); y += 5.5; };
         const bullets = (itens) => { doc.setFontSize(10); doc.setFont(undefined,'normal'); itens.forEach(t => { doc.text('•  ' + t, 24, y); y += 5.5; }); };
         const paragrafo = (texto, negrito) => { doc.setFontSize(10); doc.setFont(undefined, negrito?'bold':'normal'); const t = doc.splitTextToSize(texto, 170); doc.text(t, 20, y); y += t.length*5 + 3; };
 

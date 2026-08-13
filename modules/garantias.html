@@ -413,8 +413,7 @@
 
         let y = await desenharCabecalhoLoja(doc, empresas);
 
-        // Barra e título coloridos — igual pros dois tipos de termo
-        doc.setFillColor(...corDestaque); doc.rect(15, y-6, 180, 1.2, 'F');
+        // Título — a barra de degradê já vem desenhada pelo cabeçalho compartilhado
         doc.setFontSize(16); doc.setFont(undefined,'bold'); doc.setTextColor(20);
         doc.text(ehProdutoUsado ? 'Termo de Garantia – Produto Usado' : 'TERMO DE GARANTIA', 105, y+4, { align:'center' }); y += 8;
         doc.setDrawColor(...corDestaque); doc.setLineWidth(0.6); doc.line(20, y, 190, y); y += 8;

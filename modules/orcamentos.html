@@ -291,7 +291,7 @@
     if (!window.html2canvas) throw new Error('Não consegui carregar a biblioteca de imagem (sem internet?).');
 
     let logoDataUrl = null;
-    try { logoDataUrl = await carregarLogoComoDataUrl(); } catch (e) { logoDataUrl = null; }
+    try { const logo = await carregarLogoComoDataUrl(); logoDataUrl = logo ? logo.url : null; } catch (e) { logoDataUrl = null; }
 
     const holder = document.createElement('div');
     holder.style.cssText = 'position:fixed; left:-9999px; top:0; z-index:-1;';

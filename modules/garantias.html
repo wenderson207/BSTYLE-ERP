@@ -339,15 +339,48 @@
   }
 
   // ---------- Imprimir 1 via (só a via do cliente) ----------
+  /** Encolhe o conteúdo (mantendo tudo legível e proporcional) até caber inteiro
+   * numa única página A4, em vez de deixar o navegador criar uma segunda página. */
+  function ajustarParaUmaPagina(janela){
+    const conteudo = janela.document.getElementById('paginaConteudo');
+    if (!conteudo) return;
+    const alturaMaximaMm = 277; // A4 (297mm) menos ~10mm de margem em cima e embaixo
+    const alturaMaximaPx = alturaMaximaMm * 3.7795; // mm -> px a 96dpi
+    const alturaAtual = conteudo.scrollHeight;
+    if (alturaAtual > alturaMaximaPx) {
+      const escala = alturaMaximaPx / alturaAtual;
+      conteudo.style.transform = 'scale(' + escala.toFixed(4) + ')';
+      conteudo.style.transformOrigin = 'top center';
+      const wrap = janela.document.getElementById('paginaWrap');
+      if (wrap) { wrap.style.height = Math.ceil(alturaAtual * escala) + 'px'; wrap.style.overflow = 'hidden'; }
+    }
+  }
+
+  /** Espera as imagens carregarem, encolhe pra caber numa página só, e só então imprime. */
+  function imprimirUmaPaginaQuandoPronto(janela){
+    const imagens = janela.document.images;
+    const finalizarEImprimir = () => { ajustarParaUmaPagina(janela); janela.print(); };
+    if (!imagens.length) { finalizarEImprimir(); return; }
+    let pendentes = imagens.length;
+    const seguir = () => { pendentes--; if (pendentes <= 0) finalizarEImprimir(); };
+    [...imagens].forEach(img => {
+      if (img.complete) seguir();
+      else { img.addEventListener('load', seguir); img.addEventListener('error', seguir); }
+    });
+    setTimeout(finalizarEImprimir, 2000);
+  }
+
   document.getElementById('btnImprimir1Via').addEventListener('click', async () => {
     try {
       await salvarEdicao();
       const janela = window.open('', '_blank');
-      janela.document.write(`<html><head><title>${garantiaAtual.NUMERO_GARANTIA}</title></head><body>
-        ${montarHtmlDocumento('VIA DO CLIENTE')}
+      janela.document.write(`<html><head><title>${garantiaAtual.NUMERO_GARANTIA}</title>
+        <style>@page { size: A4; margin: 10mm; } body{ margin:0; } #paginaWrap{ width:100%; }</style>
+        </head><body>
+        <div id="paginaWrap"><div id="paginaConteudo">${montarHtmlDocumento('VIA DO CLIENTE')}</div></div>
       </body></html>`);
       janela.document.close(); janela.focus();
-      imprimirQuandoPronto(janela);
+      imprimirUmaPaginaQuandoPronto(janela);
     } catch (e) { mostrarToast('Erro: ' + e.message, 'erro'); }
   });
 

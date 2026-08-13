@@ -323,6 +323,21 @@
     return garantiaAtual.TIPO === 'PRODUTO_USADO' ? montarHtmlImpressaoProdutoUsado(via) : montarHtmlImpressaoManutencao(via);
   }
 
+  /** Só chama print() depois que todas as imagens da janela terminaram de carregar — evita
+   * o navegador tirar o preview de uma página ainda montando (com a logo "faltando" e o
+   * layout ainda se ajustando), o que fazia parecer que linhas do fim sumiam. */
+  function imprimirQuandoPronto(janela){
+    const imagens = janela.document.images;
+    if (!imagens.length) { janela.print(); return; }
+    let pendentes = imagens.length;
+    const seguir = () => { pendentes--; if (pendentes <= 0) janela.print(); };
+    [...imagens].forEach(img => {
+      if (img.complete) seguir();
+      else { img.addEventListener('load', seguir); img.addEventListener('error', seguir); }
+    });
+    setTimeout(() => janela.print(), 2000); // rede muito lenta ou imagem nunca resolve: imprime assim mesmo
+  }
+
   // ---------- Imprimir 1 via (só a via do cliente) ----------
   document.getElementById('btnImprimir1Via').addEventListener('click', async () => {
     try {
@@ -332,7 +347,7 @@
         ${montarHtmlDocumento('VIA DO CLIENTE')}
       </body></html>`);
       janela.document.close(); janela.focus();
-      setTimeout(() => janela.print(), 400);
+      imprimirQuandoPronto(janela);
     } catch (e) { mostrarToast('Erro: ' + e.message, 'erro'); }
   });
 
@@ -346,7 +361,7 @@
         ${montarHtmlDocumento('2ª VIA — CLIENTE')}
       </body></html>`);
       janela.document.close(); janela.focus();
-      setTimeout(() => janela.print(), 400);
+      imprimirQuandoPronto(janela);
     } catch (e) { mostrarToast('Erro: ' + e.message, 'erro'); }
   });
 

@@ -705,96 +705,219 @@
     } catch (e) { mostrarToast('Erro: ' + e.message, 'erro'); }
   });
 
-  // ---------- Texto da OS (usado no PDF e na impressão) ----------
-  function textoOS(){
-    const cliente = clientes.find(c => c.ID === osAtual.CLIENTE_ID) || {};
-    return `ORDEM DE SERVIÇO Nº ${osAtual.NUMERO_OS}
+  // ---------- Vias da OS (mesmo padrão do orçamento: grade com bordas, tudo numa folha A4) ----------
 
-CLIENTE: ${cliente.NOME||''}
-CPF: ${cliente.CPF||''}      TELEFONE: ${cliente.TELEFONE||''}
+  /** Via da loja: TODA a informação — cliente completo, aparelho, senha, checklist, peças e assinaturas. */
+  function desenharViaOS_Loja(doc, os, cliente, logo, yTopo){
+    const xEsq = 15, xDir = 195, largura = xDir - xEsq;
+    let y = yTopo;
+    y = desenharCabecalhoCompactoOS(doc, os, logo, y, '1ª VIA — LOJA');
 
-APARELHO: ${osAtual.MARCA||''} ${osAtual.MODELO||''}      IMEI/SÉRIE: ${osAtual.IMEI||''}
-ACESSÓRIOS ENTREGUES: ${osAtual.ACESSORIOS_ENTREGUES||'—'}
+    function celula(label, valor, x, larg, yc, alt){
+      doc.setDrawColor(150); doc.setLineWidth(0.25); doc.rect(x, yc, larg, alt);
+      doc.setFontSize(6.2); doc.setFont(undefined,'normal'); doc.setTextColor(130);
+      doc.text(label, x+1.5, yc+3);
+      doc.setFontSize(8); doc.setFont(undefined,'normal'); doc.setTextColor(20);
+      doc.text(String(valor||'—').substring(0,50), x+1.5, yc+6.2);
+    }
 
-DEFEITO INFORMADO PELO CLIENTE:
-${osAtual.DEFEITO_INFORMADO||'—'}
+    const h1 = 7.5;
+    celula('CLIENTE', cliente.NOME, xEsq, largura*0.45, y, h1);
+    celula('TELEFONE', cliente.TELEFONE, xEsq+largura*0.45, largura*0.30, y, h1);
+    celula('CPF', cliente.CPF, xEsq+largura*0.75, largura*0.25, y, h1);
+    y += h1;
 
-DIAGNÓSTICO TÉCNICO:
-${osAtual.DIAGNOSTICO||'—'}
+    celula('APARELHO', (os.MARCA||'')+' '+(os.MODELO||''), xEsq, largura*0.45, y, h1);
+    celula('IMEI / Nº SÉRIE', os.IMEI, xEsq+largura*0.45, largura*0.30, y, h1);
+    celula('TÉCNICO', os.TECNICO_RESPONSAVEL, xEsq+largura*0.75, largura*0.25, y, h1);
+    y += h1;
 
-TRABALHO A SER REALIZADO / PEÇAS A REPOR:
-${osAtual.PECAS_A_REPOR||'—'}
+    celula('ACESSÓRIOS ENTREGUES', os.ACESSORIOS_ENTREGUES, xEsq, largura, y, h1);
+    y += h1;
 
-TÉCNICO RESPONSÁVEL: ${osAtual.TECNICO_RESPONSAVEL||'—'}
-PREVISÃO DE ENTREGA: ${osAtual.PRAZO ? parseDataLocal(osAtual.PRAZO).toLocaleDateString('pt-BR') : '—'}
-STATUS ATUAL: ${osAtual.STATUS}
+    const alturaDefeito = 10;
+    doc.setDrawColor(150); doc.rect(xEsq, y, largura, alturaDefeito);
+    doc.setFontSize(6.2); doc.setTextColor(130); doc.text('DEFEITO RELATADO', xEsq+1.5, y+3);
+    doc.setFontSize(7.5); doc.setFont(undefined,'normal'); doc.setTextColor(20);
+    doc.text(doc.splitTextToSize(os.DEFEITO_INFORMADO || '—', largura-3).slice(0,2), xEsq+1.5, y+6.2);
+    y += alturaDefeito;
 
-VALOR DA NOTA: ${(Number(osAtual.VALOR_SERVICO)||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}
+    // Senha do aparelho — só na via da loja, o técnico precisa pra acessar o aparelho.
+    const alturaSenha = 7.5;
+    doc.setDrawColor(150); doc.rect(xEsq, y, largura, alturaSenha);
+    doc.setFontSize(6.2); doc.setTextColor(130); doc.text('SENHA / DESBLOQUEIO DO APARELHO', xEsq+1.5, y+3);
+    doc.setFontSize(8.5); doc.setFont(undefined,'bold'); doc.setTextColor(20);
+    const textoSenha = !os.SENHA_TIPO || !os.SENHA_VALOR ? '—'
+      : os.SENHA_TIPO === 'PADRAO' ? 'Padrão: ' + os.SENHA_VALOR.split(',').join(' → ')
+      : (os.SENHA_TIPO === 'PIN' ? 'PIN: ' : 'Senha: ') + os.SENHA_VALOR;
+    doc.text(textoSenha, xEsq+1.5, y+6.2);
+    y += alturaSenha + 3;
 
-Ao assinar, o cliente declara estar ciente do serviço a ser realizado e do valor acima informado.`;
+    // Checklist funcional — grade compacta em 3 colunas.
+    let respostasChecklist = {};
+    try { respostasChecklist = os.CHECKLIST_FUNCIONAL ? JSON.parse(os.CHECKLIST_FUNCIONAL) : {}; } catch(e) {}
+    doc.setFontSize(7); doc.setFont(undefined,'bold'); doc.setTextColor(20);
+    doc.text('CHECKLIST FUNCIONAL (registrado na abertura)', xEsq, y); y += 3.5;
+    const RESP_ABREV = { SIM:'Sim', NAO:'Não', NA:'N/A' };
+    const colunas = 3, larguraColChecklist = largura / colunas;
+    doc.setFontSize(6.3); doc.setFont(undefined,'normal');
+    ITENS_CHECKLIST.forEach((item, i) => {
+      const col = i % colunas, linha = Math.floor(i / colunas);
+      const xItem = xEsq + col*larguraColChecklist, yItem = y + linha*4;
+      const resp = respostasChecklist[item] ? RESP_ABREV[respostasChecklist[item]] : '—';
+      doc.setTextColor(90); doc.text(item.substring(0,26), xItem, yItem);
+      doc.setTextColor(resp==='Sim' ? [30,150,110] : resp==='Não' ? [200,60,60] : [120,120,120]);
+      doc.setFont(undefined,'bold'); doc.text(resp, xItem + larguraColChecklist - 8, yItem);
+      doc.setFont(undefined,'normal');
+    });
+    y += Math.ceil(ITENS_CHECKLIST.length/colunas)*4 + 4;
+
+    y = desenharTabelaPecasOS(doc, os, xEsq, xDir, largura, y);
+
+    y += 9;
+    doc.setDrawColor(20); doc.setLineWidth(0.3);
+    doc.line(xEsq+4, y, xEsq+largura*0.46, y);
+    doc.line(xEsq+largura*0.54, y, xDir-4, y);
+    doc.setFontSize(7); doc.setFont(undefined,'normal'); doc.setTextColor(100);
+    doc.text('Assinatura do Cliente', xEsq + largura*0.25, y+4, { align:'center' });
+    doc.text('Assinatura da Loja', xEsq + largura*0.75, y+4, { align:'center' });
+
+    return y + 8;
   }
 
-  function cabecalhoLojasTexto(){
-    return empresas.map(e => {
-      const endereco = [e.RUA, e.NUMERO].filter(Boolean).join(', ') + (e.BAIRRO ? ' - '+e.BAIRRO : '');
-      return `${e.NOME} — ${endereco} ${e.WHATSAPP ? '· '+e.WHATSAPP : ''}`;
-    }).join(' | ');
+  /** Via do cliente: o essencial — cliente, aparelho, peças e valor. Sem senha nem checklist. */
+  function desenharViaOS_Cliente(doc, os, cliente, logo, yTopo){
+    const xEsq = 15, xDir = 195, largura = xDir - xEsq;
+    let y = yTopo;
+    y = desenharCabecalhoCompactoOS(doc, os, logo, y, '2ª VIA — CLIENTE');
+
+    function celula(label, valor, x, larg, yc, alt){
+      doc.setDrawColor(150); doc.setLineWidth(0.25); doc.rect(x, yc, larg, alt);
+      doc.setFontSize(6.2); doc.setFont(undefined,'normal'); doc.setTextColor(130);
+      doc.text(label, x+1.5, yc+3);
+      doc.setFontSize(8); doc.setFont(undefined,'normal'); doc.setTextColor(20);
+      doc.text(String(valor||'—').substring(0,50), x+1.5, yc+6.2);
+    }
+
+    const h1 = 7.5;
+    celula('CLIENTE', cliente.NOME, xEsq, largura*0.62, y, h1);
+    celula('TELEFONE', cliente.TELEFONE, xEsq+largura*0.62, largura*0.38, y, h1);
+    y += h1;
+
+    celula('APARELHO', (os.MARCA||'')+' '+(os.MODELO||''), xEsq, largura*0.7, y, h1);
+    celula('PRAZO', os.PRAZO ? parseDataLocal(os.PRAZO).toLocaleDateString('pt-BR') : '—', xEsq+largura*0.7, largura*0.3, y, h1);
+    y += h1;
+
+    const alturaDefeito = 10;
+    doc.setDrawColor(150); doc.rect(xEsq, y, largura, alturaDefeito);
+    doc.setFontSize(6.2); doc.setTextColor(130); doc.text('DEFEITO RELATADO', xEsq+1.5, y+3);
+    doc.setFontSize(7.5); doc.setFont(undefined,'normal'); doc.setTextColor(20);
+    doc.text(doc.splitTextToSize(os.DEFEITO_INFORMADO || '—', largura-3).slice(0,2), xEsq+1.5, y+6.2);
+    y += alturaDefeito + 3;
+
+    y = desenharTabelaPecasOS(doc, os, xEsq, xDir, largura, y);
+
+    y += 6;
+    doc.setFontSize(7); doc.setFont(undefined,'normal'); doc.setTextColor(110);
+    doc.text('Guarde esta via — ela é necessária pra retirar o aparelho.', xEsq, y);
+
+    return y + 6;
+  }
+
+  /** Cabeçalho compacto (logo + nome + barra de degradê), reaproveitado nas duas vias. */
+  function desenharCabecalhoCompactoOS(doc, os, logo, yTopo, rotuloVia){
+    const xEsq = 15, xDir = 195, largura = xDir - xEsq;
+    let y = yTopo, xTextoMarca = xEsq;
+    if (logo) {
+      const areaAltura = 10, larguraFinal = areaAltura * (logo.largura / logo.altura);
+      doc.addImage(logo.url, 'PNG', xEsq, y - areaAltura + 2, larguraFinal, areaAltura);
+      xTextoMarca = xEsq + larguraFinal + 3;
+    }
+    doc.setFontSize(10.5); doc.setFont(undefined,'bold'); doc.setTextColor(226,64,28);
+    doc.text('BSTYLE - Eletrônicos & Acessórios', xTextoMarca, y);
+    doc.setFontSize(7); doc.setFont(undefined,'normal'); doc.setTextColor(130);
+    doc.text(rotuloVia, xDir, y - 3, { align:'right' });
+    doc.text('Impressão: ' + new Date().toLocaleString('pt-BR', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' }), xDir, y, { align:'right' });
+    y += 3;
+
+    const corInicio = [226,64,28], corFim = [245,166,35], passos = 40, larguraFaixa = largura / passos;
+    for (let i = 0; i < passos; i++) {
+      const t = i / (passos - 1);
+      doc.setFillColor(Math.round(corInicio[0]+(corFim[0]-corInicio[0])*t), Math.round(corInicio[1]+(corFim[1]-corInicio[1])*t), Math.round(corInicio[2]+(corFim[2]-corInicio[2])*t));
+      doc.rect(xEsq + i*larguraFaixa, y, larguraFaixa+0.15, 0.9, 'F');
+    }
+    y += 5;
+
+    doc.setFontSize(12.5); doc.setFont(undefined,'bold'); doc.setTextColor(20);
+    doc.text('ORDEM DE SERVIÇO Nº ' + os.NUMERO_OS, 105, y, { align:'center' });
+    return y + 6;
+  }
+
+  /** Tabela de peças a repor — usada nas duas vias. */
+  function desenharTabelaPecasOS(doc, os, xEsq, xDir, largura, y){
+    let itens = [];
+    try { itens = JSON.parse(os.PECAS_ITENS || '[]').filter(i => i.nome || i.item); } catch(e) {}
+
+    doc.setFontSize(6.8); doc.setFont(undefined,'bold'); doc.setTextColor(255,255,255);
+    doc.setFillColor(60,60,60); doc.rect(xEsq, y, largura, 5, 'F');
+    doc.text('PEÇA A REPOR', xEsq+2, y+3.4);
+    doc.text('PREÇO', xDir-2, y+3.4, { align:'right' });
+    y += 5;
+    doc.setFont(undefined,'normal'); doc.setFontSize(7.5);
+    if (!itens.length) {
+      doc.setDrawColor(150); doc.rect(xEsq, y, largura, 5);
+      doc.setTextColor(150); doc.text(os.PECAS_A_REPOR || 'Nenhuma peça informada', xEsq+2, y+3.4);
+      y += 5;
+    } else {
+      itens.forEach(item => {
+        doc.setDrawColor(150); doc.rect(xEsq, y, largura, 5);
+        doc.setTextColor(20);
+        doc.text(String(item.nome||item.item||'').substring(0,62), xEsq+2, y+3.4);
+        doc.text(moeda(item.preco), xDir-2, y+3.4, { align:'right' });
+        y += 5;
+      });
+    }
+
+    doc.setDrawColor(150); doc.rect(xEsq, y, largura, 7);
+    doc.setFontSize(7); doc.setTextColor(130); doc.text('VALOR DO SERVIÇO', xEsq+2, y+4.6);
+    doc.setFontSize(11); doc.setFont(undefined,'bold'); doc.setTextColor(226,64,28);
+    doc.text(moeda(os.VALOR_SERVICO), xDir-2, y+4.9, { align:'right' });
+    return y + 7;
+  }
+
+  /** Monta o PDF completo (as duas vias, mesma folha) — reaproveitado por Salvar e Imprimir. */
+  async function montarPdfOS(){
+    const cliente = clientes.find(c => c.ID === osAtual.CLIENTE_ID) || {};
+    let logo = null;
+    try { logo = await carregarLogoComoDataUrl(); } catch (e) { logo = null; }
+
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+
+    desenharViaOS_Loja(doc, osAtual, cliente, logo, 20);
+    doc.setDrawColor(180); doc.setLineDashPattern([2,1.5], 0);
+    doc.line(15, 197, 195, 197);
+    doc.setLineDashPattern([], 0);
+    desenharViaOS_Cliente(doc, osAtual, cliente, logo, 205);
+
+    return doc;
   }
 
   // ---------- Imprimir ----------
-  document.getElementById('btnImprimirOS').addEventListener('click', () => {
+  document.getElementById('btnImprimirOS').addEventListener('click', async () => {
     if (!osAtual) return;
-    const texto = textoOS();
-    const bloco = (via) => `<div style="padding:30px; font-family:Arial,sans-serif; color:#111; page-break-after:always;">
-      <div style="font-size:11px; color:#555;">${cabecalhoLojasTexto()}</div>
-      <hr><div style="text-align:right; font-size:10px; color:#888;">${via}</div>
-      <pre style="white-space:pre-wrap; font-family:Arial,sans-serif; font-size:12.5px; line-height:1.6;">${texto.replace(/</g,'&lt;')}</pre>
-      <div style="margin-top:50px; display:flex; justify-content:space-between;">
-        <div>___________________________<br>Assinatura do Cliente</div>
-        <div>___________________________<br>Assinatura da Loja</div>
-      </div></div>`;
-    const janela = window.open('', '_blank');
-    janela.document.write(`<html><head><title>${osAtual.NUMERO_OS}</title></head><body>${bloco('1ª VIA — LOJA')}${bloco('2ª VIA — CLIENTE')}</body></html>`);
-    janela.document.close(); janela.focus();
-    const imagens = janela.document.images;
-    if (!imagens.length) { janela.print(); }
-    else {
-      let pendentes = imagens.length;
-      const seguir = () => { pendentes--; if (pendentes <= 0) janela.print(); };
-      [...imagens].forEach(img => { if (img.complete) seguir(); else { img.addEventListener('load', seguir); img.addEventListener('error', seguir); } });
-      setTimeout(() => janela.print(), 2000);
-    }
+    try {
+      const doc = await montarPdfOS();
+      doc.autoPrint();
+      window.open(doc.output('bloburl'), '_blank');
+    } catch (e) { mostrarToast('Erro ao imprimir: ' + e.message, 'erro'); }
   });
 
   // ---------- Salvar PDF ----------
   document.getElementById('btnPdfOS').addEventListener('click', async () => {
     if (!osAtual) return;
     try {
-      const { jsPDF } = window.jspdf;
-      const doc = new jsPDF({ unit: 'mm', format: 'a4' });
-      const texto = textoOS();
-      const cliente = clientes.find(c => c.ID === osAtual.CLIENTE_ID) || {};
-
-      for (let idx = 0; idx < 2; idx++) {
-        const rotulo = idx === 0 ? '1ª VIA — LOJA' : '2ª VIA — CLIENTE';
-        if (idx > 0) doc.addPage();
-
-        let y = await desenharCabecalhoLoja(doc, empresas);
-        doc.setFontSize(13); doc.setFont(undefined,'bold');
-        doc.text('ORDEM DE SERVIÇO Nº: ' + osAtual.NUMERO_OS, 105, y, { align: 'center' }); y += 5;
-        doc.setFontSize(8.5); doc.setFont(undefined,'normal'); doc.setTextColor(120);
-        doc.text(rotulo, 190, y, { align: 'right' }); y += 6;
-        doc.setTextColor(20);
-
-        doc.setFontSize(10);
-        const linhas = doc.splitTextToSize(texto, 170);
-        doc.text(linhas, 20, y);
-        y += linhas.length * 5 + 20;
-        if (y > 255) { doc.addPage(); y = 20; }
-        doc.setDrawColor(20); doc.line(20, y, 90, y); doc.text('Assinatura do Cliente', 20, y+5);
-        doc.line(120, y, 190, y); doc.text('Assinatura da Loja', 120, y+5);
-      }
-
+      const doc = await montarPdfOS();
       doc.save('OS_' + osAtual.NUMERO_OS + '.pdf');
       mostrarToast('PDF da OS salvo (2 vias).');
     } catch (e) { mostrarToast('Erro ao gerar PDF: ' + e.message, 'erro'); }

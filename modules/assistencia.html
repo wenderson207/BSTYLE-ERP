@@ -46,6 +46,17 @@
   @media (max-width:900px){ .estado-entrada-wrap{ grid-template-columns:1fr; } }
   .checklist-funcional{ background:var(--bg-elevated); border:1px solid var(--hairline); border-radius:10px; padding:14px 16px; }
   .checklist-titulo{ font-size:12.5px; font-weight:600; margin-bottom:12px; }
+  .checklist-header-row{ display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:4px; }
+  .checklist-header-row .checklist-titulo{ margin-bottom:0; }
+  .checklist-explicacao{ font-size:11px; color:var(--amber); margin:0 0 12px; }
+  .toggle-sem-teste{ display:flex; align-items:center; gap:6px; cursor:pointer; flex-shrink:0; }
+  .toggle-sem-teste input{ display:none; }
+  .toggle-sem-teste .toggle-slider{ width:34px; height:19px; border-radius:20px; background:var(--hairline); position:relative; transition:background 0.15s; flex-shrink:0; }
+  .toggle-sem-teste .toggle-slider::before{ content:''; position:absolute; width:15px; height:15px; border-radius:50%; background:#fff; top:2px; left:2px; transition:transform 0.15s; }
+  .toggle-sem-teste input:checked + .toggle-slider{ background:var(--amber); }
+  .toggle-sem-teste input:checked + .toggle-slider::before{ transform:translateX(15px); }
+  .toggle-sem-teste .toggle-label{ font-size:11.5px; color:var(--text-secondary); }
+  .checklist-funcional.desabilitado #listaChecklist{ opacity:0.35; pointer-events:none; }
   .checklist-item{ display:flex; align-items:center; justify-content:space-between; gap:8px; padding:7px 0; border-bottom:1px solid var(--hairline); }
   .checklist-item:last-child{ border-bottom:none; }
   .checklist-item .nome{ font-size:11.5px; color:var(--text-secondary); flex:1; }
@@ -171,7 +182,15 @@
           </div>
         </div>
         <div class="checklist-funcional">
-          <div class="checklist-titulo">Os itens abaixo estão funcionando? <span style="color:var(--red);">*</span></div>
+          <div class="checklist-header-row">
+            <div class="checklist-titulo" id="checklistTituloNova">Os itens abaixo estão funcionando? <span style="color:var(--red);">*</span></div>
+            <label class="toggle-sem-teste">
+              <input type="checkbox" id="chkSemTeste">
+              <span class="toggle-slider"></span>
+              <span class="toggle-label">Sem teste</span>
+            </label>
+          </div>
+          <p class="checklist-explicacao" id="explicacaoSemTeste" style="display:none;">Aparelho não pôde ser testado na entrada (ex.: não liga) — o checklist fica dispensado pra essa OS.</p>
           <div id="listaChecklist"></div>
         </div>
       </div>
@@ -208,6 +227,16 @@
     'Câmera', 'Conector de Carga', 'Conector de Cartão de memória', 'Conector de Fone de Ouvido', 'Biometria'
   ];
   let checklistRespostas = {};
+  let semTeste = false;
+
+  document.getElementById('chkSemTeste').addEventListener('change', (e) => {
+    semTeste = e.target.checked;
+    document.querySelector('.checklist-funcional').classList.toggle('desabilitado', semTeste);
+    document.getElementById('explicacaoSemTeste').style.display = semTeste ? 'block' : 'none';
+    document.getElementById('checklistTituloNova').innerHTML = semTeste
+      ? 'Os itens abaixo estão funcionando?'
+      : 'Os itens abaixo estão funcionando? <span style="color:var(--red);">*</span>';
+  });
 
   function renderChecklist(){
     setHTML('listaChecklist', ITENS_CHECKLIST.map(item => {
@@ -234,7 +263,11 @@
   const CHECKLIST_LABEL_RESP = { SIM:'Sim', NAO:'Não', NA:'N/A' };
 
   /** Mostra o checklist já preenchido na abertura da OS — só leitura, com selo colorido. */
-  function renderChecklistLeitura(jsonSalvo){
+  function renderChecklistLeitura(jsonSalvo, semTesteSalvo){
+    if (semTesteSalvo) {
+      setHTML('listaChecklistVer', '<div style="display:flex; align-items:center; gap:6px; color:var(--amber); font-size:12px; font-weight:600;">🚫 Aparelho recebido sem teste — checklist não se aplica a essa OS.</div>');
+      return;
+    }
     let respostas = {};
     try { respostas = jsonSalvo ? JSON.parse(jsonSalvo) : {}; } catch (e) { respostas = {}; }
 
@@ -554,6 +587,11 @@
     renderDiagrama('diagramaVersoNova', defeitosVersoNova, true);
     checklistRespostas = {};
     renderChecklist();
+    semTeste = false;
+    document.getElementById('chkSemTeste').checked = false;
+    document.querySelector('.checklist-funcional').classList.remove('desabilitado');
+    document.getElementById('explicacaoSemTeste').style.display = 'none';
+    document.getElementById('checklistTituloNova').innerHTML = 'Os itens abaixo estão funcionando? <span style="color:var(--red);">*</span>';
     modalNova.classList.add('open');
   });
   document.getElementById('fecharModalNova').addEventListener('click', () => modalNova.classList.remove('open'));
@@ -564,12 +602,14 @@
     const defeito = document.getElementById('fDefeito').value.trim();
     if (!cliente || !defeito){ mostrarToast('Cliente e defeito informado são obrigatórios.', 'erro'); return; }
 
-    const itensSemResposta = ITENS_CHECKLIST.filter(item => !checklistRespostas[item]);
-    if (itensSemResposta.length) {
-      renderChecklist();
-      document.querySelector('.checklist-funcional').scrollIntoView({ behavior:'smooth', block:'center' });
-      mostrarToast('Responda todos os itens do checklist antes de abrir a OS (faltam ' + itensSemResposta.length + ').', 'erro');
-      return;
+    if (!semTeste) {
+      const itensSemResposta = ITENS_CHECKLIST.filter(item => !checklistRespostas[item]);
+      if (itensSemResposta.length) {
+        renderChecklist();
+        document.querySelector('.checklist-funcional').scrollIntoView({ behavior:'smooth', block:'center' });
+        mostrarToast('Responda todos os itens do checklist antes de abrir a OS (faltam ' + itensSemResposta.length + '), ou marque "Sem teste".', 'erro');
+        return;
+      }
     }
 
     let senhaValor = senhaTipoAtual==='PIN' ? document.getElementById('fSenhaPin').value.trim()
@@ -594,7 +634,7 @@
         VALOR_SERVICO: Number(document.getElementById('fValor').value)||0,
         PRAZO: document.getElementById('fPrazo').value, SENHA_TIPO: senhaTipoAtual, SENHA_VALOR: senhaValor,
         DEFEITOS_FRENTE: JSON.stringify(defeitosFrenteNova), DEFEITOS_VERSO: JSON.stringify(defeitosVersoNova),
-        CHECKLIST_FUNCIONAL: JSON.stringify(checklistRespostas),
+        CHECKLIST_FUNCIONAL: JSON.stringify(checklistRespostas), CHECKLIST_SEM_TESTE: semTeste,
         CODIGO_ACOMPANHAMENTO: codigoAcompanhamento,
         STATUS: 'Aberta', DATA_ABERTURA: new Date().toISOString(), DATA_ENTREGA_REAL: ''
       });
@@ -665,7 +705,7 @@
 
     renderDiagrama('diagramaFrenteVer', defFrente, false);
     renderDiagrama('diagramaVersoVer', defVerso, false);
-    renderChecklistLeitura(osAtual.CHECKLIST_FUNCIONAL);
+    renderChecklistLeitura(osAtual.CHECKLIST_FUNCIONAL, osAtual.CHECKLIST_SEM_TESTE);
     setHTML('visualizacaoSenha', montarVisualizacaoSenha(osAtual.SENHA_TIPO, osAtual.SENHA_VALOR));
     renderAreaPagamento(osAtual);
 
@@ -779,25 +819,33 @@
     }
     y += alturaSenha + 3;
 
-    // Checklist funcional — grade compacta em 3 colunas.
-    let respostasChecklist = {};
-    try { respostasChecklist = os.CHECKLIST_FUNCIONAL ? JSON.parse(os.CHECKLIST_FUNCIONAL) : {}; } catch(e) {}
+    // Checklist funcional — grade compacta em 3 colunas (ou aviso de "sem teste", se marcado na abertura).
     doc.setFontSize(7); doc.setFont(undefined,'bold'); doc.setTextColor(20);
     doc.text('CHECKLIST FUNCIONAL (registrado na abertura)', xEsq, y); y += 3.5;
-    const RESP_ABREV = { SIM:'Sim', NAO:'Não', NA:'N/A' };
-    const colunas = 3, larguraColChecklist = largura / colunas;
-    doc.setFontSize(6.3); doc.setFont(undefined,'normal');
-    ITENS_CHECKLIST.forEach((item, i) => {
-      const col = i % colunas, linha = Math.floor(i / colunas);
-      const xItem = xEsq + col*larguraColChecklist, yItem = y + linha*4;
-      const resp = respostasChecklist[item] ? RESP_ABREV[respostasChecklist[item]] : '—';
-      doc.setTextColor(90); doc.text(item.substring(0,26), xItem, yItem);
-      const corResp = resp==='Sim' ? [30,150,110] : resp==='Não' ? [200,60,60] : [120,120,120];
-      doc.setTextColor(corResp[0], corResp[1], corResp[2]);
-      doc.setFont(undefined,'bold'); doc.text(resp, xItem + larguraColChecklist - 8, yItem);
-      doc.setFont(undefined,'normal');
-    });
-    y += Math.ceil(ITENS_CHECKLIST.length/colunas)*4 + 4;
+
+    if (os.CHECKLIST_SEM_TESTE) {
+      doc.setFontSize(7); doc.setFont(undefined,'bold'); doc.setTextColor(200,140,20);
+      doc.text('Aparelho recebido sem teste — checklist não se aplica a essa OS.', xEsq, y);
+      doc.setTextColor(20);
+      y += 6;
+    } else {
+      let respostasChecklist = {};
+      try { respostasChecklist = os.CHECKLIST_FUNCIONAL ? JSON.parse(os.CHECKLIST_FUNCIONAL) : {}; } catch(e) {}
+      const RESP_ABREV = { SIM:'Sim', NAO:'Não', NA:'N/A' };
+      const colunas = 3, larguraColChecklist = largura / colunas;
+      doc.setFontSize(6.3); doc.setFont(undefined,'normal');
+      ITENS_CHECKLIST.forEach((item, i) => {
+        const col = i % colunas, linha = Math.floor(i / colunas);
+        const xItem = xEsq + col*larguraColChecklist, yItem = y + linha*4;
+        const resp = respostasChecklist[item] ? RESP_ABREV[respostasChecklist[item]] : '—';
+        doc.setTextColor(90); doc.text(item.substring(0,26), xItem, yItem);
+        const corResp = resp==='Sim' ? [30,150,110] : resp==='Não' ? [200,60,60] : [120,120,120];
+        doc.setTextColor(corResp[0], corResp[1], corResp[2]);
+        doc.setFont(undefined,'bold'); doc.text(resp, xItem + larguraColChecklist - 8, yItem);
+        doc.setFont(undefined,'normal');
+      });
+      y += Math.ceil(ITENS_CHECKLIST.length/colunas)*4 + 4;
+    }
 
     y = desenharTabelaPecasOS(doc, os, xEsq, xDir, largura, y);
 

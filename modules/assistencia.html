@@ -42,6 +42,19 @@
   .diagramas-wrap{ display:flex; gap:24px; justify-content:center; flex-wrap:wrap; }
   .diagrama-col{ text-align:center; }
   .diagrama-col .titulo{ font-size:11.5px; color:var(--text-tertiary); font-family:var(--font-mono); margin-bottom:8px; }
+  .estado-entrada-wrap{ display:grid; grid-template-columns:1fr 300px; gap:20px; align-items:start; }
+  @media (max-width:900px){ .estado-entrada-wrap{ grid-template-columns:1fr; } }
+  .checklist-funcional{ background:var(--bg-elevated); border:1px solid var(--hairline); border-radius:10px; padding:14px 16px; }
+  .checklist-titulo{ font-size:12.5px; font-weight:600; margin-bottom:12px; }
+  .checklist-item{ display:flex; align-items:center; justify-content:space-between; gap:8px; padding:7px 0; border-bottom:1px solid var(--hairline); }
+  .checklist-item:last-child{ border-bottom:none; }
+  .checklist-item .nome{ font-size:11.5px; color:var(--text-secondary); flex:1; }
+  .checklist-opcoes{ display:flex; gap:4px; flex-shrink:0; }
+  .checklist-opcoes button{ width:30px; height:24px; border-radius:6px; border:1px solid var(--hairline); background:var(--bg-surface); color:var(--text-tertiary); font-size:10px; cursor:pointer; font-weight:600; }
+  .checklist-opcoes button.selecionado[data-resp="SIM"]{ background:rgba(47,225,168,0.18); border-color:var(--mint); color:var(--mint); }
+  .checklist-opcoes button.selecionado[data-resp="NAO"]{ background:rgba(255,92,92,0.18); border-color:var(--red); color:var(--red); }
+  .checklist-opcoes button.selecionado[data-resp="NA"]{ background:rgba(136,145,163,0.18); border-color:var(--text-tertiary); color:var(--text-secondary); }
+  .checklist-item.pendente .nome{ color:var(--amber); }
   .phone-svg{ border-radius:20px; }
 
   .calendario{ background:var(--bg-surface); border:1px solid var(--hairline); border-radius:12px; padding:18px; }
@@ -143,11 +156,19 @@
         <button type="button" class="btn" id="btnLimparPadrao" style="font-size:11.5px; padding:6px 12px;">🔄 Limpar padrão</button>
       </div>
 
-      <div class="section-title">Estado do aparelho na entrada (marque avarias já existentes)</div>
-      <p style="color:var(--text-secondary); font-size:12px; margin:0 0 12px;">Clique no desenho pra marcar riscos, rachaduras ou manchas já existentes — protege a loja de reclamações de "isso não estava aqui antes".</p>
-      <div class="diagramas-wrap">
-        <div class="diagrama-col"><div class="titulo">FRENTE</div><div id="diagramaFrenteNova"></div></div>
-        <div class="diagrama-col"><div class="titulo">VERSO</div><div id="diagramaVersoNova"></div></div>
+      <div class="section-title">Estado do aparelho na entrada</div>
+      <div class="estado-entrada-wrap">
+        <div>
+          <p style="color:var(--text-secondary); font-size:12px; margin:0 0 12px;">Clique no desenho pra marcar riscos, rachaduras ou manchas já existentes — protege a loja de reclamações de "isso não estava aqui antes".</p>
+          <div class="diagramas-wrap">
+            <div class="diagrama-col"><div class="titulo">FRENTE</div><div id="diagramaFrenteNova"></div></div>
+            <div class="diagrama-col"><div class="titulo">VERSO</div><div id="diagramaVersoNova"></div></div>
+          </div>
+        </div>
+        <div class="checklist-funcional">
+          <div class="checklist-titulo">Os itens abaixo estão funcionando? <span style="color:var(--red);">*</span></div>
+          <div id="listaChecklist"></div>
+        </div>
       </div>
     </div>
     <div class="modal-foot">
@@ -175,6 +196,35 @@
 <script>
 (async function(){
   const STATUS_COLUNAS = ['Aberta','Em diagnóstico','Aguardando peça','Em reparo','Pronto','Entregue'];
+
+  const ITENS_CHECKLIST = [
+    'Tela Display', 'Touch Screen Tela', 'Teclas', 'Sensores de Proximidade', 'Bluetooth',
+    'Wifi', 'Ligações', 'Alto Falante', 'Áudio Auricular', 'Microfone',
+    'Câmera', 'Conector de Carga', 'Conector de Cartão de memória', 'Conector de Fone de Ouvido', 'Biometria'
+  ];
+  let checklistRespostas = {};
+
+  function renderChecklist(){
+    setHTML('listaChecklist', ITENS_CHECKLIST.map(item => {
+      const resposta = checklistRespostas[item] || null;
+      return `<div class="checklist-item ${!resposta?'pendente':''}" data-item="${item}">
+        <span class="nome">${item}</span>
+        <div class="checklist-opcoes">
+          <button type="button" data-resp="SIM" class="${resposta==='SIM'?'selecionado':''}">Sim</button>
+          <button type="button" data-resp="NAO" class="${resposta==='NAO'?'selecionado':''}">Não</button>
+          <button type="button" data-resp="NA" class="${resposta==='NA'?'selecionado':''}">N/A</button>
+        </div>
+      </div>`;
+    }).join(''));
+
+    document.querySelectorAll('#listaChecklist .checklist-opcoes button').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const item = btn.closest('.checklist-item').dataset.item;
+        checklistRespostas[item] = btn.dataset.resp;
+        renderChecklist();
+      });
+    });
+  }
   let ordens = [], clientes = [], empresas = [];
 
   function moeda(v){ return (Number(v)||0).toLocaleString('pt-BR', { style:'currency', currency:'BRL' }); }
@@ -476,6 +526,8 @@
     gerarLinhasPecas('linhasPecasNova', 'totalPecasNova', []);
     renderDiagrama('diagramaFrenteNova', defeitosFrenteNova, true);
     renderDiagrama('diagramaVersoNova', defeitosVersoNova, true);
+    checklistRespostas = {};
+    renderChecklist();
     modalNova.classList.add('open');
   });
   document.getElementById('fecharModalNova').addEventListener('click', () => modalNova.classList.remove('open'));
@@ -485,6 +537,14 @@
     const cliente = document.getElementById('fCliente').value;
     const defeito = document.getElementById('fDefeito').value.trim();
     if (!cliente || !defeito){ mostrarToast('Cliente e defeito informado são obrigatórios.', 'erro'); return; }
+
+    const itensSemResposta = ITENS_CHECKLIST.filter(item => !checklistRespostas[item]);
+    if (itensSemResposta.length) {
+      renderChecklist();
+      document.querySelector('.checklist-funcional').scrollIntoView({ behavior:'smooth', block:'center' });
+      mostrarToast('Responda todos os itens do checklist antes de abrir a OS (faltam ' + itensSemResposta.length + ').', 'erro');
+      return;
+    }
 
     let senhaValor = senhaTipoAtual==='PIN' ? document.getElementById('fSenhaPin').value.trim()
       : senhaTipoAtual==='TEXTO' ? document.getElementById('fSenhaTexto').value.trim()
@@ -508,6 +568,7 @@
         VALOR_SERVICO: Number(document.getElementById('fValor').value)||0,
         PRAZO: document.getElementById('fPrazo').value, SENHA_TIPO: senhaTipoAtual, SENHA_VALOR: senhaValor,
         DEFEITOS_FRENTE: JSON.stringify(defeitosFrenteNova), DEFEITOS_VERSO: JSON.stringify(defeitosVersoNova),
+        CHECKLIST_FUNCIONAL: JSON.stringify(checklistRespostas),
         CODIGO_ACOMPANHAMENTO: codigoAcompanhamento,
         STATUS: 'Aberta', DATA_ABERTURA: new Date().toISOString(), DATA_ENTREGA_REAL: ''
       });

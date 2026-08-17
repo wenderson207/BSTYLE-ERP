@@ -267,9 +267,15 @@ window.carregarLogoComoDataUrl = function(){
     // falhar em cache, dependendo de como o navegador já carregou ela antes.
     img.onload = () => {
       try {
+        // A logo original é bem grande (pensada pra tela) — nos documentos ela
+        // nunca aparece maior que uns 30mm, então reduzir aqui evita PDFs gigantes
+        // (cada via embute a imagem de novo; sem isso, o arquivo passava de 10-15 MB).
+        const MAX_LADO = 500;
+        const escala = Math.min(1, MAX_LADO / Math.max(img.width, img.height));
+        const largura = Math.round(img.width * escala), altura = Math.round(img.height * escala);
         const canvas = document.createElement('canvas');
-        canvas.width = img.width; canvas.height = img.height;
-        canvas.getContext('2d').drawImage(img, 0, 0);
+        canvas.width = largura; canvas.height = altura;
+        canvas.getContext('2d').drawImage(img, 0, 0, largura, altura);
         finalizar({ url: canvas.toDataURL('image/png'), largura: img.width, altura: img.height });
       } catch (e) { finalizar(null); }
     };
@@ -361,6 +367,18 @@ window.desenharCabecalhoLoja = async function(doc, empresasList){
   doc.setTextColor(20);
   return 44;
 };
+
+/**
+ * Fecha qualquer modal aberto (padrão .modal-overlay.open, usado em todas as
+ * abas) ao apertar Esc — funciona em qualquer módulo, sem precisar de código
+ * repetido em cada um. Fecha só o de cima, se houver mais de um empilhado.
+ */
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape') return;
+  const abertos = document.querySelectorAll('.modal-overlay.open');
+  if (!abertos.length) return;
+  abertos[abertos.length - 1].classList.remove('open');
+});
 
 window.setHTML = function(id, html){
   const el = document.getElementById(id);

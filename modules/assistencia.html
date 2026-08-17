@@ -55,6 +55,11 @@
   .checklist-opcoes button.selecionado[data-resp="NAO"]{ background:rgba(255,92,92,0.18); border-color:var(--red); color:var(--red); }
   .checklist-opcoes button.selecionado[data-resp="NA"]{ background:rgba(136,145,163,0.18); border-color:var(--text-tertiary); color:var(--text-secondary); }
   .checklist-item.pendente .nome{ color:var(--amber); }
+  .badge-checklist-resp{ font-size:10.5px; font-weight:600; padding:3px 10px; border-radius:20px; }
+  .badge-checklist-resp.SIM{ background:rgba(47,225,168,0.14); color:var(--mint); }
+  .badge-checklist-resp.NAO{ background:rgba(255,92,92,0.14); color:var(--red); }
+  .badge-checklist-resp.NA{ background:rgba(136,145,163,0.14); color:var(--text-secondary); }
+  .badge-checklist-resp.PENDENTE{ background:rgba(136,145,163,0.08); color:var(--text-tertiary); }
   .phone-svg{ border-radius:20px; }
 
   .calendario{ background:var(--bg-surface); border:1px solid var(--hairline); border-radius:12px; padding:18px; }
@@ -224,6 +229,27 @@
         renderChecklist();
       });
     });
+  }
+
+  const CHECKLIST_LABEL_RESP = { SIM:'Sim', NAO:'Não', NA:'N/A' };
+
+  /** Mostra o checklist já preenchido na abertura da OS — só leitura, com selo colorido. */
+  function renderChecklistLeitura(jsonSalvo){
+    let respostas = {};
+    try { respostas = jsonSalvo ? JSON.parse(jsonSalvo) : {}; } catch (e) { respostas = {}; }
+
+    if (!Object.keys(respostas).length) {
+      setHTML('listaChecklistVer', '<span style="color:var(--text-tertiary); font-size:11.5px;">Essa OS foi aberta antes desse checklist existir no sistema.</span>');
+      return;
+    }
+
+    setHTML('listaChecklistVer', ITENS_CHECKLIST.map(item => {
+      const resposta = respostas[item];
+      return `<div class="checklist-item">
+        <span class="nome">${item}</span>
+        <span class="badge-checklist-resp ${resposta||'PENDENTE'}">${resposta ? CHECKLIST_LABEL_RESP[resposta] : '—'}</span>
+      </div>`;
+    }).join(''));
   }
   let ordens = [], clientes = [], empresas = [];
 
@@ -625,14 +651,21 @@
       <div class="section-title">💰 Status do pagamento</div>
       <div id="areaPagamentoOS" style="background:var(--bg-elevated); border:1px solid var(--hairline); border-radius:10px; padding:14px 16px; margin-bottom:16px;"></div>
       <div class="section-title">Estado do aparelho na entrada (registrado na abertura)</div>
-      <div class="diagramas-wrap">
-        <div class="diagrama-col"><div class="titulo">FRENTE</div><div id="diagramaFrenteVer"></div></div>
-        <div class="diagrama-col"><div class="titulo">VERSO</div><div id="diagramaVersoVer"></div></div>
+      <div class="estado-entrada-wrap">
+        <div class="diagramas-wrap">
+          <div class="diagrama-col"><div class="titulo">FRENTE</div><div id="diagramaFrenteVer"></div></div>
+          <div class="diagrama-col"><div class="titulo">VERSO</div><div id="diagramaVersoVer"></div></div>
+        </div>
+        <div class="checklist-funcional">
+          <div class="checklist-titulo">Checklist funcional (registrado na abertura)</div>
+          <div id="listaChecklistVer"></div>
+        </div>
       </div>
     `);
 
     renderDiagrama('diagramaFrenteVer', defFrente, false);
     renderDiagrama('diagramaVersoVer', defVerso, false);
+    renderChecklistLeitura(osAtual.CHECKLIST_FUNCIONAL);
     setHTML('visualizacaoSenha', montarVisualizacaoSenha(osAtual.SENHA_TIPO, osAtual.SENHA_VALOR));
     renderAreaPagamento(osAtual);
 

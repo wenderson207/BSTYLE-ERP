@@ -357,6 +357,85 @@
     }
   });
 
+  /** Desenha uma "via" compacta do orçamento (grade com bordas, como um formulário
+   * de papel) dentro de uma faixa vertical da página — usada duas vezes na mesma
+   * folha A4 (via da loja + via do cliente), uma embaixo da outra. */
+  function desenharViaOrcamento(doc, dados, yTopo, rotuloVia){
+    const xEsq = 15, xDir = 195, largura = xDir - xEsq;
+    let y = yTopo;
+
+    doc.setFontSize(11); doc.setFont(undefined,'bold'); doc.setTextColor(226,64,28);
+    doc.text('BSTYLE - Eletrônicos & Acessórios', xEsq, y);
+    doc.setFontSize(8); doc.setFont(undefined,'normal'); doc.setTextColor(120);
+    doc.text(rotuloVia, xDir, y, { align:'right' });
+    y += 6;
+    doc.setFontSize(13); doc.setFont(undefined,'bold'); doc.setTextColor(20);
+    doc.text('ORÇAMENTO Nº ' + dados.NUMERO_ORCAMENTO, 105, y, { align:'center' });
+    y += 5;
+
+    /** Uma célula com borda: rótulo pequeno em cima, valor embaixo — como formulário de papel. */
+    function celula(label, valor, x, larg, yc, alt){
+      doc.setDrawColor(150); doc.setLineWidth(0.25); doc.rect(x, yc, larg, alt);
+      doc.setFontSize(6.3); doc.setFont(undefined,'normal'); doc.setTextColor(130);
+      doc.text(label, x+1.5, yc+3);
+      doc.setFontSize(8.5); doc.setFont(undefined,'normal'); doc.setTextColor(20);
+      doc.text(String(valor||'—').substring(0,48), x+1.5, yc+6.4);
+    }
+
+    const alturaLinha = 8;
+    celula('CLIENTE', dados.CLIENTE_NOME, xEsq, largura*0.62, y, alturaLinha);
+    celula('TELEFONE', dados.CLIENTE_TELEFONE, xEsq+largura*0.62, largura*0.38, y, alturaLinha);
+    y += alturaLinha;
+
+    celula('APARELHO', dados.APARELHO, xEsq, largura*0.5, y, alturaLinha);
+    celula('DATA', dataBR(dados.DATA), xEsq+largura*0.5, largura*0.25, y, alturaLinha);
+    celula('VALIDADE', (dados.VALIDADE_DIAS||'—') + ' dias', xEsq+largura*0.75, largura*0.25, y, alturaLinha);
+    y += alturaLinha;
+
+    const alturaProblema = 13;
+    doc.setDrawColor(150); doc.rect(xEsq, y, largura, alturaProblema);
+    doc.setFontSize(6.3); doc.setTextColor(130); doc.text('PROBLEMA RELATADO', xEsq+1.5, y+3);
+    doc.setFontSize(8); doc.setFont(undefined,'normal'); doc.setTextColor(20);
+    const linhasProblema = doc.splitTextToSize(dados.PROBLEMA_RELATADO || '—', largura-3);
+    doc.text(linhasProblema.slice(0,2), xEsq+1.5, y+6.8);
+    y += alturaProblema;
+
+    const listaItens = JSON.parse(dados.ITENS_JSON || '[]').filter(i => i.item);
+    doc.setFontSize(6.8); doc.setFont(undefined,'bold'); doc.setTextColor(255,255,255);
+    doc.setFillColor(60,60,60); doc.rect(xEsq, y, largura, 5, 'F');
+    doc.text('ITEM / PEÇA', xEsq+2, y+3.4);
+    doc.text('VALOR', xDir-2, y+3.4, { align:'right' });
+    y += 5;
+    doc.setFont(undefined,'normal'); doc.setFontSize(8);
+    if (!listaItens.length) {
+      doc.setDrawColor(150); doc.rect(xEsq, y, largura, 5);
+      doc.setTextColor(150); doc.text('Nenhum item detalhado', xEsq+2, y+3.4);
+      y += 5;
+    } else {
+      listaItens.forEach(item => {
+        doc.setDrawColor(150); doc.rect(xEsq, y, largura, 5);
+        doc.setTextColor(20);
+        doc.text(String(item.item).substring(0,62), xEsq+2, y+3.4);
+        doc.text(moeda(item.preco), xDir-2, y+3.4, { align:'right' });
+        y += 5;
+      });
+    }
+
+    const alturaTotais = 9;
+    celula('DESCONTO', moeda(dados.DESCONTO||0), xEsq, largura*0.55, y, alturaTotais);
+    doc.setDrawColor(150); doc.rect(xEsq+largura*0.55, y, largura*0.45, alturaTotais);
+    doc.setFontSize(6.5); doc.setTextColor(130); doc.text('TOTAL', xEsq+largura*0.55+1.5, y+3.2);
+    doc.setFontSize(12); doc.setFont(undefined,'bold'); doc.setTextColor(226,64,28);
+    doc.text(moeda(dados.VALOR_TOTAL), xDir-1.5, y+7.2, { align:'right' });
+    y += alturaTotais + 8;
+
+    doc.setDrawColor(20); doc.setLineWidth(0.3); doc.line(xEsq+largura*0.28, y, xEsq+largura*0.72, y);
+    doc.setFontSize(7); doc.setFont(undefined,'normal'); doc.setTextColor(100);
+    doc.text('Assinatura', 105, y+4, { align:'center' });
+
+    return y + 8;
+  }
+
   document.getElementById('btnSalvarPdf').addEventListener('click', async () => {
     try {
       const salvo = await salvarOrcamento();
@@ -364,26 +443,15 @@
 
       const { jsPDF } = window.jspdf;
       const doc = new jsPDF({ unit: 'mm', format: 'a4' });
-      let y = await desenharCabecalhoLoja(doc, empresas);
 
-      doc.setFontSize(15); doc.setFont(undefined,'bold'); doc.setTextColor(20);
-      doc.text('ORÇAMENTO Nº ' + salvo.NUMERO_ORCAMENTO, 105, y, { align:'center' }); y += 10;
-
-      const secao = (t) => { doc.setFontSize(11); doc.setFont(undefined,'bold'); doc.text(t, 20, y); y += 6; };
-      const linha = (l,v) => { doc.setFontSize(10); doc.setFont(undefined,'bold'); doc.text(l,20,y); doc.setFont(undefined,'normal'); doc.text(String(v||''),65,y); y += 5.5; };
-
-      secao('Cliente'); linha('Nome:', salvo.CLIENTE_NOME); linha('Telefone:', salvo.CLIENTE_TELEFONE); linha('Aparelho:', salvo.APARELHO); y += 3;
-      if (salvo.PROBLEMA_RELATADO) { secao('Problema relatado'); doc.setFontSize(10); doc.setFont(undefined,'normal'); const t = doc.splitTextToSize(salvo.PROBLEMA_RELATADO, 170); doc.text(t,20,y); y += t.length*5+4; }
-
-      secao('Itens do orçamento');
-      const listaItens = JSON.parse(salvo.ITENS_JSON || '[]');
-      doc.setFontSize(10); doc.setFont(undefined,'normal');
-      listaItens.forEach(i => { doc.text('• ' + i.item, 24, y); doc.text(moeda(i.preco), 170, y, { align:'right' }); y += 5.5; });
-      y += 4;
-      doc.setDrawColor(200); doc.line(20,y,190,y); y += 6;
-      if (salvo.DESCONTO) linha('Desconto:', moeda(salvo.DESCONTO));
-      doc.setFontSize(12); doc.setFont(undefined,'bold'); doc.text('Total: ' + moeda(salvo.VALOR_TOTAL), 20, y); y += 8;
-      doc.setFontSize(9.5); doc.setFont(undefined,'normal'); doc.text('Orçamento válido por ' + salvo.VALIDADE_DIAS + ' dias.', 20, y);
+      // As duas vias na mesma folha: a de cima começa logo no topo, a de baixo
+      // começa na metade da página — assim dá pra cortar ao meio depois de imprimir.
+      const fimVia1 = desenharViaOrcamento(doc, salvo, 18, '1ª VIA — LOJA');
+      doc.setDrawColor(180); doc.setLineDashPattern([2,1.5], 0);
+      doc.line(15, 150, 195, 150);
+      doc.setLineDashPattern([], 0);
+      doc.setFontSize(6.5); doc.setTextColor(150); doc.text('✂ corte aqui', 105, 148, { align:'center' });
+      desenharViaOrcamento(doc, salvo, 158, '2ª VIA — CLIENTE');
 
       doc.save('Orcamento_' + salvo.NUMERO_ORCAMENTO + '.pdf');
       mostrarToast('PDF salvo no seu computador.');

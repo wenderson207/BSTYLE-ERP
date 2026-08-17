@@ -360,18 +360,41 @@
   /** Desenha uma "via" compacta do orçamento (grade com bordas, como um formulário
    * de papel) dentro de uma faixa vertical da página — usada duas vezes na mesma
    * folha A4 (via da loja + via do cliente), uma embaixo da outra. */
-  function desenharViaOrcamento(doc, dados, yTopo, rotuloVia){
+  /** Desenha uma "via" compacta do orçamento (grade com bordas, como um formulário
+   * de papel) dentro de uma faixa vertical da página — usada duas vezes na mesma
+   * folha A4 (via da loja + via do cliente), uma embaixo da outra. Cabeçalho no
+   * mesmo padrão visual usado no Termo de Garantia (logo + nome + barra de degradê). */
+  function desenharViaOrcamento(doc, dados, logo, yTopo, rotuloVia){
     const xEsq = 15, xDir = 195, largura = xDir - xEsq;
     let y = yTopo;
 
-    doc.setFontSize(11); doc.setFont(undefined,'bold'); doc.setTextColor(226,64,28);
-    doc.text('BSTYLE - Eletrônicos & Acessórios', xEsq, y);
-    doc.setFontSize(8); doc.setFont(undefined,'normal'); doc.setTextColor(120);
-    doc.text(rotuloVia, xDir, y, { align:'right' });
-    y += 6;
+    // ---------- Cabeçalho compacto, mesmo padrão visual da Garantia ----------
+    let xTextoMarca = xEsq;
+    if (logo) {
+      const areaAltura = 10, proporcao = logo.largura / logo.altura;
+      const larguraFinal = areaAltura * proporcao;
+      doc.addImage(logo.url, 'PNG', xEsq, y - areaAltura + 2, larguraFinal, areaAltura);
+      xTextoMarca = xEsq + larguraFinal + 3;
+    }
+    doc.setFontSize(10.5); doc.setFont(undefined,'bold'); doc.setTextColor(226,64,28);
+    doc.text('BSTYLE - Eletrônicos & Acessórios', xTextoMarca, y);
+    doc.setFontSize(7); doc.setFont(undefined,'normal'); doc.setTextColor(130);
+    doc.text(rotuloVia, xDir, y - 3, { align:'right' });
+    doc.text('Impressão: ' + new Date().toLocaleString('pt-BR', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' }), xDir, y, { align:'right' });
+    y += 3;
+
+    // Barra de degradê laranja -> âmbar, igual à usada no cabeçalho padrão dos documentos.
+    const corInicio = [226,64,28], corFim = [245,166,35], passos = 40, larguraFaixa = largura / passos;
+    for (let i = 0; i < passos; i++) {
+      const t = i / (passos - 1);
+      doc.setFillColor(Math.round(corInicio[0]+(corFim[0]-corInicio[0])*t), Math.round(corInicio[1]+(corFim[1]-corInicio[1])*t), Math.round(corInicio[2]+(corFim[2]-corInicio[2])*t));
+      doc.rect(xEsq + i*larguraFaixa, y, larguraFaixa+0.15, 0.9, 'F');
+    }
+    y += 5;
+
     doc.setFontSize(13); doc.setFont(undefined,'bold'); doc.setTextColor(20);
     doc.text('ORÇAMENTO Nº ' + dados.NUMERO_ORCAMENTO, 105, y, { align:'center' });
-    y += 5;
+    y += 6;
 
     /** Uma célula com borda: rótulo pequeno em cima, valor embaixo — como formulário de papel. */
     function celula(label, valor, x, larg, yc, alt){
@@ -427,11 +450,15 @@
     doc.setFontSize(6.5); doc.setTextColor(130); doc.text('TOTAL', xEsq+largura*0.55+1.5, y+3.2);
     doc.setFontSize(12); doc.setFont(undefined,'bold'); doc.setTextColor(226,64,28);
     doc.text(moeda(dados.VALOR_TOTAL), xDir-1.5, y+7.2, { align:'right' });
-    y += alturaTotais + 8;
+    y += alturaTotais + 10;
 
-    doc.setDrawColor(20); doc.setLineWidth(0.3); doc.line(xEsq+largura*0.28, y, xEsq+largura*0.72, y);
+    // Duas assinaturas lado a lado — cliente e loja.
+    doc.setDrawColor(20); doc.setLineWidth(0.3);
+    doc.line(xEsq+4, y, xEsq+largura*0.46, y);
+    doc.line(xEsq+largura*0.54, y, xDir-4, y);
     doc.setFontSize(7); doc.setFont(undefined,'normal'); doc.setTextColor(100);
-    doc.text('Assinatura', 105, y+4, { align:'center' });
+    doc.text('Assinatura do Cliente', xEsq + largura*0.25, y+4, { align:'center' });
+    doc.text('Assinatura da Loja', xEsq + largura*0.75, y+4, { align:'center' });
 
     return y + 8;
   }
@@ -443,15 +470,16 @@
 
       const { jsPDF } = window.jspdf;
       const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+      let logo = null;
+      try { logo = await carregarLogoComoDataUrl(); } catch (e) { logo = null; }
 
       // As duas vias na mesma folha: a de cima começa logo no topo, a de baixo
       // começa na metade da página — assim dá pra cortar ao meio depois de imprimir.
-      const fimVia1 = desenharViaOrcamento(doc, salvo, 18, '1ª VIA — LOJA');
+      desenharViaOrcamento(doc, salvo, logo, 22, '1ª VIA — LOJA');
       doc.setDrawColor(180); doc.setLineDashPattern([2,1.5], 0);
       doc.line(15, 150, 195, 150);
       doc.setLineDashPattern([], 0);
-      doc.setFontSize(6.5); doc.setTextColor(150); doc.text('✂ corte aqui', 105, 148, { align:'center' });
-      desenharViaOrcamento(doc, salvo, 158, '2ª VIA — CLIENTE');
+      desenharViaOrcamento(doc, salvo, logo, 162, '2ª VIA — CLIENTE');
 
       doc.save('Orcamento_' + salvo.NUMERO_ORCAMENTO + '.pdf');
       mostrarToast('PDF salvo no seu computador.');

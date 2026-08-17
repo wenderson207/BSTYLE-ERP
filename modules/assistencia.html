@@ -743,14 +743,40 @@
     y += alturaDefeito;
 
     // Senha do aparelho — só na via da loja, o técnico precisa pra acessar o aparelho.
-    const alturaSenha = 7.5;
+    // Quando é padrão de desenho, mostra a grade de pontos desenhada de verdade, com o
+    // número da ordem em cada um — fica muito mais fácil de reproduzir do que só o texto.
+    const ehPadrao = os.SENHA_TIPO === 'PADRAO' && os.SENHA_VALOR;
+    const alturaSenha = ehPadrao ? 17 : 7.5;
     doc.setDrawColor(150); doc.rect(xEsq, y, largura, alturaSenha);
-    doc.setFontSize(6.2); doc.setTextColor(130); doc.text('SENHA / DESBLOQUEIO DO APARELHO', xEsq+1.5, y+3);
-    doc.setFontSize(8.5); doc.setFont(undefined,'bold'); doc.setTextColor(20);
-    const textoSenha = !os.SENHA_TIPO || !os.SENHA_VALOR ? '—'
-      : os.SENHA_TIPO === 'PADRAO' ? 'Padrão: ' + os.SENHA_VALOR.split(',').join(' → ')
-      : (os.SENHA_TIPO === 'PIN' ? 'PIN: ' : 'Senha: ') + os.SENHA_VALOR;
-    doc.text(textoSenha, xEsq+1.5, y+6.2);
+    doc.setFontSize(6.2); doc.setFont(undefined,'normal'); doc.setTextColor(130);
+    doc.text('SENHA / DESBLOQUEIO DO APARELHO', xEsq+1.5, y+3);
+
+    if (ehPadrao) {
+      const sequencia = os.SENHA_VALOR.split(',').map(Number);
+      doc.setFontSize(8); doc.setFont(undefined,'bold'); doc.setTextColor(20);
+      doc.text('Padrão: ' + sequencia.join(' → '), xEsq+1.5, y+7.5);
+
+      // Grade 3x3 de pontos, à direita da célula, com o número da ordem em cada um marcado.
+      const raio = 1.8, espaco = 5.5, xGrade = xEsq + largura - (espaco*2 + raio*2) - 4, yGrade = y + 6;
+      for (let pos = 1; pos <= 9; pos++) {
+        const col = (pos-1) % 3, lin = Math.floor((pos-1)/3);
+        const cx = xGrade + col*espaco, cy = yGrade + lin*espaco;
+        const ordem = sequencia.indexOf(pos);
+        const ativo = ordem !== -1;
+        doc.setDrawColor(ativo ? 30 : 180); doc.setLineWidth(0.3);
+        if (ativo) { doc.setFillColor(226,64,28); doc.circle(cx, cy, raio, 'FD'); }
+        else { doc.circle(cx, cy, raio, 'D'); }
+        if (ativo) {
+          doc.setFontSize(5.5); doc.setFont(undefined,'bold'); doc.setTextColor(255,255,255);
+          doc.text(String(ordem+1), cx, cy+0.8, { align:'center' });
+        }
+      }
+      doc.setTextColor(20);
+    } else {
+      doc.setFontSize(8.5); doc.setFont(undefined,'bold'); doc.setTextColor(20);
+      const textoSenha = !os.SENHA_TIPO || !os.SENHA_VALOR ? '—' : (os.SENHA_TIPO === 'PIN' ? 'PIN: ' : 'Senha: ') + os.SENHA_VALOR;
+      doc.text(textoSenha, xEsq+1.5, y+6.2);
+    }
     y += alturaSenha + 3;
 
     // Checklist funcional — grade compacta em 3 colunas.

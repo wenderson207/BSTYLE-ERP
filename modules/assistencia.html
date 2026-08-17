@@ -54,6 +54,16 @@
   .cal-dia.hoje{ border-color:var(--mint); }
   .cal-dia .num{ color:var(--text-secondary); font-family:var(--font-mono); }
   .cal-dia .os-chip{ background:rgba(47,225,168,0.15); color:var(--mint); border-radius:4px; padding:2px 5px; font-size:9.5px; margin-top:4px; display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .filtros-assist{ display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; margin:16px 0; }
+  .filtros-assist .grupo{ display:flex; flex-direction:column; gap:4px; }
+  .filtros-assist .grupo span{ font-size:10.5px; color:var(--text-tertiary); }
+  .filtros-assist input{ background:var(--bg-surface); border:1px solid var(--hairline); color:var(--text-primary); padding:8px 12px; border-radius:8px; font-size:12.5px; }
+  .filtros-assist input#filtroBuscaAssist{ min-width:220px; }
+  .entregues-toggle{ display:flex; align-items:center; justify-content:space-between; cursor:pointer; padding:6px 2px; font-size:11.5px; color:var(--text-secondary); user-select:none; }
+  .entregues-toggle .seta{ transition:transform 0.15s; display:inline-block; }
+  .entregues-toggle.aberto .seta{ transform:rotate(90deg); }
+  .entregues-lista{ display:none; }
+  .entregues-lista.aberto{ display:block; }
 </style>
 
 <div class="toolbar">
@@ -67,6 +77,12 @@
 </div>
 
 <div id="viewKanban" class="view-panel active">
+  <div class="filtros-assist">
+    <div class="grupo"><span>Buscar</span><input id="filtroBuscaAssist" placeholder="Nº da OS, aparelho ou cliente…"></div>
+    <div class="grupo"><span>De</span><input type="date" id="filtroDeAssist"></div>
+    <div class="grupo"><span>Até</span><input type="date" id="filtroAteAssist"></div>
+    <button class="btn" id="btnLimparFiltroAssist" style="padding:8px 12px;">Limpar</button>
+  </div>
   <div class="kanban" id="kanban"></div>
 </div>
 
@@ -328,13 +344,57 @@
 
   function nomeCliente(id){ const c = clientes.find(x => x.ID === id); return c ? c.NOME : '—'; }
 
+  function ordensFiltradas(){
+    const termo = document.getElementById('filtroBuscaAssist').value.trim().toLowerCase();
+    const de = document.getElementById('filtroDeAssist').value;
+    const ate = document.getElementById('filtroAteAssist').value;
+    return ordens.filter(o => {
+      if (termo) {
+        const alvo = [o.NUMERO_OS, o.MARCA, o.MODELO, nomeCliente(o.CLIENTE_ID)].filter(Boolean).join(' ').toLowerCase();
+        if (!alvo.includes(termo)) return false;
+      }
+      if (de || ate) {
+        const dataOS = o.DATA_ABERTURA ? new Date(o.DATA_ABERTURA) : null;
+        if (!dataOS) return false;
+        if (de && dataOS < new Date(de + 'T00:00:00')) return false;
+        if (ate && dataOS > new Date(ate + 'T23:59:59')) return false;
+      }
+      return true;
+    });
+  }
+  ['filtroBuscaAssist','filtroDeAssist','filtroAteAssist'].forEach(id => document.getElementById(id).addEventListener('input', renderKanban));
+  document.getElementById('btnLimparFiltroAssist').addEventListener('click', () => {
+    document.getElementById('filtroBuscaAssist').value = ''; document.getElementById('filtroDeAssist').value = ''; document.getElementById('filtroAteAssist').value = '';
+    renderKanban();
+  });
+
+  function cartaoOS(o){
+    return `<div class="kanban-card" onclick="window.__abrirOS('${o.ID}')"><div style="color:var(--mint); font-family:var(--font-mono); font-size:11px;">${o.NUMERO_OS}</div><b>${o.MARCA||''} ${o.MODELO||''}</b><div style="color:var(--text-tertiary);">${o.DEFEITO_INFORMADO||''}</div></div>`;
+  }
+
   function renderKanban(){
+    const lista = ordensFiltradas();
     setHTML('kanban', STATUS_COLUNAS.map(status => {
-      const doStatus = ordens.filter(o => o.STATUS === status);
-      return `<div class="kanban-col"><h4>${status} (${doStatus.length})</h4>${
-        doStatus.map(o => `<div class="kanban-card" onclick="window.__abrirOS('${o.ID}')"><div style="color:var(--mint); font-family:var(--font-mono); font-size:11px;">${o.NUMERO_OS}</div><b>${o.MARCA||''} ${o.MODELO||''}</b><div style="color:var(--text-tertiary);">${o.DEFEITO_INFORMADO||''}</div></div>`).join('')
-        || '<div style="color:var(--text-tertiary); font-size:11.5px;">Nenhuma OS.</div>'}</div>`;
+      const doStatus = lista.filter(o => o.STATUS === status);
+      if (!doStatus.length) return `<div class="kanban-col"><h4>${status} (0)</h4><div style="color:var(--text-tertiary); font-size:11.5px;">Nenhuma OS.</div></div>`;
+
+      // A coluna "Entregue" costuma acumular muita coisa com o tempo — fica recolhida, com uma seta pra abrir quando quiser ver.
+      if (status === 'Entregue') {
+        return `<div class="kanban-col"><h4>${status} (${doStatus.length})</h4>
+          <div class="entregues-toggle" id="toggleEntregues">
+            <span><span class="seta">▶</span> ${doStatus.length} entregue${doStatus.length>1?'s':''} — clique pra ver</span>
+          </div>
+          <div class="entregues-lista" id="listaEntregues">${doStatus.map(cartaoOS).join('')}</div>
+        </div>`;
+      }
+      return `<div class="kanban-col"><h4>${status} (${doStatus.length})</h4>${doStatus.map(cartaoOS).join('')}</div>`;
     }).join(''));
+
+    const toggle = document.getElementById('toggleEntregues');
+    if (toggle) toggle.addEventListener('click', () => {
+      toggle.classList.toggle('aberto');
+      document.getElementById('listaEntregues').classList.toggle('aberto');
+    });
   }
 
   function renderCalendario(){

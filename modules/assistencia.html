@@ -766,7 +766,8 @@
       const xItem = xEsq + col*larguraColChecklist, yItem = y + linha*4;
       const resp = respostasChecklist[item] ? RESP_ABREV[respostasChecklist[item]] : '—';
       doc.setTextColor(90); doc.text(item.substring(0,26), xItem, yItem);
-      doc.setTextColor(resp==='Sim' ? [30,150,110] : resp==='Não' ? [200,60,60] : [120,120,120]);
+      const corResp = resp==='Sim' ? [30,150,110] : resp==='Não' ? [200,60,60] : [120,120,120];
+      doc.setTextColor(corResp[0], corResp[1], corResp[2]);
       doc.setFont(undefined,'bold'); doc.text(resp, xItem + larguraColChecklist - 8, yItem);
       doc.setFont(undefined,'normal');
     });

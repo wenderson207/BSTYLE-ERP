@@ -14,6 +14,13 @@
   .summary-row.total{ font-size:16px; color:var(--text-primary); font-weight:700; font-family:var(--font-display); border-top:1px solid var(--hairline); margin-top:8px; padding-top:12px; }
   .selected-client{ display:flex; align-items:center; justify-content:space-between; background:var(--bg-elevated); border:1px solid var(--hairline); border-radius:8px; padding:9px 12px; font-size:12.5px; }
   .selected-client button{ background:none; border:none; color:var(--text-tertiary); cursor:pointer; }
+  .modal-overlay{ position:fixed; inset:0; background:rgba(3,5,8,0.6); display:none; align-items:center; justify-content:center; z-index:100; padding:24px; }
+  .modal-overlay.open{ display:flex; }
+  .modal-box{ background:var(--bg-surface); border:1px solid var(--hairline); border-radius:14px; width:100%; }
+  .modal-head{ display:flex; justify-content:space-between; padding:18px 22px; border-bottom:1px solid var(--hairline); }
+  .modal-body{ padding:20px 22px; }
+  .modal-foot{ display:flex; justify-content:flex-end; gap:10px; padding:16px 22px; border-top:1px solid var(--hairline); }
+  .modal-close{ background:none; border:none; color:var(--text-tertiary); font-size:18px; cursor:pointer; }
 </style>
 
 <div class="toolbar">
@@ -91,6 +98,14 @@
     <thead><tr><th>Data/Hora</th><th>Cliente</th><th>Vendedor</th><th>Loja</th><th>Pagamento</th><th>Valor</th><th>Status</th><th></th></tr></thead>
     <tbody id="linhasHistorico"><tr class="empty-row"><td colspan="8">Carregando…</td></tr></tbody>
   </table>
+</div>
+
+<div class="modal-overlay" id="modalVerVenda">
+  <div class="modal-box" style="max-width:480px;">
+    <div class="modal-head"><h3 style="font-family:var(--font-display); margin:0;">Detalhes da venda</h3><button class="modal-close" id="fecharModalVerVenda">✕</button></div>
+    <div class="modal-body" id="corpoVerVenda">Carregando…</div>
+    <div class="modal-foot"><button class="btn" id="fecharModalVerVenda2">Fechar</button></div>
+  </div>
 </div>
 
 <script>
@@ -593,9 +608,59 @@
       <td>${dataHoraBR(v.DATA)}</td><td>${nomeClienteHist(v.CLIENTE_ID)}</td><td>${nomeVendedorHist(v.USUARIO_ID)}</td><td>${nomeLojaHist(v.EMPRESA_ID)}</td>
       <td>${v.FORMA_PAGAMENTO||'—'}</td><td>${moeda(v.VALOR_TOTAL)}</td>
       <td><span class="badge ${v.STATUS==='Cancelada'?'neutral':'ok'}">${v.STATUS}</span></td>
-      <td>${v.STATUS!=='Cancelada' ? `<button class="btn" style="padding:6px 10px; font-size:11.5px; color:var(--red);" onclick="window.__excluirVenda('${v.ID}')">Excluir</button>` : ''}</td>
+      <td style="display:flex; gap:6px; flex-wrap:wrap;">
+        <button class="btn" style="padding:6px 10px; font-size:11.5px;" onclick="window.__verVenda('${v.ID}')">Ver</button>
+        ${v.STATUS!=='Cancelada' ? `<button class="btn" style="padding:6px 10px; font-size:11.5px; color:var(--mint);" onclick="window.__enviarReciboHistorico('${v.ID}')">💬 Enviar</button>
+        <button class="btn" style="padding:6px 10px; font-size:11.5px; color:var(--red);" onclick="window.__excluirVenda('${v.ID}')">Excluir</button>` : ''}
+      </td>
       </tr>`).join(''));
   }
+
+  /** Busca os itens de uma venda e monta o texto — reaproveitado pelo "Ver" e pelo "Enviar". */
+  async function montarDetalhesVenda(vendaId){
+    const venda = historicoVendas.find(v => v.ID === vendaId);
+    if (!venda) return null;
+    const itens = await dbQuery('ITENS_VENDA', { VENDA_ID: vendaId });
+    const cliente = todosClientes.find(c => c.ID === venda.CLIENTE_ID) || { NOME: 'Cliente avulso', TELEFONE: '' };
+    const itensComNome = itens.map(i => ({
+      ...i,
+      NOME: i.OS_ID ? 'Serviço (OS)' : ((todosProdutosCarregados.find(p => p.ID === i.PRODUTO_ID) || {}).NOME || 'Produto removido')
+    }));
+    return { venda, cliente, itens: itensComNome };
+  }
+
+  window.__verVenda = async (vendaId) => {
+    document.getElementById('modalVerVenda').classList.add('open');
+    setHTML('corpoVerVenda', 'Carregando…');
+    const detalhes = await montarDetalhesVenda(vendaId);
+    if (!detalhes){ setHTML('corpoVerVenda', 'Venda não encontrada.'); return; }
+    const { venda, cliente, itens } = detalhes;
+    setHTML('corpoVerVenda', `
+      <div style="font-size:12.5px; color:var(--text-secondary); margin-bottom:12px;">
+        <b>${dataHoraBR(venda.DATA)}</b> · ${cliente.NOME} · Vendedor: ${nomeVendedorHist(venda.USUARIO_ID)}
+      </div>
+      <table class="dt" style="margin-bottom:14px;">
+        <thead><tr><th>Item</th><th>Qtd.</th><th>Valor</th></tr></thead>
+        <tbody>${itens.map(i => `<tr><td>${i.NOME}</td><td>${i.QUANTIDADE}</td><td>${moeda(i.QUANTIDADE*i.PRECO_UNITARIO)}</td></tr>`).join('')}</tbody>
+      </table>
+      <div class="summary-row"><span>Desconto</span><span>${moeda(venda.DESCONTO||0)}</span></div>
+      <div class="summary-row total"><span>Total pago</span><span>${moeda(venda.VALOR_TOTAL)}</span></div>
+      <div class="summary-row"><span>Forma de pagamento</span><span>${venda.FORMA_PAGAMENTO}</span></div>
+    `);
+  };
+  document.getElementById('fecharModalVerVenda').addEventListener('click', () => document.getElementById('modalVerVenda').classList.remove('open'));
+  document.getElementById('fecharModalVerVenda2').addEventListener('click', () => document.getElementById('modalVerVenda').classList.remove('open'));
+
+  window.__enviarReciboHistorico = async (vendaId) => {
+    const detalhes = await montarDetalhesVenda(vendaId);
+    if (!detalhes){ mostrarToast('Venda não encontrada.', 'erro'); return; }
+    const { venda, cliente, itens } = detalhes;
+    const telefone = String(cliente.TELEFONE||'').replace(/\D/g,'');
+    if (!telefone){ mostrarToast('Esse cliente não tem telefone cadastrado.', 'erro'); return; }
+    const numeroComPais = telefone.length<=11 ? '55'+telefone : telefone;
+    const texto = montarTextoReciboVenda(cliente, itens, venda);
+    window.open('https://wa.me/' + numeroComPais + '?text=' + encodeURIComponent(texto), '_blank');
+  };
 
   document.getElementById('buscaHistorico').addEventListener('input', e => {
     const t = e.target.value.toLowerCase();
@@ -642,25 +707,36 @@
     } catch (e) { mostrarToast('Erro ao excluir venda: ' + e.message, 'erro'); }
   };
 
+  /** Monta o texto do comprovante de venda pro WhatsApp — reaproveitado tanto
+   * logo depois de finalizar quanto pelo botão "Enviar" no histórico.
+   * O nome da marca é fixo (igual nos outros documentos do sistema), não
+   * depende do nome cadastrado de cada loja específica. */
+  function montarTextoReciboVenda(cliente, itens, venda){
+    const linha = '▬▬▬▬▬▬▬▬▬▬▬▬▬▬';
+    let texto = `📲 *BStyle - Eletrônicos & Acessórios*\n🧾 _Comprovante de Venda_\n${linha}\n\n`;
+    texto += `🛍️ *Itens*\n`;
+    texto += itens.map(i => `▫️ ${i.QUANTIDADE}x ${i.NOME}\n     ${moeda(i.QUANTIDADE*i.PRECO_UNITARIO)}`).join('\n');
+    texto += `\n\n${linha}\n`;
+    texto += `💵 Subtotal: ${moeda(itens.reduce((s,i)=>s+i.QUANTIDADE*i.PRECO_UNITARIO,0))}\n`;
+    if (venda.DESCONTO) texto += `🏷️ Desconto: ${moeda(venda.DESCONTO)}\n`;
+    texto += `✅ *Total pago: ${moeda(venda.VALOR_TOTAL)}*\n\n`;
+    if (venda.FORMA_PAGAMENTO === 'Combinado' && venda.FORMAS_PAGAMENTO && venda.FORMAS_PAGAMENTO.length) {
+      texto += `💳 *Pagamento combinado:*\n` + venda.FORMAS_PAGAMENTO.map(f => `   ▫️ ${f.forma}: ${moeda(f.valor)}` + (f.forma==='Cartão de Crédito' && f.parcelas>1 ? ` (${f.parcelas}x)` : '')).join('\n');
+    } else {
+      texto += `💳 Forma de pagamento: *${venda.FORMA_PAGAMENTO}*`;
+    }
+    texto += `\n\n${linha}\n🙏 Obrigado pela preferência, *${cliente.NOME}*!\n🛜 Fica ligado nas novidades da loja! 📶✨`;
+    return texto;
+  }
+
   // ---------- Enviar nota fiscal (recibo) por WhatsApp ----------
   document.getElementById('btnEnviarNotaWpp').addEventListener('click', () => {
     if (!ultimaVendaParaNota) return;
     const { cliente, itens, venda } = ultimaVendaParaNota;
     const telefone = String(cliente.TELEFONE||'').replace(/\D/g,'');
     const numeroComPais = telefone.length<=11 ? '55'+telefone : telefone;
-    const nomeLojaNota = (empresasCarregadas.find(e => e.ID === venda.EMPRESA_ID) || empresasCarregadas[0] || {}).NOME || 'Nossa loja';
 
-    let texto = `🧾 *${nomeLojaNota}* — Comprovante de venda\n\n`;
-    texto += itens.map(i => `${i.QUANTIDADE}x ${i.NOME} — ${moeda(i.QUANTIDADE*i.PRECO_UNITARIO)}`).join('\n');
-    texto += `\n\n*Subtotal:* ${moeda(itens.reduce((s,i)=>s+i.QUANTIDADE*i.PRECO_UNITARIO,0))}`;
-    if (venda.DESCONTO) texto += `\n*Desconto:* ${moeda(venda.DESCONTO)}`;
-    texto += `\n*Total pago:* ${moeda(venda.VALOR_TOTAL)}`;
-    if (venda.FORMA_PAGAMENTO === 'Combinado' && venda.FORMAS_PAGAMENTO && venda.FORMAS_PAGAMENTO.length) {
-      texto += `\n*Forma de pagamento:* Combinado\n` + venda.FORMAS_PAGAMENTO.map(f => `  • ${f.forma}: ${moeda(f.valor)}` + (f.forma==='Cartão de Crédito' && f.parcelas>1 ? ` (${f.parcelas}x)` : '')).join('\n');
-    } else {
-      texto += `\n*Forma de pagamento:* ${venda.FORMA_PAGAMENTO}`;
-    }
-    texto += `\n\nObrigado pela preferência, ${cliente.NOME}! 🙏`;
+    const texto = montarTextoReciboVenda(cliente, itens, venda);
 
     window.open('https://wa.me/' + numeroComPais + '?text=' + encodeURIComponent(texto), '_blank');
     document.getElementById('notaFiscalWrap').style.display = 'none';

@@ -821,7 +821,6 @@
     const linhasPagamento = (venda.FORMA_PAGAMENTO === 'Combinado' && venda.FORMAS_PAGAMENTO && venda.FORMAS_PAGAMENTO.length)
       ? venda.FORMAS_PAGAMENTO.map(f => `${f.forma}: ${moeda(f.valor)}` + (f.forma==='Cartão de Crédito' && f.parcelas>1 ? ` (${f.parcelas}x)` : '')).join(' · ')
       : venda.FORMA_PAGAMENTO;
-    const numeroVenda = '#' + String(venda.ID||'').slice(-6).toUpperCase();
     const vendedor = typeof nomeVendedorHist === 'function' ? nomeVendedorHist(venda.USUARIO_ID) : '—';
 
     return `
@@ -835,9 +834,6 @@
                 <div style="font-size:16.5px; font-weight:800; color:#fff; letter-spacing:0.3px;">${nomeLoja}</div>
                 <div style="font-size:11px; color:rgba(255,255,255,0.9); margin-top:2px; text-transform:uppercase; letter-spacing:1px;">Comprovante de Venda</div>
               </div>
-            </div>
-            <div style="position:absolute; top:24px; right:28px; text-align:right;">
-              <div style="background:rgba(255,255,255,0.22); color:#fff; font-size:11px; font-weight:700; padding:4px 10px; border-radius:20px; display:inline-block;">${numeroVenda}</div>
             </div>
           </div>
 

@@ -803,21 +803,37 @@
    * logo depois de finalizar quanto pelo botão "Enviar" no histórico.
    * O nome da marca é fixo (igual nos outros documentos do sistema), não
    * depende do nome cadastrado de cada loja específica. */
+  /**
+   * Emojis montados a partir do código Unicode deles (\u{...}), em vez de
+   * ficarem guardados como caractere "de verdade" no arquivo. Isso existe
+   * porque emoji são caracteres de vários bytes, e dependendo de como o
+   * arquivo passa por diferentes ferramentas até chegar no ar (edição, git,
+   * hospedagem), esses bytes podem se corromper e virar "�". Escrevendo o
+   * código em vez do caractere, é o próprio navegador que monta o emoji
+   * certinho na hora, sempre — não importa o que aconteceu com o arquivo.
+   */
+  const EMOJI = {
+    celular: '\u{1F4F2}', recibo: '\u{1F9FE}', sacola: '\u{1F6CD}\u{FE0F}',
+    quadrado: '\u{25AB}\u{FE0F}', dinheiro: '\u{1F4B5}', etiqueta: '\u{1F3F7}\u{FE0F}',
+    check: '\u{2705}', cartao: '\u{1F4B3}', gratidao: '\u{1F64F}',
+    wifi: '\u{1F6DC}', sinal: '\u{1F4F6}', brilho: '\u{2728}', barraForte: '\u{25AC}'
+  };
+
   function montarTextoReciboVenda(cliente, itens, venda){
-    const linha = '▬▬▬▬▬▬▬▬▬▬▬▬▬▬';
-    let texto = `📲 *BStyle - Eletrônicos & Acessórios*\n🧾 _Comprovante de Venda_\n${linha}\n\n`;
-    texto += `🛍️ *Itens*\n`;
-    texto += itens.map(i => `▫️ ${i.QUANTIDADE}x ${i.NOME}\n     ${moeda(i.QUANTIDADE*i.PRECO_UNITARIO)}`).join('\n');
+    const linha = EMOJI.barraForte.repeat(14);
+    let texto = `${EMOJI.celular} *BStyle - Eletrônicos & Acessórios*\n${EMOJI.recibo} _Comprovante de Venda_\n${linha}\n\n`;
+    texto += `${EMOJI.sacola} *Itens*\n`;
+    texto += itens.map(i => `${EMOJI.quadrado} ${i.QUANTIDADE}x ${i.NOME}\n     ${moeda(i.QUANTIDADE*i.PRECO_UNITARIO)}`).join('\n');
     texto += `\n\n${linha}\n`;
-    texto += `💵 Subtotal: ${moeda(itens.reduce((s,i)=>s+i.QUANTIDADE*i.PRECO_UNITARIO,0))}\n`;
-    if (venda.DESCONTO) texto += `🏷️ Desconto: ${moeda(venda.DESCONTO)}\n`;
-    texto += `✅ *Total pago: ${moeda(venda.VALOR_TOTAL)}*\n\n`;
+    texto += `${EMOJI.dinheiro} Subtotal: ${moeda(itens.reduce((s,i)=>s+i.QUANTIDADE*i.PRECO_UNITARIO,0))}\n`;
+    if (venda.DESCONTO) texto += `${EMOJI.etiqueta} Desconto: ${moeda(venda.DESCONTO)}\n`;
+    texto += `${EMOJI.check} *Total pago: ${moeda(venda.VALOR_TOTAL)}*\n\n`;
     if (venda.FORMA_PAGAMENTO === 'Combinado' && venda.FORMAS_PAGAMENTO && venda.FORMAS_PAGAMENTO.length) {
-      texto += `💳 *Pagamento combinado:*\n` + venda.FORMAS_PAGAMENTO.map(f => `   ▫️ ${f.forma}: ${moeda(f.valor)}` + (f.forma==='Cartão de Crédito' && f.parcelas>1 ? ` (${f.parcelas}x)` : '')).join('\n');
+      texto += `${EMOJI.cartao} *Pagamento combinado:*\n` + venda.FORMAS_PAGAMENTO.map(f => `   ${EMOJI.quadrado} ${f.forma}: ${moeda(f.valor)}` + (f.forma==='Cartão de Crédito' && f.parcelas>1 ? ` (${f.parcelas}x)` : '')).join('\n');
     } else {
-      texto += `💳 Forma de pagamento: *${venda.FORMA_PAGAMENTO}*`;
+      texto += `${EMOJI.cartao} Forma de pagamento: *${venda.FORMA_PAGAMENTO}*`;
     }
-    texto += `\n\n${linha}\n🙏 Obrigado pela preferência, *${cliente.NOME}*!\n🛜 Fica ligado nas novidades da loja! 📶✨`;
+    texto += `\n\n${linha}\n${EMOJI.gratidao} Obrigado pela preferência, *${cliente.NOME}*!\n${EMOJI.wifi} Fica ligado nas novidades da loja! ${EMOJI.sinal}${EMOJI.brilho}`;
     return texto;
   }
 

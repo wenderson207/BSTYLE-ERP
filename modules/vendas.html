@@ -683,11 +683,8 @@
     const detalhes = await montarDetalhesVenda(vendaId);
     if (!detalhes){ mostrarToast('Venda não encontrada.', 'erro'); return; }
     const { venda, cliente, itens } = detalhes;
-    const telefone = String(cliente.TELEFONE||'').replace(/\D/g,'');
-    if (!telefone){ mostrarToast('Esse cliente não tem telefone cadastrado.', 'erro'); return; }
-    const numeroComPais = telefone.length<=11 ? '55'+telefone : telefone;
-    const texto = montarTextoReciboVenda(cliente, itens, venda);
-    window.open('https://wa.me/' + numeroComPais + '?text=' + encodeURIComponent(texto), '_blank');
+    try { await enviarComprovanteVenda(cliente, itens, venda); }
+    catch (e) { mostrarToast('Erro: ' + e.message, 'erro'); }
   };
 
   document.getElementById('buscaHistorico').addEventListener('input', e => {
@@ -812,42 +809,135 @@
    * código em vez do caractere, é o próprio navegador que monta o emoji
    * certinho na hora, sempre — não importa o que aconteceu com o arquivo.
    */
-  const EMOJI = {
-    celular: '\u{1F4F2}', recibo: '\u{1F9FE}', sacola: '\u{1F6CD}\u{FE0F}',
-    quadrado: '\u{25AB}\u{FE0F}', dinheiro: '\u{1F4B5}', etiqueta: '\u{1F3F7}\u{FE0F}',
-    check: '\u{2705}', cartao: '\u{1F4B3}', gratidao: '\u{1F64F}',
-    wifi: '\u{1F6DC}', sinal: '\u{1F4F6}', brilho: '\u{2728}', barraForte: '\u{25AC}'
-  };
-
-  function montarTextoReciboVenda(cliente, itens, venda){
-    const linha = EMOJI.barraForte.repeat(14);
-    let texto = `${EMOJI.celular} *BStyle - Eletrônicos & Acessórios*\n${EMOJI.recibo} _Comprovante de Venda_\n${linha}\n\n`;
-    texto += `${EMOJI.sacola} *Itens*\n`;
-    texto += itens.map(i => `${EMOJI.quadrado} ${i.QUANTIDADE}x ${i.NOME}\n     ${moeda(i.QUANTIDADE*i.PRECO_UNITARIO)}`).join('\n');
-    texto += `\n\n${linha}\n`;
-    texto += `${EMOJI.dinheiro} Subtotal: ${moeda(itens.reduce((s,i)=>s+i.QUANTIDADE*i.PRECO_UNITARIO,0))}\n`;
-    if (venda.DESCONTO) texto += `${EMOJI.etiqueta} Desconto: ${moeda(venda.DESCONTO)}\n`;
-    texto += `${EMOJI.check} *Total pago: ${moeda(venda.VALOR_TOTAL)}*\n\n`;
-    if (venda.FORMA_PAGAMENTO === 'Combinado' && venda.FORMAS_PAGAMENTO && venda.FORMAS_PAGAMENTO.length) {
-      texto += `${EMOJI.cartao} *Pagamento combinado:*\n` + venda.FORMAS_PAGAMENTO.map(f => `   ${EMOJI.quadrado} ${f.forma}: ${moeda(f.valor)}` + (f.forma==='Cartão de Crédito' && f.parcelas>1 ? ` (${f.parcelas}x)` : '')).join('\n');
-    } else {
-      texto += `${EMOJI.cartao} Forma de pagamento: *${venda.FORMA_PAGAMENTO}*`;
-    }
-    texto += `\n\n${linha}\n${EMOJI.gratidao} Obrigado pela preferência, *${cliente.NOME}*!\n${EMOJI.wifi} Fica ligado nas novidades da loja! ${EMOJI.sinal}${EMOJI.brilho}`;
-    return texto;
+  /** Monta o cartão (HTML) do comprovante — mesmo estilo visual usado no orçamento,
+   * fundo claro, ótimo como imagem de chat. Isso evita de vez qualquer problema de
+   * emoji corrompido, já que vira uma imagem, não texto. */
+  function montarCartaoVenda(venda, cliente, itens, logoDataUrl){
+    const nomeLoja = 'BSTYLE - Eletrônicos & Acessórios';
+    const logoHtml = logoDataUrl
+      ? `<div style="background:#fff; border-radius:8px; padding:5px 8px; flex-shrink:0; display:flex; align-items:center;"><img src="${logoDataUrl}" style="height:32px; width:auto; object-fit:contain; display:block;"></div>`
+      : `<div style="width:40px; height:40px; background:#fff; border-radius:8px; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:18px; color:#e2401c; flex-shrink:0;">B</div>`;
+    const subtotal = itens.reduce((s,i)=>s+i.QUANTIDADE*i.PRECO_UNITARIO,0);
+    const linhasPagamento = (venda.FORMA_PAGAMENTO === 'Combinado' && venda.FORMAS_PAGAMENTO && venda.FORMAS_PAGAMENTO.length)
+      ? venda.FORMAS_PAGAMENTO.map(f => `${f.forma}: ${moeda(f.valor)}` + (f.forma==='Cartão de Crédito' && f.parcelas>1 ? ` (${f.parcelas}x)` : '')).join(' · ')
+      : venda.FORMA_PAGAMENTO;
+    return `
+      <div style="width:480px; background:#ffffff; font-family:'Segoe UI',Arial,sans-serif; color:#1a1a1a; padding:0;">
+        <div style="background:linear-gradient(135deg,#e2401c,#f5a623); padding:22px 26px; display:flex; align-items:center; gap:12px;">
+          ${logoHtml}
+          <div>
+            <div style="font-size:15px; font-weight:800; color:#fff;">${nomeLoja}</div>
+            <div style="font-size:11.5px; color:rgba(255,255,255,0.85);">Comprovante de Venda</div>
+          </div>
+        </div>
+        <div style="padding:24px 26px;">
+          <div style="font-size:12px; color:#999; margin-bottom:14px;">${dataHoraBR(venda.DATA)}</div>
+          <table style="width:100%; border-collapse:collapse; margin-bottom:10px;">
+            <thead><tr style="border-bottom:2px solid #eee;"><th style="text-align:left; font-size:10.5px; color:#999; padding-bottom:8px; text-transform:uppercase;">Item</th><th style="text-align:right; font-size:10.5px; color:#999; padding-bottom:8px; text-transform:uppercase;">Valor</th></tr></thead>
+            <tbody>
+              ${itens.map(i => `<tr style="border-bottom:1px solid #f2f2f2;"><td style="padding:8px 0; font-size:13px;">${i.QUANTIDADE}x ${i.NOME}</td><td style="padding:8px 0; font-size:13px; text-align:right;">${moeda(i.QUANTIDADE*i.PRECO_UNITARIO)}</td></tr>`).join('')}
+            </tbody>
+          </table>
+          <div style="display:flex; justify-content:space-between; font-size:12.5px; color:#666; padding:4px 0;"><span>Subtotal</span><span>${moeda(subtotal)}</span></div>
+          ${venda.DESCONTO ? `<div style="display:flex; justify-content:space-between; font-size:12.5px; color:#666; padding:4px 0;"><span>Desconto</span><span>-${moeda(venda.DESCONTO)}</span></div>` : ''}
+          <div style="display:flex; justify-content:space-between; font-size:17px; font-weight:800; color:#e2401c; border-top:2px solid #eee; margin-top:8px; padding-top:10px;"><span>Total pago</span><span>${moeda(venda.VALOR_TOTAL)}</span></div>
+          <div style="font-size:12px; color:#666; margin-top:10px;">Pagamento: ${linhasPagamento}</div>
+          <div style="text-align:center; font-size:12px; color:#888; margin-top:22px; padding-top:14px; border-top:1px dashed #ddd;">Obrigado pela preferência, ${cliente.NOME}! 🙏</div>
+        </div>
+      </div>`;
   }
 
-  // ---------- Enviar nota fiscal (recibo) por WhatsApp ----------
-  document.getElementById('btnEnviarNotaWpp').addEventListener('click', () => {
+  async function carregarHtml2Canvas(){
+    return new Promise(resolve => {
+      if (window.html2canvas) return resolve();
+      const s = document.createElement('script');
+      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+      s.onload = resolve; s.onerror = resolve;
+      document.head.appendChild(s);
+    });
+  }
+
+  /** Gera a imagem do comprovante fora da tela, converte em arquivo PNG. */
+  async function gerarImagemVenda(venda, cliente, itens){
+    await carregarHtml2Canvas();
+    if (!window.html2canvas) throw new Error('Não consegui carregar a biblioteca de imagem (sem internet?).');
+
+    let logoDataUrl = null;
+    try { const logo = await carregarLogoComoDataUrl(); logoDataUrl = logo ? logo.url : null; } catch (e) { logoDataUrl = null; }
+
+    const holder = document.createElement('div');
+    holder.style.cssText = 'position:fixed; left:-9999px; top:0; z-index:-1;';
+    holder.innerHTML = montarCartaoVenda(venda, cliente, itens, logoDataUrl);
+    document.body.appendChild(holder);
+
+    const imgLogo = holder.querySelector('img');
+    if (imgLogo && !imgLogo.complete) {
+      await new Promise(res => { imgLogo.onload = res; imgLogo.onerror = res; setTimeout(res, 1500); });
+    }
+
+    let canvas;
+    try {
+      canvas = await window.html2canvas(holder.firstElementChild, { scale: 2, backgroundColor: '#ffffff', useCORS: true, allowTaint: false, logging: false });
+    } finally {
+      document.body.removeChild(holder);
+    }
+
+    return new Promise((resolve, reject) => {
+      canvas.toBlob(blob => { if (!blob) { reject(new Error('Não consegui converter o comprovante em imagem.')); return; } resolve(blob); }, 'image/png');
+    });
+  }
+
+  /**
+   * Fluxo único de envio do comprovante — reaproveitado pelo botão de "logo depois
+   * de finalizar" e pelo "Enviar" no histórico:
+   * 1) Sempre gera a imagem do comprovante.
+   * 2) Se o cliente TEM telefone salvo, abre o WhatsApp dele direto (o número já
+   *    preenchido) — só falta anexar a imagem, que já abre pronta pra isso.
+   * 3) Se NÃO tem telefone, só gera a imagem mesmo, sem tentar abrir WhatsApp nenhum.
+   */
+  async function enviarComprovanteVenda(cliente, itens, venda){
+    mostrarToast('Gerando imagem…');
+    const blob = await gerarImagemVenda(venda, cliente, itens);
+    const arquivo = new File([blob], 'Comprovante_Venda.png', { type: 'image/png' });
+
+    const urlAbaNova = URL.createObjectURL(blob);
+    window.open(urlAbaNova, '_blank');
+
+    const telefone = String(cliente.TELEFONE||'').replace(/\D/g,'');
+    const temTelefone = telefone.length >= 10;
+
+    if (navigator.canShare && navigator.canShare({ files: [arquivo] })) {
+      try {
+        await navigator.share({ files: [arquivo], title: 'Comprovante de venda' });
+        mostrarToast('Comprovante compartilhado.');
+        return;
+      } catch (erroShare) {
+        if (erroShare.name === 'AbortError') return;
+        // Se o compartilhamento nativo falhar, segue pro fallback abaixo.
+      }
+    }
+
+    if (temTelefone) {
+      const numeroComPais = telefone.length<=11 ? '55'+telefone : telefone;
+      window.open('https://wa.me/' + numeroComPais, '_blank');
+      mostrarToast('WhatsApp do cliente aberto — anexa a imagem que abriu na outra aba.');
+    } else {
+      // Sem telefone salvo: baixa a imagem também, já que não tem pra onde mandar direto.
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = arquivo.name; a.click();
+      URL.revokeObjectURL(url);
+      mostrarToast('Esse cliente não tem telefone salvo — a imagem foi baixada pra você enviar manualmente.');
+    }
+  }
+
+  // ---------- Enviar comprovante (imagem) ----------
+  document.getElementById('btnEnviarNotaWpp').addEventListener('click', async () => {
     if (!ultimaVendaParaNota) return;
     const { cliente, itens, venda } = ultimaVendaParaNota;
-    const telefone = String(cliente.TELEFONE||'').replace(/\D/g,'');
-    const numeroComPais = telefone.length<=11 ? '55'+telefone : telefone;
-
-    const texto = montarTextoReciboVenda(cliente, itens, venda);
-
-    window.open('https://wa.me/' + numeroComPais + '?text=' + encodeURIComponent(texto), '_blank');
-    document.getElementById('notaFiscalWrap').style.display = 'none';
+    try {
+      await enviarComprovanteVenda(cliente, itens, venda);
+      document.getElementById('notaFiscalWrap').style.display = 'none';
+    } catch (e) { mostrarToast('Erro: ' + e.message, 'erro'); }
   });
 
   renderCarrinho();

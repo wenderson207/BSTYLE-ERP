@@ -187,7 +187,13 @@ async function carregarModulo(modulo){
 
     const resp = await fetch('modules/' + modulo.toLowerCase() + '.html');
     if (!resp.ok) throw new Error('Módulo ainda não foi construído (' + resp.status + ').');
-    const html = await resp.text();
+    // Usar resp.text() aqui deixa o navegador "adivinhar" a codificação a partir do
+    // cabeçalho que o servidor manda — e o GitHub Pages nem sempre declara UTF-8
+    // certinho pra arquivos .html, o que corrompia emojis e acentos (viravam "�").
+    // Lendo os bytes crus e decodificando como UTF-8 na mão, isso nunca depende
+    // do que o servidor disser.
+    const bytes = await resp.arrayBuffer();
+    const html = new TextDecoder('utf-8').decode(bytes);
     injetarConteudo(html);
   } catch (e) {
     content.innerHTML = '<div style="padding:40px;color:var(--red);">Erro ao carregar módulo: ' + e.message + '</div>';

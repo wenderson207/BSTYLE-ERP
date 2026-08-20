@@ -222,7 +222,7 @@
 
 <script>
 (async function(){
-  const STATUS_COLUNAS = ['Aberta','Em diagnóstico','Aguardando peça','Em reparo','Pronto','Entregue'];
+  const STATUS_COLUNAS = ['Aberta','Em diagnóstico','Aguardando peça','Em reparo','Pronto','Com Defeito - Devolução','Entregue'];
 
   const ITENS_CHECKLIST = [
     'Tela Display', 'Touch Screen Tela', 'Teclas', 'Sensores de Proximidade', 'Bluetooth',
@@ -357,6 +357,91 @@
   }
 
   /** Mostra de volta a senha/PIN/padrão cadastrado na abertura da OS — clara e legível. */
+  /** Lista os "achados" identificados depois do reparo — separados do checklist de entrada. */
+  function renderListaPosTeste(os){
+    let achados = [];
+    try { achados = JSON.parse(os.PROBLEMAS_POS_TESTE || '[]'); } catch(e) {}
+
+    if (!achados.length) {
+      setHTML('listaPosTeste', '<span style="color:var(--text-tertiary); font-size:12px;">Nenhum problema pós-teste registrado nessa OS.</span>');
+      return;
+    }
+
+    setHTML('listaPosTeste', achados.map((a, i) => `
+      <div style="background:var(--bg-elevated); border:1px solid var(--hairline); border-left:3px solid var(--amber); border-radius:8px; padding:10px 14px; margin-bottom:8px;">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px;">
+          <div style="flex:1;">
+            <span style="font-size:10px; font-weight:700; color:var(--amber); letter-spacing:0.5px;">PÓS-TESTE</span>
+            <span style="font-size:10.5px; color:var(--text-tertiary); margin-left:6px;">${new Date(a.data).toLocaleDateString('pt-BR')}</span>
+            <p style="margin:4px 0 0; font-size:12.5px;">${a.descricao}</p>
+            ${a.valorEstimado ? `<p style="margin:4px 0 0; font-size:12px; color:var(--text-secondary);">Valor estimado: ${moeda(a.valorEstimado)}</p>` : ''}
+          </div>
+          <div style="text-align:right; flex-shrink:0;">
+            <span style="font-size:11px; font-weight:600; color:${a.comunicadoCliente?'var(--mint)':'var(--red)'};">${a.comunicadoCliente ? '✅ Cliente avisado' : '⏳ Não avisado'}</span><br>
+            ${!a.comunicadoCliente ? `<button class="btn" style="padding:5px 9px; font-size:11px; margin-top:6px;" onclick="window.__marcarAvisadoPosTeste(${i})">Marcar avisado</button>
+            <button class="btn" style="padding:5px 9px; font-size:11px; margin-top:6px; color:var(--mint);" onclick="window.__avisarWhatsappPosTeste(${i})">💬 WhatsApp</button>` : ''}
+          </div>
+        </div>
+      </div>`).join(''));
+  }
+
+  /** Liga os eventos do formulário de pós-teste — precisa ser chamado toda vez que a
+   * OS é aberta, porque esse HTML é recriado a cada vez (não existe na carga inicial). */
+  function ligarEventosPosTeste(){
+    document.getElementById('btnNovoPosTeste').addEventListener('click', () => {
+      document.getElementById('formNovoPosTeste').style.display = 'block';
+      document.getElementById('btnNovoPosTeste').style.display = 'none';
+      ['fPosTesteDescricao','fPosTesteValor'].forEach(id => document.getElementById(id).value = '');
+      document.getElementById('fPosTesteComunicado').checked = false;
+    });
+    document.getElementById('btnCancelarPosTeste').addEventListener('click', () => {
+      document.getElementById('formNovoPosTeste').style.display = 'none';
+      document.getElementById('btnNovoPosTeste').style.display = 'inline-flex';
+    });
+
+    document.getElementById('btnSalvarPosTeste').addEventListener('click', async () => {
+      const descricao = document.getElementById('fPosTesteDescricao').value.trim();
+      if (!descricao){ mostrarToast('Descreve o que foi identificado.', 'erro'); return; }
+      try {
+        if (!(await checarPermissao('ASSISTENCIA','EDITAR'))){ mostrarToast('Sem permissão.', 'erro'); return; }
+        let achados = [];
+        try { achados = JSON.parse(osAtual.PROBLEMAS_POS_TESTE || '[]'); } catch(e) {}
+        achados.push({
+          descricao, data: new Date().toISOString(),
+          valorEstimado: Number(document.getElementById('fPosTesteValor').value) || 0,
+          comunicadoCliente: document.getElementById('fPosTesteComunicado').checked
+        });
+        await dbUpdate('ASSISTENCIAS', osAtual.ID, { PROBLEMAS_POS_TESTE: JSON.stringify(achados) });
+        osAtual.PROBLEMAS_POS_TESTE = JSON.stringify(achados);
+        renderListaPosTeste(osAtual);
+        document.getElementById('formNovoPosTeste').style.display = 'none';
+        document.getElementById('btnNovoPosTeste').style.display = 'inline-flex';
+        mostrarToast('Problema pós-teste registrado.');
+      } catch (e) { mostrarToast('Erro: ' + e.message, 'erro'); }
+    });
+  }
+
+  window.__marcarAvisadoPosTeste = async (indice) => {
+    try {
+      let achados = JSON.parse(osAtual.PROBLEMAS_POS_TESTE || '[]');
+      achados[indice].comunicadoCliente = true;
+      await dbUpdate('ASSISTENCIAS', osAtual.ID, { PROBLEMAS_POS_TESTE: JSON.stringify(achados) });
+      osAtual.PROBLEMAS_POS_TESTE = JSON.stringify(achados);
+      renderListaPosTeste(osAtual);
+      mostrarToast('Marcado como avisado.');
+    } catch (e) { mostrarToast('Erro: ' + e.message, 'erro'); }
+  };
+
+  window.__avisarWhatsappPosTeste = (indice) => {
+    const achados = JSON.parse(osAtual.PROBLEMAS_POS_TESTE || '[]');
+    const achado = achados[indice];
+    const cliente = clientes.find(c => c.ID === osAtual.CLIENTE_ID);
+    if (!cliente || !cliente.TELEFONE){ mostrarToast('Esse cliente não tem telefone cadastrado.', 'erro'); return; }
+    const telefone = String(cliente.TELEFONE).replace(/\D/g,'');
+    const texto = `Olá, ${cliente.NOME}! Durante o reparo do seu aparelho (OS ${osAtual.NUMERO_OS}), identificamos um problema adicional que não pôde ser detectado antes do conserto: *${achado.descricao}*.${achado.valorEstimado ? '\n\nValor estimado pra esse reparo: ' + moeda(achado.valorEstimado) + '.' : ''}\n\nQualquer dúvida, estamos à disposição!`;
+    window.open('https://wa.me/55' + telefone + '?text=' + encodeURIComponent(texto), '_blank');
+  };
+
   function montarVisualizacaoSenha(tipo, valor){
     if (!tipo || !valor) return '<span style="color:var(--text-tertiary); font-size:12.5px;">Nenhum desbloqueio informado na abertura desta OS.</span>';
 
@@ -500,25 +585,34 @@
   });
 
   function cartaoOS(o){
-    return `<div class="kanban-card" onclick="window.__abrirOS('${o.ID}')"><div style="color:var(--mint); font-family:var(--font-mono); font-size:11px;">${o.NUMERO_OS}</div><b>${o.MARCA||''} ${o.MODELO||''}</b><div style="color:var(--text-tertiary);">${o.DEFEITO_INFORMADO||''}</div></div>`;
+    const ehDevolucao = o.STATUS === 'Com Defeito - Devolução';
+    const estiloExtra = ehDevolucao ? 'border-color:var(--red); background:rgba(255,92,92,0.08);' : '';
+    const corNumero = ehDevolucao ? 'var(--red)' : 'var(--mint)';
+    return `<div class="kanban-card" style="${estiloExtra}" onclick="window.__abrirOS('${o.ID}')">
+      <div style="color:${corNumero}; font-family:var(--font-mono); font-size:11px;">${o.NUMERO_OS}</div>
+      <b>${o.MARCA||''} ${o.MODELO||''}</b>
+      <div style="color:var(--text-tertiary);">${o.DEFEITO_INFORMADO||''}</div>
+      ${ehDevolucao ? '<div style="color:var(--red); font-size:10.5px; font-weight:700; margin-top:4px;">⚠ Devolução sem reparo</div>' : ''}
+    </div>`;
   }
 
   function renderKanban(){
     const lista = ordensFiltradas();
     setHTML('kanban', STATUS_COLUNAS.map(status => {
       const doStatus = lista.filter(o => o.STATUS === status);
-      if (!doStatus.length) return `<div class="kanban-col"><h4>${status} (0)</h4><div style="color:var(--text-tertiary); font-size:11.5px;">Nenhuma OS.</div></div>`;
+      const tituloColuna = status === 'Com Defeito - Devolução' ? `<h4 style="color:var(--red);">⚠ ${status} (${doStatus.length})</h4>` : `<h4>${status} (${doStatus.length})</h4>`;
+      if (!doStatus.length) return `<div class="kanban-col">${tituloColuna}<div style="color:var(--text-tertiary); font-size:11.5px;">Nenhuma OS.</div></div>`;
 
       // A coluna "Entregue" costuma acumular muita coisa com o tempo — fica recolhida, com uma seta pra abrir quando quiser ver.
       if (status === 'Entregue') {
-        return `<div class="kanban-col"><h4>${status} (${doStatus.length})</h4>
+        return `<div class="kanban-col">${tituloColuna}
           <div class="entregues-toggle" id="toggleEntregues">
             <span><span class="seta">▶</span> ${doStatus.length} entregue${doStatus.length>1?'s':''} — clique pra ver</span>
           </div>
           <div class="entregues-lista" id="listaEntregues">${doStatus.map(cartaoOS).join('')}</div>
         </div>`;
       }
-      return `<div class="kanban-col"><h4>${status} (${doStatus.length})</h4>${doStatus.map(cartaoOS).join('')}</div>`;
+      return `<div class="kanban-col">${tituloColuna}${doStatus.map(cartaoOS).join('')}</div>`;
     }).join(''));
 
     const toggle = document.getElementById('toggleEntregues');
@@ -688,6 +782,10 @@
         <div class="ffield"><label>Status</label><select id="vStatus">${STATUS_COLUNAS.map(s => `<option value="${s}" ${s===osAtual.STATUS?'selected':''}>${s}</option>`).join('')}</select></div>
         <div class="ffield"><label>Previsão de entrega</label><input id="vPrazo" type="date" value="${osAtual.PRAZO||''}"></div>
       </div>
+      <div class="ffield" id="wrapObsDevolucao" style="display:none; background:rgba(255,92,92,0.08); border:1px solid var(--red); border-radius:10px; padding:12px 14px;">
+        <label style="color:var(--red);">⚠ O que houve? (obrigatório pra devolução)</label>
+        <textarea id="vObsDevolucao" style="width:100%; min-height:70px; background:var(--bg-elevated); border:1px solid var(--hairline); color:var(--text-primary); padding:10px 12px; border-radius:8px; font-size:13px; font-family:inherit; box-sizing:border-box;" placeholder="Ex.: peça não compatível, defeito na placa que não compensa o reparo, cliente desistiu do orçamento...">${osAtual.OBSERVACAO_DEVOLUCAO||''}</textarea>
+      </div>
       <div class="section-title">🔒 Desbloqueio do aparelho</div>
       <div id="visualizacaoSenha" style="background:var(--bg-elevated); border:1px solid var(--hairline); border-radius:10px; padding:14px 16px; margin-bottom:16px;"></div>
       <div class="section-title">Aparelho</div>
@@ -706,6 +804,22 @@
           <tfoot><tr><td style="text-align:right; font-weight:600;">Total das peças:</td><td style="font-weight:700;" id="totalPecasVer">R$ 0,00</td></tr></tfoot>
         </table>
       </div>
+      <div class="section-title">🔍 Problemas identificados após o reparo (pós-teste)</div>
+      <p style="color:var(--text-secondary); font-size:12px; margin:0 0 10px;">Pra quando o aparelho chegou sem poder ser testado (ex.: não ligava) e, depois de consertar o problema principal, você percebe outro defeito — tipo alto-falante, câmera, etc. Fica registrado separado do checklist de entrada, com a data e se o cliente já foi avisado.</p>
+      <div id="listaPosTeste" style="margin-bottom:10px;"></div>
+      <div id="formNovoPosTeste" style="display:none; background:var(--bg-elevated); border:1px solid var(--hairline); border-radius:10px; padding:14px 16px; margin-bottom:12px;">
+        <div class="ffield"><label>O que foi identificado?</label><textarea id="fPosTesteDescricao" style="min-height:50px;" placeholder="Ex.: Alto-falante com chiado, identificado ao testar após a troca de tela"></textarea></div>
+        <div class="frow2">
+          <div class="ffield"><label>Valor estimado do reparo (R$, opcional)</label><input id="fPosTesteValor" type="number" step="0.01"></div>
+          <div class="ffield"><label style="display:flex; align-items:center; gap:6px; margin-top:20px;"><input type="checkbox" id="fPosTesteComunicado"> Já avisei o cliente</label></div>
+        </div>
+        <div style="display:flex; gap:8px; justify-content:flex-end;">
+          <button class="btn" type="button" id="btnCancelarPosTeste">Cancelar</button>
+          <button class="btn btn-primary" type="button" id="btnSalvarPosTeste">Salvar achado</button>
+        </div>
+      </div>
+      <button class="btn" type="button" id="btnNovoPosTeste" style="margin-bottom:16px;">+ Registrar problema pós-teste</button>
+
       <div class="frow2">
         <div class="ffield"><label>Valor do serviço (R$)</label><input id="vValor" type="number" step="0.01" value="${osAtual.VALOR_SERVICO||0}"></div>
         <div class="ffield"><label>Técnico responsável</label><input id="vTecnico" value="${osAtual.TECNICO_RESPONSAVEL||''}"></div>
@@ -730,6 +844,15 @@
     renderChecklistLeitura(osAtual.CHECKLIST_FUNCIONAL, osAtual.CHECKLIST_SEM_TESTE);
     setHTML('visualizacaoSenha', montarVisualizacaoSenha(osAtual.SENHA_TIPO, osAtual.SENHA_VALOR));
     renderAreaPagamento(osAtual);
+    renderListaPosTeste(osAtual);
+    ligarEventosPosTeste();
+
+    // Mostra/esconde o campo de observação conforme o status escolhido.
+    const selectStatus = document.getElementById('vStatus');
+    const wrapObs = document.getElementById('wrapObsDevolucao');
+    function atualizarVisibilidadeObsDevolucao(){ wrapObs.style.display = selectStatus.value === 'Com Defeito - Devolução' ? 'block' : 'none'; }
+    atualizarVisibilidadeObsDevolucao();
+    selectStatus.addEventListener('change', atualizarVisibilidadeObsDevolucao);
 
     let itensPecasExistentes = [];
     try { itensPecasExistentes = JSON.parse(osAtual.PECAS_ITENS || '[]'); } catch (e) { itensPecasExistentes = []; }
@@ -748,9 +871,16 @@
     try {
       if (!(await checarPermissao('ASSISTENCIA','EDITAR'))){ mostrarToast('Sem permissão.', 'erro'); return; }
       const novoStatus = document.getElementById('vStatus').value;
+      const obsDevolucao = document.getElementById('vObsDevolucao').value.trim();
+      if (novoStatus === 'Com Defeito - Devolução' && !obsDevolucao) {
+        mostrarToast('Descreve o que houve antes de marcar como devolução.', 'erro');
+        document.getElementById('vObsDevolucao').focus();
+        return;
+      }
       const pecasVer = coletarPecas('linhasPecasVer');
       const dados = {
         STATUS: novoStatus, PRAZO: document.getElementById('vPrazo').value,
+        OBSERVACAO_DEVOLUCAO: novoStatus === 'Com Defeito - Devolução' ? obsDevolucao : (osAtual.OBSERVACAO_DEVOLUCAO || ''),
         MARCA: document.getElementById('vMarca').value.trim(), MODELO: document.getElementById('vModelo').value.trim(),
         IMEI: document.getElementById('vImei').value.trim(), DEFEITO_INFORMADO: document.getElementById('vDefeito').value.trim(),
         DIAGNOSTICO: document.getElementById('vDiagnostico').value.trim(),
@@ -867,6 +997,21 @@
         doc.setFont(undefined,'normal');
       });
       y += Math.ceil(ITENS_CHECKLIST.length/colunas)*4 + 4;
+    }
+
+    // Problemas identificados depois do reparo (pós-teste) — só aparece se tiver algum registrado.
+    let achadosPosTeste = [];
+    try { achadosPosTeste = JSON.parse(os.PROBLEMAS_POS_TESTE || '[]'); } catch(e) {}
+    if (achadosPosTeste.length) {
+      doc.setFontSize(7); doc.setFont(undefined,'bold'); doc.setTextColor(200,140,20);
+      doc.text('⚠ PROBLEMAS IDENTIFICADOS APÓS O REPARO (PÓS-TESTE)', xEsq, y); y += 4;
+      doc.setFontSize(7); doc.setFont(undefined,'normal'); doc.setTextColor(20);
+      achadosPosTeste.forEach(a => {
+        const linhaTexto = doc.splitTextToSize('• ' + a.descricao + (a.valorEstimado ? ' (' + moeda(a.valorEstimado) + ')' : '') + ' — ' + (a.comunicadoCliente ? 'cliente avisado' : 'cliente NÃO avisado ainda'), largura);
+        doc.text(linhaTexto, xEsq, y);
+        y += linhaTexto.length * 3.4 + 1.5;
+      });
+      y += 2;
     }
 
     y = desenharTabelaPecasOS(doc, os, xEsq, xDir, largura, y);

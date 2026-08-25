@@ -47,7 +47,7 @@
   let itens = [], clientes = [], empresas = [], produtos = [], ordens = [];
   let garantiaAtual = null;
 
-  function dataBR(v){ return v ? new Date(v).toLocaleDateString('pt-BR') : '—'; }
+  function dataBR(v){ return v ? parseDataLocal(v).toLocaleDateString('pt-BR') : '—'; }
   function moeda(v){ return (Number(v)||0).toLocaleString('pt-BR', { style:'currency', currency:'BRL' }); }
   function nomeCliente(id){ const c = clientes.find(x => x.ID === id); return c ? c.NOME : '—'; }
   function clientePorId(id){ return clientes.find(x => x.ID === id) || {}; }

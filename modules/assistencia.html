@@ -5,7 +5,8 @@
   .view-panel{ display:none; }
   .view-panel.active{ display:block; }
 
-  .kanban{ display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:12px; }
+  .kanban{ display:flex; gap:12px; overflow-x:auto; -webkit-overflow-scrolling:touch; padding-bottom:8px; scroll-snap-type:x proximity; }
+  .kanban-col{ flex:0 0 240px; scroll-snap-align:start; }
   .kanban-col{ background:var(--bg-surface); border:1px solid var(--hairline); border-radius:12px; padding:12px; }
   .kanban-col h4{ font-size:11px; text-transform:uppercase; color:var(--text-tertiary); font-family:var(--font-mono); margin:0 0 10px; }
   .kanban-card{ background:var(--bg-elevated); border:1px solid var(--hairline); border-radius:9px; padding:10px 12px; margin-bottom:8px; font-size:12px; cursor:pointer; }
@@ -919,9 +920,10 @@
     celula('CPF', cliente.CPF, xEsq+largura*0.75, largura*0.25, y, h1);
     y += h1;
 
-    celula('APARELHO', (os.MARCA||'')+' '+(os.MODELO||''), xEsq, largura*0.45, y, h1);
-    celula('IMEI / Nº SÉRIE', os.IMEI, xEsq+largura*0.45, largura*0.30, y, h1);
-    celula('TÉCNICO', os.TECNICO_RESPONSAVEL, xEsq+largura*0.75, largura*0.25, y, h1);
+    celula('APARELHO', (os.MARCA||'')+' '+(os.MODELO||''), xEsq, largura*0.36, y, h1);
+    celula('IMEI / Nº SÉRIE', os.IMEI, xEsq+largura*0.36, largura*0.24, y, h1);
+    celula('TÉCNICO', os.TECNICO_RESPONSAVEL, xEsq+largura*0.60, largura*0.18, y, h1);
+    celula('PREVISÃO DE ENTREGA', os.PRAZO ? parseDataLocal(os.PRAZO).toLocaleDateString('pt-BR') : '—', xEsq+largura*0.78, largura*0.22, y, h1);
     y += h1;
 
     celula('ACESSÓRIOS ENTREGUES', os.ACESSORIOS_ENTREGUES, xEsq, largura, y, h1);
@@ -1047,7 +1049,7 @@
     y += h1;
 
     celula('APARELHO', (os.MARCA||'')+' '+(os.MODELO||''), xEsq, largura*0.7, y, h1);
-    celula('PRAZO', os.PRAZO ? parseDataLocal(os.PRAZO).toLocaleDateString('pt-BR') : '—', xEsq+largura*0.7, largura*0.3, y, h1);
+    celula('PREVISÃO DE ENTREGA', os.PRAZO ? parseDataLocal(os.PRAZO).toLocaleDateString('pt-BR') : '—', xEsq+largura*0.7, largura*0.3, y, h1);
     y += h1;
 
     const alturaDefeito = 10;

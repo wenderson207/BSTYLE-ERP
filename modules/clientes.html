@@ -219,7 +219,7 @@
 
   // ---------- Ficha consolidada (compras + assistências + garantias) ----------
   const modalFicha = document.getElementById('modalFicha');
-  function dataBR(v){ return v ? new Date(v).toLocaleDateString('pt-BR') : '—'; }
+  function dataBR(v){ return v ? parseDataLocal(v).toLocaleDateString('pt-BR') : '—'; }
 
   window.__verFicha = async (id) => {
     const cliente = clientes.find(x => x.ID === id);

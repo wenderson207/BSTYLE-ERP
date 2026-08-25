@@ -114,7 +114,7 @@
 (async function(){
   let todos = [], abaAtual = 'dashboard';
   function moeda(v){ return (Number(v)||0).toLocaleString('pt-BR', { style:'currency', currency:'BRL' }); }
-  function dataBR(v){ return v ? new Date(v).toLocaleDateString('pt-BR') : '—'; }
+  function dataBR(v){ return v ? parseDataLocal(v).toLocaleDateString('pt-BR') : '—'; }
 
   function tentarCarregarScript(src, timeoutMs){
     return new Promise((resolve) => {

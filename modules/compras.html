@@ -39,7 +39,7 @@
   let compras = [], fornecedores = [], produtos = [], empresas = [], produtosDaLojaCompra = [];
 
   function moeda(v){ return (Number(v)||0).toLocaleString('pt-BR', { style:'currency', currency:'BRL' }); }
-  function dataBR(v){ return v ? new Date(v).toLocaleDateString('pt-BR') : '—'; }
+  function dataBR(v){ return v ? parseDataLocal(v).toLocaleDateString('pt-BR') : '—'; }
   function nomeFornecedor(id){ const f = fornecedores.find(x=>x.ID===id); return f?f.NOME:'—'; }
   function nomeLoja(id){ if (!id) return '—'; const e = empresas.find(x=>x.ID===id); return e?e.NOME:'—'; }
 

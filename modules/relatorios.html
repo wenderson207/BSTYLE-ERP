@@ -71,7 +71,7 @@
   function nomeUsuario(id){ const u = usuarios.find(x=>x.ID===id); return u?u.NOME:(id||'—'); }
   function moeda(v){ return (Number(v)||0).toLocaleString('pt-BR', { style:'currency', currency:'BRL' }); }
   function dataHoraBR(v){ return v ? new Date(v).toLocaleString('pt-BR', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' }) : '—'; }
-  function dataBR(v){ return v ? new Date(v).toLocaleDateString('pt-BR') : '—'; }
+  function dataBR(v){ return v ? parseDataLocal(v).toLocaleDateString('pt-BR') : '—'; }
 
   function tentarCarregarScript(src, timeoutMs){
     return new Promise((resolve) => {

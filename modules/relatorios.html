@@ -130,6 +130,16 @@
       ],
       campoData: v => v.DATA_PAGAMENTO || v.DATA_VENCIMENTO, campoCategoria: f => f.CATEGORIA || 'Sem categoria', rotuloCategoria: 'Por categoria', campoValor: f => Number(f.VALOR)||0, mostrarHora: true
     },
+    { id:'produtos_por_cliente', nome:'Produtos por Cliente', colecao:'VENDAS', agrupadoPorCliente: true,
+      colunas: ['Cliente','Produto','Quantidade','Valor Unitário','Valor Total'],
+      linha: item => [item.clienteNome, item.produtoNome, item.quantidade, moeda(item.valorUnitMedio), moeda(item.valorTotal)],
+      resumo: lista => [
+        ['Clientes', new Set(lista.map(i=>i.clienteId)).size],
+        ['Produtos diferentes', new Set(lista.map(i=>i.produtoNome)).size],
+        ['Valor total', moeda(lista.reduce((s,i)=>s+i.valorTotal,0))]
+      ],
+      campoData: 'DATA'
+    },
     { id:'compras', nome:'Compras', colecao:'COMPRAS',
       colunas: ['Data','Valor total','Status'],
       linha: c => [dataBR(c.DATA), moeda(c.VALOR_TOTAL), c.STATUS],
@@ -226,9 +236,32 @@
       });
     }
 
+    if (relAtivo.agrupadoPorCliente) lista = agregarPorClienteProduto(lista);
+
     dadosFiltrados = lista;
     renderTabela();
     renderGraficosRelatorio();
+  }
+
+  /** Cruza as vendas filtradas com os itens delas, juntando tudo por (cliente, produto). */
+  function agregarPorClienteProduto(vendasFiltradas){
+    const idsVendas = new Set(vendasFiltradas.map(v => v.ID));
+    const chaveParaGrupo = {}; // "clienteId::produtoNome" -> { ... }
+
+    itensVendaGlobal.filter(i => idsVendas.has(i.VENDA_ID)).forEach(item => {
+      const venda = vendasFiltradas.find(v => v.ID === item.VENDA_ID);
+      const clienteId = venda.CLIENTE_ID || 'sem-cliente';
+      const clienteNome = venda.CLIENTE_ID ? nomeCliente(venda.CLIENTE_ID) : 'Cliente avulso (sem cadastro)';
+      const produto = produtosGlobal.find(p => p.ID === item.PRODUTO_ID);
+      const produtoNome = produto ? produto.NOME : (item.OS_ID ? 'Serviço de assistência técnica' : 'Produto removido');
+
+      const chave = clienteId + '::' + produtoNome;
+      if (!chaveParaGrupo[chave]) chaveParaGrupo[chave] = { clienteId, clienteNome, produtoNome, quantidade: 0, valorTotal: 0 };
+      chaveParaGrupo[chave].quantidade += Number(item.QUANTIDADE) || 0;
+      chaveParaGrupo[chave].valorTotal += (Number(item.QUANTIDADE)||0) * (Number(item.PRECO_UNITARIO)||0);
+    });
+
+    return Object.values(chaveParaGrupo).map(g => Object.assign(g, { valorUnitMedio: g.quantidade ? g.valorTotal / g.quantidade : 0 }));
   }
 
   async function renderGraficosRelatorio(){
@@ -380,6 +413,8 @@
   }
 
   function renderTabela(){
+    if (relAtivo.agrupadoPorCliente) { renderTabelaAgrupadaPorCliente(); return; }
+
     const linhasRenderizadas = dadosFiltrados.map(item => relAtivo.linha(item));
     const linhasOrdenadas = ordenarLinhas(linhasRenderizadas);
 
@@ -391,6 +426,42 @@
     setHTML('relTbody', linhasOrdenadas.length
       ? linhasOrdenadas.map(linha => '<tr>' + linha.map(v => `<td>${v}</td>`).join('') + '</tr>').join('')
       : `<tr class="empty-row"><td colspan="${relAtivo.colunas.length}">Nenhum registro encontrado.</td></tr>`);
+
+    setHTML('relResumo', relAtivo.resumo(dadosFiltrados).map(([lbl,val]) => `<div class="item"><div class="lbl">${lbl}</div><div class="val">${val}</div></div>`).join(''));
+  }
+
+  /** Visão especial: agrupa as linhas (já vêm no formato cliente+produto) por cliente,
+   * mostrando cada um com a lista de produtos que comprou embaixo do nome dele. */
+  function renderTabelaAgrupadaPorCliente(){
+    setHTML('relThead', '<tr><th>Cliente / Produtos comprados</th><th></th><th>Qtd.</th><th>Val. Unit.</th><th>Total</th></tr>');
+
+    if (!dadosFiltrados.length){
+      setHTML('relTbody', '<tr class="empty-row"><td colspan="5">Nenhuma compra encontrada com os filtros atuais.</td></tr>');
+      setHTML('relResumo', relAtivo.resumo(dadosFiltrados).map(([lbl,val]) => `<div class="item"><div class="lbl">${lbl}</div><div class="val">${val}</div></div>`).join(''));
+      return;
+    }
+
+    const porCliente = {};
+    dadosFiltrados.forEach(item => {
+      if (!porCliente[item.clienteId]) porCliente[item.clienteId] = { nome: item.clienteNome, produtos: [], totalGasto: 0 };
+      porCliente[item.clienteId].produtos.push(item);
+      porCliente[item.clienteId].totalGasto += item.valorTotal;
+    });
+    const clientesOrdenados = Object.values(porCliente).sort((a,b) => b.totalGasto - a.totalGasto);
+
+    setHTML('relTbody', clientesOrdenados.map(c => `
+      <tr style="background:var(--bg-elevated);">
+        <td colspan="4" style="font-weight:700;">👤 ${c.nome}</td>
+        <td style="font-weight:700; color:var(--mint);">${moeda(c.totalGasto)}</td>
+      </tr>
+      ${c.produtos.sort((a,b)=>b.valorTotal-a.valorTotal).map(p => `
+        <tr>
+          <td colspan="2" style="padding-left:32px; color:var(--text-secondary);">${p.produtoNome}</td>
+          <td>${p.quantidade}</td>
+          <td>${moeda(p.valorUnitMedio)}</td>
+          <td>${moeda(p.valorTotal)}</td>
+        </tr>`).join('')}
+    `).join(''));
 
     setHTML('relResumo', relAtivo.resumo(dadosFiltrados).map(([lbl,val]) => `<div class="item"><div class="lbl">${lbl}</div><div class="val">${val}</div></div>`).join(''));
   }
@@ -413,6 +484,41 @@
   document.getElementById('btnExportPdf').addEventListener('click', () => {
     if (!relAtivo || !dadosFiltrados.length){ mostrarToast('Nada pra exportar.', 'erro'); return; }
     const { jsPDF } = window.jspdf;
+
+    if (relAtivo.agrupadoPorCliente) {
+      const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+      doc.setFontSize(14); doc.setFont(undefined,'bold'); doc.text('Produtos comprados por cliente', 15, 18);
+      doc.setFontSize(9); doc.setFont(undefined,'normal'); doc.setTextColor(120);
+      doc.text('Gerado em ' + new Date().toLocaleString('pt-BR'), 15, 24);
+      doc.setTextColor(20);
+
+      const porCliente = {};
+      dadosFiltrados.forEach(item => {
+        if (!porCliente[item.clienteId]) porCliente[item.clienteId] = { nome: item.clienteNome, produtos: [], totalGasto: 0 };
+        porCliente[item.clienteId].produtos.push(item);
+        porCliente[item.clienteId].totalGasto += item.valorTotal;
+      });
+      const clientesOrdenados = Object.values(porCliente).sort((a,b) => b.totalGasto - a.totalGasto);
+
+      let y = 34;
+      clientesOrdenados.forEach(c => {
+        if (y > 275) { doc.addPage(); y = 20; }
+        doc.setFontSize(11); doc.setFont(undefined,'bold'); doc.setTextColor(226,64,28);
+        doc.text(c.nome + ' — ' + moeda(c.totalGasto), 15, y);
+        y += 6;
+        doc.setFontSize(9.5); doc.setFont(undefined,'normal'); doc.setTextColor(20);
+        c.produtos.sort((a,b)=>b.valorTotal-a.valorTotal).forEach(p => {
+          if (y > 280) { doc.addPage(); y = 20; }
+          doc.text('• ' + p.produtoNome + ' (' + moeda(p.valorUnitMedio) + ', ' + p.quantidade + 'x) = ' + moeda(p.valorTotal), 20, y);
+          y += 5.5;
+        });
+        y += 4;
+      });
+
+      doc.save('Produtos_por_Cliente.pdf');
+      return;
+    }
+
     const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
     doc.setFontSize(14); doc.text('Relatório de ' + relAtivo.nome, 14, 15);
     doc.setFontSize(9);

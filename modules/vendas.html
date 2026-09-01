@@ -1012,7 +1012,17 @@
             for (var i=0; i<imgs.length; i++){ if (imgs[i].complete) seguir(); else { imgs[i].onload = seguir; imgs[i].onerror = seguir; } }
             setTimeout(cb, 2000);
           }
-          function prontoParaImprimir(){ setTimeout(function(){ window.print(); }, 150); }
+          function prontoParaImprimir(){
+            // Força o navegador a recalcular o tamanho da página AGORA, com o QR Code já
+            // inserido — sem isso, ele podia calcular o tamanho do papel antes do QR entrar
+            // na tela, e cortar o final do comprovante na hora de imprimir de verdade
+            // (mesmo aparecendo certinho na tela normal).
+            document.body.offsetHeight; // força o navegador a "olhar" o tamanho de novo
+            setTimeout(function(){
+              document.body.offsetHeight;
+              window.print();
+            }, 400);
+          }
           function usarLinkComoTexto(motivo){
             console.error('QR Code do Instagram não gerou — usando o link em texto. Motivo:', motivo);
             var elLink = document.getElementById('linkInstagramTexto');

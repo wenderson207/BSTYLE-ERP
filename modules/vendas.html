@@ -87,7 +87,8 @@
     <button class="btn btn-primary" style="width:100%; margin-top:16px; justify-content:center;" id="btnFinalizar">Finalizar venda</button>
     <div id="notaFiscalWrap" style="display:none; margin-top:12px; padding:12px; border-radius:8px; background:rgba(47,225,168,0.08); border:1px solid rgba(47,225,168,0.3); text-align:center;">
       <div style="font-size:12.5px; color:var(--mint); font-weight:600; margin-bottom:8px;">✅ Venda concluída!</div>
-      <button class="btn btn-primary" style="width:100%; justify-content:center;" id="btnEnviarNotaWpp">💬 Enviar nota via WhatsApp</button>
+      <button class="btn btn-primary" style="width:100%; justify-content:center; margin-bottom:8px;" id="btnEnviarNotaWpp">💬 Enviar nota via WhatsApp</button>
+      <button class="btn" style="width:100%; justify-content:center;" id="btnImprimirTermica">🖨️ Imprimir na impressora térmica (58mm)</button>
     </div>
   </div>
 </div>
@@ -637,6 +638,7 @@
           ${v.STATUS!=='Cancelada' ? `
           <button class="btn-icone" title="Editar cliente / observação" onclick="window.__editarVenda('${v.ID}')">✏️</button>
           <button class="btn-icone" title="Enviar comprovante" style="color:var(--mint);" onclick="window.__enviarReciboHistorico('${v.ID}')">💬</button>
+          <button class="btn-icone" title="Imprimir térmica 58mm" onclick="window.__imprimirTermicaHistorico('${v.ID}')">🖨️</button>
           <button class="btn-icone" title="Excluir venda" style="color:var(--red);" onclick="window.__excluirVenda('${v.ID}')">🗑️</button>` : ''}
         </div>
       </td>
@@ -930,6 +932,136 @@
    *    preenchido) — só falta anexar a imagem, que já abre pronta pra isso.
    * 3) Se NÃO tem telefone, só gera a imagem mesmo, sem tentar abrir WhatsApp nenhum.
    */
+  /** Monta o HTML do comprovante formatado pra impressora térmica de 58mm — texto
+   * corrido, sem cor, pensado pra papel de rolo (impressoras tipo "OI VIDA" e afins). */
+  function montarHtmlTermica58mm(venda, cliente, itens, logoDataUrl){
+    const empresa = empresasCarregadas.find(e => e.ID === venda.EMPRESA_ID) || empresasCarregadas[0] || {};
+    const endereco = [empresa.RUA, empresa.NUMERO].filter(Boolean).join(', ') + (empresa.BAIRRO ? ' - ' + empresa.BAIRRO : '');
+    const subtotal = itens.reduce((s,i)=>s+i.QUANTIDADE*i.PRECO_UNITARIO,0);
+    const linhasPagamento = (venda.FORMA_PAGAMENTO === 'Combinado' && venda.FORMAS_PAGAMENTO && venda.FORMAS_PAGAMENTO.length)
+      ? venda.FORMAS_PAGAMENTO.map(f => f.forma + ': ' + moeda(f.valor)).join('<br>')
+      : venda.FORMA_PAGAMENTO;
+    const linha = '- - - - - - - - - - - - - - - -';
+    const linkInstagram = empresa.INSTAGRAM ? 'https://instagram.com/' + empresa.INSTAGRAM : '';
+
+    return `<!DOCTYPE html><html><head><meta charset="utf-8">
+      <style>
+        @page { size: 58mm auto; margin: 0; }
+        * { box-sizing:border-box; }
+        body { width:54mm; margin:0 auto; padding:2mm 2mm 6mm; font-family:'Courier New',monospace; font-size:9.5px; line-height:1.45; color:#000; }
+        .centro { text-align:center; }
+        .logo { max-width:34mm; max-height:16mm; display:block; margin:0 auto 2mm; }
+        .nome-loja { font-size:12px; font-weight:700; }
+        .pequeno { font-size:8.5px; }
+        .linha-tracejada { text-align:center; margin:2mm 0; letter-spacing:-0.5px; }
+        .item-linha { display:flex; justify-content:space-between; gap:4px; margin:1mm 0; }
+        .item-nome { flex:1; word-break:break-word; }
+        .totais div { display:flex; justify-content:space-between; margin:0.8mm 0; }
+        .total-final { font-size:12px; font-weight:700; border-top:1px dashed #000; padding-top:1.5mm; margin-top:1.5mm; }
+        #qrcode{ display:flex; justify-content:center; margin:2mm 0; }
+        #qrcode table{ border-collapse:collapse; }
+        #qrcode td{ padding:0; }
+      </style></head>
+      <body>
+        <div class="centro">
+          ${logoDataUrl ? `<img class="logo" src="${logoDataUrl}">` : ''}
+          <div class="nome-loja">BSTYLE - Eletrônicos & Acessórios</div>
+          ${endereco ? `<div class="pequeno">${endereco}</div>` : ''}
+          ${empresa.WHATSAPP ? `<div class="pequeno">Tel: ${empresa.WHATSAPP}</div>` : ''}
+          ${empresa.CNPJ ? `<div class="pequeno">CNPJ: ${empresa.CNPJ}</div>` : ''}
+        </div>
+        <div class="linha-tracejada">${linha}</div>
+        <div class="centro pequeno">COMPROVANTE DE VENDA</div>
+        <div class="pequeno">Data: ${dataHoraBR(venda.DATA)}</div>
+        <div class="pequeno">Impresso: ${new Date().toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})}</div>
+        <div class="pequeno">Cliente: ${cliente.NOME||'Cliente avulso'}</div>
+        <div class="linha-tracejada">${linha}</div>
+
+        ${itens.map(i => `<div class="item-linha">
+          <div class="item-nome">${i.QUANTIDADE}x ${i.NOME}</div>
+          <div>${moeda(i.QUANTIDADE*i.PRECO_UNITARIO)}</div>
+        </div>`).join('')}
+
+        <div class="linha-tracejada">${linha}</div>
+        <div class="totais">
+          <div><span>Subtotal</span><span>${moeda(subtotal)}</span></div>
+          ${venda.DESCONTO ? `<div><span>Desconto</span><span>-${moeda(venda.DESCONTO)}</span></div>` : ''}
+          <div class="total-final"><span>TOTAL</span><span>${moeda(venda.VALOR_TOTAL)}</span></div>
+        </div>
+        <div class="pequeno" style="margin-top:2mm;">Pagamento: ${linhasPagamento}</div>
+        <div class="linha-tracejada">${linha}</div>
+        <div class="centro pequeno">Obrigado pela preferência!</div>
+        <div class="centro pequeno">Guarde este comprovante.</div>
+
+        ${linkInstagram ? `
+        <div id="qrcode"></div>
+        <div class="centro pequeno">@${empresa.INSTAGRAM} no Instagram</div>` : ''}
+
+        <script>
+          // Só manda imprimir depois que a logo (se tiver) carregou de verdade E o QR Code
+          // (se tiver Instagram) já foi gerado — sem isso, corria o risco de imprimir a
+          // página pela metade. O QR já vem prontinho em tabela, funciona sem internet
+          // na hora de imprimir (só precisa de internet uma vez, pra baixar a biblioteca).
+          function esperarImagens(cb){
+            var imgs = document.images;
+            if (!imgs.length) { cb(); return; }
+            var pendentes = imgs.length;
+            var seguir = function(){ pendentes--; if (pendentes <= 0) cb(); };
+            for (var i=0; i<imgs.length; i++){ if (imgs[i].complete) seguir(); else { imgs[i].onload = seguir; imgs[i].onerror = seguir; } }
+            setTimeout(cb, 2000);
+          }
+          function prontoParaImprimir(){ setTimeout(function(){ window.print(); }, 150); }
+          esperarImagens(function(){
+            ${linkInstagram ? `
+            (function(){
+              var s = document.createElement('script');
+              s.src = 'https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.0.3/qrcode.min.js';
+              s.onload = function(){
+                try {
+                  var qr = qrcode(0, 'M');
+                  qr.addData(${JSON.stringify(linkInstagram)});
+                  qr.make();
+                  document.getElementById('qrcode').innerHTML = qr.createTableTag(2.2);
+                } catch(e) {}
+                prontoParaImprimir();
+              };
+              s.onerror = prontoParaImprimir;
+              document.head.appendChild(s);
+            })();` : 'prontoParaImprimir();'}
+          });
+        <\/script>
+      </body></html>`;
+  }
+
+  /** Abre a janela de impressão já formatada pra impressora térmica 58mm — a própria
+   * página gerada dispara a impressão sozinha, depois que o QR Code (se tiver) já estiver pronto. */
+  async function imprimirViaTermica(cliente, itens, venda){
+    let logoDataUrl = null;
+    try { const logo = await carregarLogoComoDataUrl(); logoDataUrl = logo ? logo.url : null; } catch (e) { logoDataUrl = null; }
+
+    const html = montarHtmlTermica58mm(venda, cliente, itens, logoDataUrl);
+    const janela = window.open('', '_blank', 'width=320,height=600');
+    janela.document.write(html);
+    janela.document.close(); janela.focus();
+    // Não precisa esperar nada aqui — a própria página chama window.print() sozinha,
+    // depois que a logo carregou e o QR Code (se tiver) já foi gerado.
+  }
+
+  document.getElementById('btnImprimirTermica').addEventListener('click', async () => {
+    if (!ultimaVendaParaNota) return;
+    const { cliente, itens, venda } = ultimaVendaParaNota;
+    try { await imprimirViaTermica(cliente, itens, venda); }
+    catch (e) { mostrarToast('Erro: ' + e.message, 'erro'); }
+  });
+
+  window.__imprimirTermicaHistorico = async (vendaId) => {
+    const detalhes = await montarDetalhesVenda(vendaId);
+    if (!detalhes){ mostrarToast('Venda não encontrada.', 'erro'); return; }
+    const { venda, cliente, itens } = detalhes;
+    try { await imprimirViaTermica(cliente, itens, venda); }
+    catch (e) { mostrarToast('Erro: ' + e.message, 'erro'); }
+  };
+
   async function enviarComprovanteVenda(cliente, itens, venda){
     mostrarToast('Gerando imagem…');
     const blob = await gerarImagemVenda(venda, cliente, itens);

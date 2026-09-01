@@ -1027,16 +1027,23 @@
               var s = document.createElement('script');
               s.src = 'https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.0.3/qrcode.min.js';
               s.onload = function(){
-                try {
-                  if (typeof qrcode !== 'function') { usarLinkComoTexto('biblioteca carregou mas "qrcode" não é uma função'); return; }
-                  var qr = qrcode(0, 'M');
-                  qr.addData(${JSON.stringify(linkInstagram)});
-                  qr.make();
-                  var tabela = qr.createTableTag(2.2);
-                  if (!tabela || tabela.indexOf('<table') === -1) { usarLinkComoTexto('createTableTag não devolveu uma tabela válida'); return; }
-                  document.getElementById('qrcode').innerHTML = tabela;
-                  prontoParaImprimir();
-                } catch(e) { usarLinkComoTexto('erro ao gerar: ' + e.message); }
+                if (typeof qrcode !== 'function') { usarLinkComoTexto('biblioteca carregou mas "qrcode" não é uma função'); return; }
+                // O "0" (detecção automática de tamanho) tem um bug conhecido nessa biblioteca
+                // e quebra com "Cannot read properties of undefined". A solução é tentar
+                // tamanhos fixos, do menor pro maior, até um dar certo pro tamanho do link.
+                var tabela = null, ultimoErro = null;
+                for (var tamanho = 2; tamanho <= 10 && !tabela; tamanho++) {
+                  try {
+                    var qr = qrcode(tamanho, 'M');
+                    qr.addData(${JSON.stringify(linkInstagram)});
+                    qr.make();
+                    var tentativa = qr.createTableTag(2.2);
+                    if (tentativa && tentativa.indexOf('<table') !== -1) tabela = tentativa;
+                  } catch (e) { ultimoErro = e.message; }
+                }
+                if (!tabela) { usarLinkComoTexto('nenhum tamanho funcionou — último erro: ' + ultimoErro); return; }
+                document.getElementById('qrcode').innerHTML = tabela;
+                prontoParaImprimir();
               };
               s.onerror = function(){ usarLinkComoTexto('não conseguiu carregar a biblioteca do CDN (sem internet ou bloqueado)'); };
               document.head.appendChild(s);

@@ -344,9 +344,12 @@
       return;
     }
 
-    const linhasPagamentos = pagamentos.map((p, i) => `<div style="display:flex; justify-content:space-between; font-size:12px; padding:5px 0; ${i>0?'border-top:1px solid var(--hairline);':''}">
+    const linhasPagamentos = pagamentos.map((p, i) => `<div style="display:flex; justify-content:space-between; align-items:center; font-size:12px; padding:5px 0; ${i>0?'border-top:1px solid var(--hairline);':''}">
       <span style="color:var(--text-secondary);">Parte ${i+1} — ${new Date(p.data).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})} · ${p.forma||'—'}</span>
-      <b style="color:var(--mint);">${moeda(p.valor)}</b>
+      <span style="display:flex; align-items:center; gap:8px;">
+        <b style="color:var(--mint);">${moeda(p.valor)}</b>
+        <button type="button" title="Remover esse pagamento (use se a venda dele foi excluída antes da correção)" onclick="window.__removerPagamentoOS(${i})" style="background:none; border:none; color:var(--text-tertiary); cursor:pointer; font-size:13px; padding:2px 4px;">🗑️</button>
+      </span>
     </div>`).join('');
 
     const statusResumo = saldo <= 0
@@ -354,8 +357,23 @@
       : `<div style="color:var(--amber); font-weight:600; font-size:13px; margin-bottom:8px;">🔶 Parcialmente pago — ${moeda(totalPago)} de ${moeda(Number(os.VALOR_SERVICO||0))} (falta ${moeda(saldo)})</div>`;
 
     setHTML('areaPagamentoOS', statusResumo + linhasPagamentos +
-      (saldo > 0 ? `<div style="font-size:11px; color:var(--text-tertiary); margin-top:8px;">Pro restante, vai na aba Vendas e busca por "${os.NUMERO_OS}" de novo.</div>` : ''));
+      (saldo > 0 ? `<div style="font-size:11px; color:var(--text-tertiary); margin-top:8px;">Pro restante, vai na aba Vendas e busca por "${os.NUMERO_OS}" de novo.</div>` : '') +
+      `<div style="font-size:10.5px; color:var(--text-tertiary); margin-top:10px; padding-top:8px; border-top:1px dashed var(--hairline);">Se um pagamento aqui ficou "preso" porque a venda dele foi excluída antes de existir essa correção, usa o 🗑️ do lado pra remover manualmente.</div>`);
   }
+
+  window.__removerPagamentoOS = async (indice) => {
+    if (!confirm('Remover esse pagamento? Use só se a venda correspondente já foi excluída e ele ficou "preso" aqui por engano. Isso não mexe em nenhuma venda, só tira o registro dessa OS.')) return;
+    try {
+      if (!(await checarPermissao('ASSISTENCIA','EDITAR'))){ mostrarToast('Sem permissão.', 'erro'); return; }
+      let pagamentos = [];
+      try { pagamentos = JSON.parse(osAtual.PAGAMENTOS_OS || '[]'); } catch(e) {}
+      pagamentos.splice(indice, 1);
+      await dbUpdate('ASSISTENCIAS', osAtual.ID, { PAGAMENTOS_OS: JSON.stringify(pagamentos) });
+      osAtual.PAGAMENTOS_OS = JSON.stringify(pagamentos);
+      renderAreaPagamento(osAtual);
+      mostrarToast('Pagamento removido — a OS foi recalculada.');
+    } catch (e) { mostrarToast('Erro: ' + e.message, 'erro'); }
+  };
 
   /** Mostra de volta a senha/PIN/padrão cadastrado na abertura da OS — clara e legível. */
   /** Lista os "achados" identificados depois do reparo — separados do checklist de entrada. */
@@ -442,6 +460,41 @@
     const texto = `Olá, ${cliente.NOME}! Durante o reparo do seu aparelho (OS ${osAtual.NUMERO_OS}), identificamos um problema adicional que não pôde ser detectado antes do conserto: *${achado.descricao}*.${achado.valorEstimado ? '\n\nValor estimado pra esse reparo: ' + moeda(achado.valorEstimado) + '.' : ''}\n\nQualquer dúvida, estamos à disposição!`;
     window.open('https://wa.me/55' + telefone + '?text=' + encodeURIComponent(texto), '_blank');
   };
+
+  const CAMPOS_HISTORICO_LABEL = {
+    STATUS: 'Status', PRAZO: 'Previsão de entrega', MARCA: 'Marca', MODELO: 'Modelo', IMEI: 'IMEI/série',
+    DEFEITO_INFORMADO: 'Defeito informado', DIAGNOSTICO: 'Diagnóstico', VALOR_SERVICO: 'Valor do serviço',
+    TECNICO_RESPONSAVEL: 'Técnico responsável', SENHA_TIPO: 'Tipo de senha', SENHA_VALOR: 'Senha/PIN/Padrão'
+  };
+
+  /** Compara os dados antigos com os novos e monta a lista de mudanças pro histórico — só os campos que realmente mudaram. */
+  function calcularMudancas(antigo, novo){
+    const mudancas = [];
+    Object.keys(CAMPOS_HISTORICO_LABEL).forEach(campo => {
+      const de = antigo[campo] ?? '';
+      const para = novo[campo] ?? '';
+      if (String(de) !== String(para)) {
+        mudancas.push({
+          campo: CAMPOS_HISTORICO_LABEL[campo],
+          de: campo === 'SENHA_VALOR' && !de ? '(vazio)' : String(de) || '(vazio)',
+          para: campo === 'SENHA_VALOR' && !para ? '(vazio)' : String(para) || '(vazio)'
+        });
+      }
+    });
+    return mudancas;
+  }
+
+  function renderHistoricoAlteracoes(os){
+    let historico = [];
+    try { historico = JSON.parse(os.HISTORICO_ALTERACOES || '[]'); } catch(e) {}
+    if (!historico.length) { setHTML('listaHistoricoAlteracoes', '<span style="color:var(--text-tertiary); font-size:12px;">Nenhuma alteração registrada ainda.</span>'); return; }
+
+    setHTML('listaHistoricoAlteracoes', historico.slice().reverse().map(h => `
+      <div style="background:var(--bg-elevated); border:1px solid var(--hairline); border-radius:8px; padding:10px 14px; margin-bottom:8px;">
+        <div style="font-size:11px; color:var(--text-tertiary); margin-bottom:6px;">${new Date(h.data).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})} · ${h.usuario||'—'}</div>
+        ${h.mudancas.map(m => `<div style="font-size:12px; margin-bottom:3px;"><b>${m.campo}:</b> <span style="color:var(--text-tertiary); text-decoration:line-through;">${m.de}</span> → <span style="color:var(--mint);">${m.para}</span></div>`).join('')}
+      </div>`).join(''));
+  }
 
   function montarVisualizacaoSenha(tipo, valor){
     if (!tipo || !valor) return '<span style="color:var(--text-tertiary); font-size:12.5px;">Nenhum desbloqueio informado na abertura desta OS.</span>';
@@ -787,8 +840,30 @@
         <label style="color:var(--red);">⚠ O que houve? (obrigatório pra devolução)</label>
         <textarea id="vObsDevolucao" style="width:100%; min-height:70px; background:var(--bg-elevated); border:1px solid var(--hairline); color:var(--text-primary); padding:10px 12px; border-radius:8px; font-size:13px; font-family:inherit; box-sizing:border-box;" placeholder="Ex.: peça não compatível, defeito na placa que não compensa o reparo, cliente desistiu do orçamento...">${osAtual.OBSERVACAO_DEVOLUCAO||''}</textarea>
       </div>
-      <div class="section-title">🔒 Desbloqueio do aparelho</div>
+      <div class="section-title" style="display:flex; align-items:center; justify-content:space-between;">
+        🔒 Desbloqueio do aparelho
+        <button class="btn" type="button" id="btnEditarSenha" style="padding:5px 10px; font-size:11.5px;">✏️ Editar</button>
+      </div>
       <div id="visualizacaoSenha" style="background:var(--bg-elevated); border:1px solid var(--hairline); border-radius:10px; padding:14px 16px; margin-bottom:16px;"></div>
+      <div id="edicaoSenhaWrap" style="display:none; background:var(--bg-elevated); border:1px solid var(--mint); border-radius:10px; padding:14px 16px; margin-bottom:16px;">
+        <div class="senha-tabs" id="statusTabsVer">
+          <button type="button" class="status-tab" data-status-senha="PIN">PIN</button>
+          <button type="button" class="status-tab" data-status-senha="TEXTO">Senha texto</button>
+          <button type="button" class="status-tab" data-status-senha="PADRAO">Padrão</button>
+        </div>
+        <div class="ffield" id="vSenhaPinWrap" style="margin-top:10px;"><label>PIN numérico</label><input id="vSenhaPin" inputmode="numeric"></div>
+        <div class="ffield" id="vSenhaTextoWrap" style="display:none; margin-top:10px;"><label>Senha / texto</label><input id="vSenhaTexto"></div>
+        <div class="ffield" id="vSenhaPadraoWrap" style="display:none; text-align:center; margin-top:10px;">
+          <label style="text-align:left;">Padrão — clique os pontos na ordem certa</label>
+          <div class="pattern-grid" id="patternGridVer"></div>
+          <div style="font-size:11px; color:var(--text-tertiary); font-family:var(--font-mono); margin-bottom:8px;" id="patternSeqVer">—</div>
+          <button type="button" class="btn" id="btnLimparPadraoVer" style="font-size:11.5px; padding:6px 12px;">🔄 Limpar padrão</button>
+        </div>
+        <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:10px;">
+          <button class="btn" type="button" id="btnCancelarEdicaoSenha">Cancelar</button>
+        </div>
+        <p style="font-size:11px; color:var(--text-tertiary); margin:8px 0 0;">A alteração fica pendente até você clicar em "Salvar alterações", lá embaixo.</p>
+      </div>
       <div class="section-title">Aparelho</div>
       <div class="frow3">
         <div class="ffield"><label>Marca</label><input id="vMarca" value="${osAtual.MARCA||''}"></div>
@@ -827,6 +902,9 @@
       </div>
       <div class="section-title">💰 Status do pagamento</div>
       <div id="areaPagamentoOS" style="background:var(--bg-elevated); border:1px solid var(--hairline); border-radius:10px; padding:14px 16px; margin-bottom:16px;"></div>
+
+      <div class="section-title">📜 Histórico de alterações</div>
+      <div id="listaHistoricoAlteracoes" style="margin-bottom:16px;"></div>
       <div class="section-title">Estado do aparelho na entrada (registrado na abertura)</div>
       <div class="estado-entrada-wrap">
         <div class="diagramas-wrap">
@@ -847,6 +925,9 @@
     renderAreaPagamento(osAtual);
     renderListaPosTeste(osAtual);
     ligarEventosPosTeste();
+    renderHistoricoAlteracoes(osAtual);
+    ligarEventosSenha();
+    prepararEdicaoSenha(osAtual);
 
     // Mostra/esconde o campo de observação conforme o status escolhido.
     const selectStatus = document.getElementById('vStatus');
@@ -867,6 +948,79 @@
   document.getElementById('fecharModalVer').addEventListener('click', () => modalVer.classList.remove('open'));
   document.getElementById('btnFecharVer').addEventListener('click', () => modalVer.classList.remove('open'));
 
+  // ---------- Edição da senha na tela de ver/editar OS ----------
+  let senhaTipoAtualVer = 'PIN', sequenciaPadraoVer = [], gradeSenhaVerCriada = false;
+
+  function criarGradeSenhaVerSeNecessario(){
+    if (gradeSenhaVerCriada) return;
+    const grade = document.getElementById('patternGridVer');
+    for (let i=1;i<=9;i++){
+      const ponto = document.createElement('div'); ponto.className='pattern-dot';
+      ponto.addEventListener('click', () => {
+        if (sequenciaPadraoVer.includes(i)) return;
+        sequenciaPadraoVer.push(i); ponto.classList.add('active'); ponto.textContent = sequenciaPadraoVer.length;
+        document.getElementById('patternSeqVer').textContent = sequenciaPadraoVer.join(' → ');
+      });
+      grade.appendChild(ponto);
+    }
+    gradeSenhaVerCriada = true;
+    document.getElementById('btnLimparPadraoVer').addEventListener('click', () => {
+      sequenciaPadraoVer = [];
+      document.getElementById('patternSeqVer').textContent = '—';
+      document.querySelectorAll('#patternGridVer .pattern-dot').forEach(d => { d.classList.remove('active'); d.textContent = ''; });
+    });
+    document.querySelectorAll('#statusTabsVer button').forEach(btn => btn.addEventListener('click', () => {
+      document.querySelectorAll('#statusTabsVer button').forEach(b=>b.classList.remove('active')); btn.classList.add('active');
+      senhaTipoAtualVer = btn.dataset.statusSenha;
+      document.getElementById('vSenhaPinWrap').style.display = senhaTipoAtualVer==='PIN'?'block':'none';
+      document.getElementById('vSenhaTextoWrap').style.display = senhaTipoAtualVer==='TEXTO'?'block':'none';
+      document.getElementById('vSenhaPadraoWrap').style.display = senhaTipoAtualVer==='PADRAO'?'block':'none';
+    }));
+  }
+
+  function prepararEdicaoSenha(os){
+    criarGradeSenhaVerSeNecessario();
+    document.getElementById('edicaoSenhaWrap').style.display = 'none';
+    document.getElementById('visualizacaoSenha').style.display = 'block';
+    document.getElementById('btnEditarSenha').textContent = '✏️ Editar';
+  }
+
+  /** Liga os eventos do botão de editar senha — precisa ser chamado toda vez que a OS
+   * é aberta, porque esses botões ficam dentro do HTML que é recriado a cada vez. */
+  function ligarEventosSenha(){
+    document.getElementById('btnEditarSenha').addEventListener('click', () => {
+      // Pré-preenche o formulário com o que já está salvo, pra editar em cima em vez de começar do zero.
+      senhaTipoAtualVer = osAtual.SENHA_TIPO || 'PIN';
+      sequenciaPadraoVer = senhaTipoAtualVer === 'PADRAO' && osAtual.SENHA_VALOR ? osAtual.SENHA_VALOR.split(',').map(Number) : [];
+
+      document.querySelectorAll('#statusTabsVer button').forEach(b => b.classList.toggle('active', b.dataset.statusSenha === senhaTipoAtualVer));
+      document.getElementById('vSenhaPinWrap').style.display = senhaTipoAtualVer==='PIN'?'block':'none';
+      document.getElementById('vSenhaTextoWrap').style.display = senhaTipoAtualVer==='TEXTO'?'block':'none';
+      document.getElementById('vSenhaPadraoWrap').style.display = senhaTipoAtualVer==='PADRAO'?'block':'none';
+      document.getElementById('vSenhaPin').value = senhaTipoAtualVer === 'PIN' ? (osAtual.SENHA_VALOR||'') : '';
+      document.getElementById('vSenhaTexto').value = senhaTipoAtualVer === 'TEXTO' ? (osAtual.SENHA_VALOR||'') : '';
+
+      document.querySelectorAll('#patternGridVer .pattern-dot').forEach(d => { d.classList.remove('active'); d.textContent = ''; });
+      if (sequenciaPadraoVer.length) {
+        sequenciaPadraoVer.forEach((pos, idx) => {
+          const ponto = document.querySelectorAll('#patternGridVer .pattern-dot')[pos-1];
+          ponto.classList.add('active'); ponto.textContent = idx+1;
+        });
+        document.getElementById('patternSeqVer').textContent = sequenciaPadraoVer.join(' → ');
+      } else {
+        document.getElementById('patternSeqVer').textContent = '—';
+      }
+
+      document.getElementById('visualizacaoSenha').style.display = 'none';
+      document.getElementById('edicaoSenhaWrap').style.display = 'block';
+    });
+
+    document.getElementById('btnCancelarEdicaoSenha').addEventListener('click', () => {
+      document.getElementById('edicaoSenhaWrap').style.display = 'none';
+      document.getElementById('visualizacaoSenha').style.display = 'block';
+    });
+  }
+
   document.getElementById('btnSalvarVer').addEventListener('click', async () => {
     if (!osAtual) return;
     try {
@@ -879,6 +1033,18 @@
         return;
       }
       const pecasVer = coletarPecas('linhasPecasVer');
+
+      // Se o formulário de edição da senha estiver aberto, usa o que foi digitado ali;
+      // senão, mantém a senha que já estava salva (sem mudar).
+      const editandoSenha = document.getElementById('edicaoSenhaWrap').style.display === 'block';
+      let senhaTipoParaSalvar = osAtual.SENHA_TIPO || '', senhaValorParaSalvar = osAtual.SENHA_VALOR || '';
+      if (editandoSenha) {
+        senhaTipoParaSalvar = senhaTipoAtualVer;
+        senhaValorParaSalvar = senhaTipoAtualVer==='PIN' ? document.getElementById('vSenhaPin').value.trim()
+          : senhaTipoAtualVer==='TEXTO' ? document.getElementById('vSenhaTexto').value.trim()
+          : sequenciaPadraoVer.join(',');
+      }
+
       const dados = {
         STATUS: novoStatus, PRAZO: document.getElementById('vPrazo').value,
         OBSERVACAO_DEVOLUCAO: novoStatus === 'Com Defeito - Devolução' ? obsDevolucao : (osAtual.OBSERVACAO_DEVOLUCAO || ''),
@@ -886,9 +1052,19 @@
         IMEI: document.getElementById('vImei').value.trim(), DEFEITO_INFORMADO: document.getElementById('vDefeito').value.trim(),
         DIAGNOSTICO: document.getElementById('vDiagnostico').value.trim(),
         PECAS_A_REPOR: pecasVer.texto, PECAS_ITENS: JSON.stringify(pecasVer.itens), VALOR_PECAS: pecasVer.total,
-        VALOR_SERVICO: Number(document.getElementById('vValor').value)||0, TECNICO_RESPONSAVEL: document.getElementById('vTecnico').value.trim()
+        VALOR_SERVICO: Number(document.getElementById('vValor').value)||0, TECNICO_RESPONSAVEL: document.getElementById('vTecnico').value.trim(),
+        SENHA_TIPO: senhaTipoParaSalvar, SENHA_VALOR: senhaValorParaSalvar
       };
       if (novoStatus === 'Entregue' && !osAtual.DATA_ENTREGA_REAL) dados.DATA_ENTREGA_REAL = new Date().toISOString();
+
+      // Registra no histórico só os campos que realmente mudaram.
+      const mudancas = calcularMudancas(osAtual, dados);
+      if (mudancas.length) {
+        let historico = [];
+        try { historico = JSON.parse(osAtual.HISTORICO_ALTERACOES || '[]'); } catch(e) {}
+        historico.push({ data: new Date().toISOString(), usuario: usuarioAtual.NOME || usuarioAtual.ID, mudancas });
+        dados.HISTORICO_ALTERACOES = JSON.stringify(historico);
+      }
 
       await dbUpdate('ASSISTENCIAS', osAtual.ID, dados);
       await atualizarEspelhoPublico(Object.assign({}, osAtual, dados));

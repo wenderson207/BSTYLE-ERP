@@ -151,7 +151,7 @@
         <td>${baixo?'<span class="badge warn">Baixo</span>':'<span class="badge ok">OK</span>'}</td>
         <td style="display:flex; gap:6px;">
           <button class="btn" style="padding:6px 10px;font-size:11.5px;" onclick="window.__ajustar('${p.ID}','${p.NOME.replace(/'/g,"\\'")}',${p.ESTOQUE_ATUAL})">Ajustar</button>
-          ${baixo ? `<button class="btn" style="padding:6px 10px;font-size:11.5px; color:var(--mint);" onclick="window.__enviarParaListaCompras('${p.ID}')">📝 Lista</button>` : ''}
+          <button class="btn" style="padding:6px 10px;font-size:11.5px; color:var(--mint);" onclick="window.__enviarParaListaCompras('${p.ID}')">📝 Lista</button>
         </td></tr>`;
     }).join(''));
   }

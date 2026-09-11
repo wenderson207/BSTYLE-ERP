@@ -85,14 +85,29 @@
   document.getElementById('dataHoje').textContent = new Date().toLocaleDateString('pt-BR', { weekday:'long', day:'2-digit', month:'long' });
 
   try {
-    const [vendas, itensVenda, clientes, produtos, financeiro, assistencias] = await Promise.all([
+    const [vendasBrutas, itensVendaBrutos, clientes, produtosBrutos, financeiroBruto, assistencias, empresas] = await Promise.all([
       dbQuery('VENDAS', { STATUS: 'Concluída' }),
       dbGetAll('ITENS_VENDA'),
       dbGetAll('CLIENTES'),
       dbGetAll('PRODUTOS'),
       dbGetAll('FINANCEIRO'),
-      dbGetAll('ASSISTENCIAS')
+      dbGetAll('ASSISTENCIAS'),
+      dbGetAll('EMPRESAS')
     ]);
+
+    // Aplica o filtro de loja (o seletor lá no topo do sistema) em tudo que os
+    // cards e gráficos daqui em cima usam — antes disso, "Vendido hoje" e o
+    // resto somavam as duas lojas juntas, sem respeitar o filtro.
+    const vendas = window.lojaAtivaId ? vendasBrutas.filter(v => v.EMPRESA_ID === window.lojaAtivaId) : vendasBrutas;
+    const produtos = window.lojaAtivaId ? produtosBrutos.filter(p => p.EMPRESA_ID === window.lojaAtivaId) : produtosBrutos;
+    const financeiro = window.lojaAtivaId ? financeiroBruto.filter(f => f.EMPRESA_ID === window.lojaAtivaId) : financeiroBruto;
+    const idsVendasFiltradas = new Set(vendas.map(v => v.ID));
+    const itensVenda = window.lojaAtivaId ? itensVendaBrutos.filter(i => idsVendasFiltradas.has(i.VENDA_ID)) : itensVendaBrutos;
+    // Assistência técnica ainda não guarda de qual loja é cada OS, então "OS entregues
+    // hoje" continua mostrando de todas as lojas juntas mesmo com o filtro ativo.
+
+    const lojaAtivaNome = window.lojaAtivaId ? (empresas.find(e => e.ID === window.lojaAtivaId)||{}).NOME : null;
+    document.querySelector('.toolbar p').textContent = lojaAtivaNome ? 'Visão geral de ' + lojaAtivaNome + '.' : 'Visão geral de todas as lojas.';
 
     const hojeStr = new Date().toDateString();
     const vendasHoje = vendas.filter(v => new Date(v.DATA).toDateString() === hojeStr);

@@ -569,7 +569,7 @@
       }
 
       await dbInsert('FINANCEIRO', {
-        TIPO:'Receita', CATEGORIA:'Venda', DESCRICAO:'Venda '+venda.ID, VALOR: valorTotal,
+        EMPRESA_ID: venda.EMPRESA_ID || '', TIPO:'Receita', CATEGORIA:'Venda', DESCRICAO:'Venda '+venda.ID, VALOR: valorTotal,
         FORMA_PAGAMENTO: formaPagamento, DATA_VENCIMENTO: new Date().toISOString(), DATA_PAGAMENTO: new Date().toISOString(), STATUS:'Pago',
         ORIGEM_TIPO: 'VENDA', ORIGEM_ID: venda.ID
       });

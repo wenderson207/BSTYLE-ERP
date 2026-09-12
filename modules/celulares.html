@@ -183,12 +183,12 @@
   </div>
 
   <table class="dt" style="margin-bottom:28px;">
-    <thead><tr><th>Marca</th><th>Modelo</th><th>Tipo</th><th>Qualidade</th><th>Valor compra</th><th>Qtd.</th><th>Situação</th><th></th></tr></thead>
-    <tbody id="linhasTelas"><tr class="empty-row"><td colspan="8">Carregando…</td></tr></tbody>
+    <thead><tr><th>Marca</th><th>Modelo</th><th>Tipo</th><th>Qualidade</th><th>Valor compra</th><th>Valor venda</th><th>Qtd.</th><th>Situação</th><th></th></tr></thead>
+    <tbody id="linhasTelas"><tr class="empty-row"><td colspan="9">Carregando…</td></tr></tbody>
   </table>
 
   <h3 style="font-family:var(--font-display); font-size:16px; margin:0 0 12px;">📊 Tabela consolidada de preços</h3>
-  <p style="color:var(--text-secondary); font-size:12.5px; margin:0 0 14px;">Igual sua planilha de referência — por modelo, o valor de cada tipo de tela que você já cadastrou.</p>
+  <p style="color:var(--text-secondary); font-size:12.5px; margin:0 0 14px;">Igual sua planilha de referência — por modelo, o <b>valor de venda</b> de cada tipo de tela que você já cadastrou.</p>
   <div id="tabelaConsolidadaTelas" style="overflow-x:auto; margin-bottom:28px;">Carregando…</div>
 
   <h3 style="font-family:var(--font-display); font-size:16px; margin:0 0 12px;">Histórico de baixas</h3>
@@ -204,9 +204,16 @@
     <div class="modal-body">
       <input type="hidden" id="ftId">
       <div class="frow2">
-        <div class="ffield"><label>Marca do celular *</label><input id="ftMarca" list="listaMarcasTela" placeholder="Ex.: Samsung, Motorola, iPhone…"><datalist id="listaMarcasTela"></datalist></div>
+        <div class="ffield"><label>Marca do celular *</label>
+          <select id="ftMarca">
+            <option value="Motorola">Motorola</option><option value="Apple">Apple</option>
+            <option value="Samsung">Samsung</option><option value="Realme">Realme</option>
+            <option value="Outro">Outro…</option>
+          </select>
+        </div>
         <div class="ffield"><label>Modelo da tela *</label><input id="ftModelo" placeholder="Ex.: A01, G22, 11…"></div>
       </div>
+      <div class="ffield" id="wrapMarcaOutraTela" style="display:none;"><label>Qual marca?</label><input id="ftMarcaOutra" placeholder="Digite a marca"></div>
       <div class="frow2">
         <div class="ffield"><label>Tipo da tela *</label>
           <select id="ftTipoAro"><option value="COM_ARO">Com Aro</option><option value="SEM_ARO">Sem Aro</option></select>
@@ -227,8 +234,9 @@
         </div>
         <div id="listaCompativeisTela" style="display:flex; gap:6px; flex-wrap:wrap; margin-top:10px;"></div>
       </div>
-      <div class="frow2">
+      <div class="frow3">
         <div class="ffield"><label>Valor de compra (R$) *</label><input id="ftValorCompra" type="number" step="0.01"></div>
+        <div class="ffield"><label>Valor de venda (R$) *</label><input id="ftValorVenda" type="number" step="0.01"></div>
         <div class="ffield"><label>Quantidade *</label><input id="ftQuantidade" type="number" min="1" value="1"></div>
       </div>
     </div>
@@ -818,12 +826,12 @@
 
   function renderLinhasTelas(){
     const lista = telasFiltradas();
-    if (!lista.length){ setHTML('linhasTelas', '<tr class="empty-row"><td colspan="8">Nenhuma tela encontrada.</td></tr>'); return; }
+    if (!lista.length){ setHTML('linhasTelas', '<tr class="empty-row"><td colspan="9">Nenhuma tela encontrada.</td></tr>'); return; }
     setHTML('linhasTelas', lista.map(t => {
       const sit = situacaoTela(t);
       return `<tr>
         <td>${t.MARCA}</td><td><b>${t.MODELO}</b>${(t.MODELOS_COMPATIVEIS||[]).map(m=>`<span class="badge-compativel">${m}</span>`).join('')}</td><td>${labelTipoAro(t.TIPO_ARO)}</td><td>${labelQualidadeTela(t)}</td>
-        <td>${moeda(t.VALOR_COMPRA)}</td><td>${t.QUANTIDADE}</td>
+        <td>${moeda(t.VALOR_COMPRA)}</td><td><b>${moeda(t.VALOR_VENDA)}</b></td><td>${t.QUANTIDADE}</td>
         <td><span style="color:${sit.cor}; font-weight:600; font-size:12px;">${sit.texto}</span></td>
         <td style="display:flex; gap:6px;">
           <button class="btn" style="padding:6px 10px; font-size:11.5px; color:var(--mint);" ${Number(t.QUANTIDADE)<=0?'disabled':''} onclick="window.__abrirBaixaTela('${t.ID}')">Dar baixa</button>
@@ -864,7 +872,7 @@
         const entradas = telasEstoque.filter(t => t.MARCA===marca && t.MODELO===modelo && labelQualidadeTela(t)===c.qualidade && t.TIPO_ARO===c.tipo);
         if (!entradas.length) return '<td style="color:var(--text-tertiary);">—</td>';
         const maisRecente = entradas.sort((a,b) => new Date(b.DATA_CADASTRO)-new Date(a.DATA_CADASTRO))[0];
-        return `<td>${moeda(maisRecente.VALOR_COMPRA)}</td>`;
+        return `<td>${moeda(maisRecente.VALOR_VENDA)}</td>`;
       }).join('');
       const modeloComCompativeis = modelo + (compativeis.length ? ` <span style="color:var(--blue); font-size:10.5px; font-weight:400;">(serve em ${compativeis.join(', ')})</span>` : '');
       return `<tr><td><b>${marca}</b></td><td>${modeloComCompativeis}</td>${celulas}</tr>`;
@@ -915,10 +923,11 @@
     telaEmEdicao = null;
     document.getElementById('modalTituloTela').textContent = 'Nova tela';
     document.getElementById('ftId').value = '';
-    document.getElementById('ftMarca').value = ''; document.getElementById('ftModelo').value = '';
+    document.getElementById('ftMarca').value = 'Motorola'; document.getElementById('ftMarcaOutra').value = ''; document.getElementById('wrapMarcaOutraTela').style.display = 'none';
+    document.getElementById('ftModelo').value = '';
     document.getElementById('ftTipoAro').value = 'COM_ARO'; document.getElementById('ftQualidade').value = 'INCELL';
     document.getElementById('ftQualidadeOutra').value = ''; document.getElementById('wrapQualidadeOutraTela').style.display = 'none';
-    document.getElementById('ftValorCompra').value = ''; document.getElementById('ftQuantidade').value = '1';
+    document.getElementById('ftValorCompra').value = ''; document.getElementById('ftValorVenda').value = ''; document.getElementById('ftQuantidade').value = '1';
     compativeisEmEdicao = []; document.getElementById('ftCompativelInput').value = ''; renderListaCompativeisTela();
     modalTela.classList.add('open');
   });
@@ -927,19 +936,31 @@
   document.getElementById('ftQualidade').addEventListener('change', (e) => {
     document.getElementById('wrapQualidadeOutraTela').style.display = e.target.value === 'OUTRO' ? 'block' : 'none';
   });
+  document.getElementById('ftMarca').addEventListener('change', (e) => {
+    document.getElementById('wrapMarcaOutraTela').style.display = e.target.value === 'Outro' ? 'block' : 'none';
+  });
 
   window.__editarTela = (id) => {
     telaEmEdicao = telasEstoque.find(t => t.ID === id);
     if (!telaEmEdicao) return;
     document.getElementById('modalTituloTela').textContent = 'Editar tela';
     document.getElementById('ftId').value = telaEmEdicao.ID;
-    document.getElementById('ftMarca').value = telaEmEdicao.MARCA;
+    const marcasFixas = ['Motorola','Apple','Samsung','Realme'];
+    if (marcasFixas.includes(telaEmEdicao.MARCA)) {
+      document.getElementById('ftMarca').value = telaEmEdicao.MARCA;
+      document.getElementById('ftMarcaOutra').value = ''; document.getElementById('wrapMarcaOutraTela').style.display = 'none';
+    } else {
+      document.getElementById('ftMarca').value = 'Outro';
+      document.getElementById('ftMarcaOutra').value = telaEmEdicao.MARCA;
+      document.getElementById('wrapMarcaOutraTela').style.display = 'block';
+    }
     document.getElementById('ftModelo').value = telaEmEdicao.MODELO;
     document.getElementById('ftTipoAro').value = telaEmEdicao.TIPO_ARO;
     document.getElementById('ftQualidade').value = telaEmEdicao.QUALIDADE;
     document.getElementById('ftQualidadeOutra').value = telaEmEdicao.QUALIDADE_OUTRA || '';
     document.getElementById('wrapQualidadeOutraTela').style.display = telaEmEdicao.QUALIDADE === 'OUTRO' ? 'block' : 'none';
     document.getElementById('ftValorCompra').value = telaEmEdicao.VALOR_COMPRA;
+    document.getElementById('ftValorVenda').value = telaEmEdicao.VALOR_VENDA || '';
     document.getElementById('ftQuantidade').value = telaEmEdicao.QUANTIDADE;
     compativeisEmEdicao = Array.isArray(telaEmEdicao.MODELOS_COMPATIVEIS) ? [...telaEmEdicao.MODELOS_COMPATIVEIS] : [];
     document.getElementById('ftCompativelInput').value = ''; renderListaCompativeisTela();
@@ -947,20 +968,24 @@
   };
 
   document.getElementById('btnSalvarTela').addEventListener('click', async () => {
-    const marca = document.getElementById('ftMarca').value.trim();
+    const marcaSelecionada = document.getElementById('ftMarca').value;
+    const marca = marcaSelecionada === 'Outro' ? document.getElementById('ftMarcaOutra').value.trim() : marcaSelecionada;
     const modelo = document.getElementById('ftModelo').value.trim();
     const valorCompra = Number(document.getElementById('ftValorCompra').value) || 0;
+    const valorVenda = Number(document.getElementById('ftValorVenda').value) || 0;
     const quantidade = Number(document.getElementById('ftQuantidade').value) || 0;
     const qualidade = document.getElementById('ftQualidade').value;
     const qualidadeOutra = document.getElementById('ftQualidadeOutra').value.trim();
+    if (marcaSelecionada === 'Outro' && !marca){ mostrarToast('Digite qual é a marca.', 'erro'); return; }
     if (!marca || !modelo){ mostrarToast('Marca e modelo são obrigatórios.', 'erro'); return; }
     if (!valorCompra){ mostrarToast('Informe o valor de compra.', 'erro'); return; }
+    if (!valorVenda){ mostrarToast('Informe o valor de venda.', 'erro'); return; }
     if (qualidade === 'OUTRO' && !qualidadeOutra){ mostrarToast('Descreve qual é a qualidade da tela.', 'erro'); return; }
 
     const dados = {
       MARCA: marca, MODELO: modelo, TIPO_ARO: document.getElementById('ftTipoAro').value,
       QUALIDADE: qualidade, QUALIDADE_OUTRA: qualidade === 'OUTRO' ? qualidadeOutra : '',
-      VALOR_COMPRA: valorCompra, QUANTIDADE: quantidade, MODELOS_COMPATIVEIS: compativeisEmEdicao
+      VALOR_COMPRA: valorCompra, VALOR_VENDA: valorVenda, QUANTIDADE: quantidade, MODELOS_COMPATIVEIS: compativeisEmEdicao
     };
 
     try {

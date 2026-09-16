@@ -42,7 +42,7 @@
   function moeda(v){ return (Number(v)||0).toLocaleString('pt-BR', { style:'currency', currency:'BRL' }); }
 
   try {
-    if (!(await checarPermissao('ESTOQUE','VISUALIZAR'))){ setHTML('linhasEstoque', '<tr class="empty-row"><td colspan="7">Sem permissão.</td></tr>'); return; }
+    if (!(await checarPermissao('DIVERGENCIAS_ESTOQUE','VISUALIZAR'))){ setHTML('linhasEstoque', '<tr class="empty-row"><td colspan="7">Sem permissão.</td></tr>'); return; }
 
     const [todasDivergencias, empresas, usuarios] = await Promise.all([dbGetAll('DIVERGENCIAS_ESTOQUE'), dbGetAll('EMPRESAS'), dbGetAll('USUARIOS')]);
     function nomeLoja(id){ if (!id) return '—'; const e = empresas.find(x=>x.ID===id); return e?e.NOME:'—'; }

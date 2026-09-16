@@ -74,32 +74,41 @@
           <div class="kpi"><div class="lbl">Esperado em caixa (dinheiro)</div><div class="val">${moeda(esperadoEmCaixa)}</div></div>
         </div>
         <div class="kpi-grid" style="margin-bottom:18px;">
-          <div class="kpi"><div class="lbl">💵 Dinheiro</div><div class="val">${moeda(porForma['Dinheiro'])}</div></div>
-          <div class="kpi"><div class="lbl">💠 PIX</div><div class="val">${moeda(porForma['PIX'])}</div></div>
-          <div class="kpi"><div class="lbl">💳 Débito</div><div class="val">${moeda(porForma['Cartão de Débito'])}</div></div>
-          <div class="kpi"><div class="lbl">💳 Crédito</div><div class="val">${moeda(porForma['Cartão de Crédito'])}</div></div>
+          <div class="kpi"><div class="lbl">\u{1F4B5} Dinheiro</div><div class="val">${moeda(porForma['Dinheiro'])}</div></div>
+          <div class="kpi"><div class="lbl">\u{1F4A0} PIX</div><div class="val">${moeda(porForma['PIX'])}</div></div>
+          <div class="kpi"><div class="lbl">\u{1F4B3} Débito</div><div class="val">${moeda(porForma['Cartão de Débito'])}</div></div>
+          <div class="kpi"><div class="lbl">\u{1F4B3} Crédito</div><div class="val">${moeda(porForma['Cartão de Crédito'])}</div></div>
         </div>
         <div class="frow2" style="max-width:400px;">
           <div class="ffield"><label>Valor contado ao fechar (R$)</label><input id="valorContado" type="number" step="0.01"></div>
         </div>
         <div style="display:flex; gap:10px; flex-wrap:wrap;">
           <button class="btn btn-primary" id="btnFecharCaixa">Fechar caixa</button>
-          <button class="btn" id="btnResumoWpp">💬 Mandar resumo do dia no WhatsApp</button>
+          <button class="btn" id="btnResumoWpp">\u{1F4AC} Mandar resumo do dia no WhatsApp</button>
         </div>
         <div id="resultadoFechamento" style="margin-top:14px; font-size:13px;"></div>`;
 
+      // Emojis escritos como \u{...} em vez do caractere literal — o navegador
+      // reconstrói o caractere certinho a partir do código, sem depender da
+      // integridade dos bytes do arquivo (esse arquivo passa por camadas que
+      // às vezes corrompem emoji, como já vimos antes no comprovante de venda).
+      const EMOJI_RESUMO = {
+        grafico: '\u{1F4CA}', dinheiro: '\u{1F4B5}', pix: '\u{1F4A0}', cartao: '\u{1F4B3}',
+        certo: '\u{2705}', azul: '\u{1F535}', vermelho: '\u{1F534}'
+      };
+
       function montarTextoResumoDia(diferenca){
         const linha = '- - - - - - - - - - -';
-        let texto = `📊 *Resumo do dia — ${nomeLoja(lojaId)}*\n${new Date().toLocaleDateString('pt-BR')}\n${linha}\n`
+        let texto = `${EMOJI_RESUMO.grafico} *Resumo do dia — ${nomeLoja(lojaId)}*\n${new Date().toLocaleDateString('pt-BR')}\n${linha}\n`
           + `Abertura de caixa: ${moeda(caixaHoje.VALOR_ABERTURA)}\n\n`
-          + `💵 Dinheiro: ${moeda(porForma['Dinheiro'])}\n`
-          + `💠 PIX: ${moeda(porForma['PIX'])}\n`
-          + `💳 Débito: ${moeda(porForma['Cartão de Débito'])}\n`
-          + `💳 Crédito: ${moeda(porForma['Cartão de Crédito'])}\n`
+          + `${EMOJI_RESUMO.dinheiro} Dinheiro: ${moeda(porForma['Dinheiro'])}\n`
+          + `${EMOJI_RESUMO.pix} PIX: ${moeda(porForma['PIX'])}\n`
+          + `${EMOJI_RESUMO.cartao} Débito: ${moeda(porForma['Cartão de Débito'])}\n`
+          + `${EMOJI_RESUMO.cartao} Crédito: ${moeda(porForma['Cartão de Crédito'])}\n`
           + `${linha}\n*Total vendido: ${moeda(totalVendidoHoje)}*\n`
           + `Esperado em caixa (dinheiro): ${moeda(esperadoEmCaixa)}`;
         if (diferenca !== undefined && !isNaN(diferenca)) {
-          texto += `\n${linha}\n` + (diferenca === 0 ? '✅ Caixa bateu certinho!' : diferenca > 0 ? `🔵 Sobrou ${moeda(diferenca)} no caixa.` : `🔴 Faltou ${moeda(Math.abs(diferenca))} no caixa.`);
+          texto += `\n${linha}\n` + (diferenca === 0 ? `${EMOJI_RESUMO.certo} Caixa bateu certinho!` : diferenca > 0 ? `${EMOJI_RESUMO.azul} Sobrou ${moeda(diferenca)} no caixa.` : `${EMOJI_RESUMO.vermelho} Faltou ${moeda(Math.abs(diferenca))} no caixa.`);
         }
         return texto;
       }
@@ -121,10 +130,10 @@
           if (!(await checarPermissao('CAIXA','EDITAR'))){ mostrarToast('Sem permissão.', 'erro'); return; }
           await dbUpdate('CAIXA', idDia, { STATUS: 'Fechado', VALOR_ESPERADO: esperadoEmCaixa, VALOR_CONTADO: contado, DIFERENCA: diferenca, USUARIO_FECHAMENTO: usuarioAtual.ID, DATA_FECHAMENTO: new Date().toISOString() });
           const cor = diferenca === 0 ? 'var(--mint)' : (diferenca > 0 ? 'var(--blue)' : 'var(--red)');
-          const textoResultado = diferenca === 0 ? 'Caixa bateu certinho! 🎉' : (diferenca > 0 ? `Sobrou ${moeda(diferenca)} no caixa.` : `Faltou ${moeda(Math.abs(diferenca))} no caixa.`);
+          const textoResultado = diferenca === 0 ? 'Caixa bateu certinho! \u{1F389}' : (diferenca > 0 ? `Sobrou ${moeda(diferenca)} no caixa.` : `Faltou ${moeda(Math.abs(diferenca))} no caixa.`);
           const textoResumo = montarTextoResumoDia(diferenca);
 
-          setHTML('resultadoFechamento', `<b style="color:${cor};">${textoResultado}</b><p style="color:var(--text-tertiary); font-size:11.5px; margin-top:8px;" id="statusEnvioTelegram">Enviando resumo pro Telegram…</p><button class="btn" style="margin-top:6px;" id="btnCopiarResumo">📋 Copiar resumo do dia</button>`);
+          setHTML('resultadoFechamento', `<b style="color:${cor};">${textoResultado}</b><p style="color:var(--text-tertiary); font-size:11.5px; margin-top:8px;" id="statusEnvioTelegram">Enviando resumo pro Telegram…</p><button class="btn" style="margin-top:6px;" id="btnCopiarResumo">\u{1F4CB} Copiar resumo do dia</button>`);
           document.getElementById('btnCopiarResumo').addEventListener('click', () => copiarResumoParaAreaTransferencia(textoResumo));
           mostrarToast('Caixa fechado.');
 
@@ -135,7 +144,7 @@
             const statusEl = document.getElementById('statusEnvioTelegram');
             if (cfgTelegram && cfgTelegram.BOT_TOKEN && cfgTelegram.CHAT_ID) {
               const resultado = await window.enviarMensagemTelegram(cfgTelegram.BOT_TOKEN, cfgTelegram.CHAT_ID, textoResumo);
-              if (statusEl) { statusEl.textContent = resultado.ok ? '✓ Resumo enviado pro Telegram.' : 'Não consegui enviar pro Telegram — usa o botão de copiar acima.'; statusEl.style.color = resultado.ok ? 'var(--mint)' : 'var(--amber)'; }
+              if (statusEl) { statusEl.textContent = resultado.ok ? '\u{2713} Resumo enviado pro Telegram.' : 'Não consegui enviar pro Telegram — usa o botão de copiar acima.'; statusEl.style.color = resultado.ok ? 'var(--mint)' : 'var(--amber)'; }
             } else if (statusEl) {
               statusEl.textContent = 'Telegram não configurado ainda (Configurações → Telegram) — usa o botão de copiar acima.';
               statusEl.style.color = 'var(--text-tertiary)';

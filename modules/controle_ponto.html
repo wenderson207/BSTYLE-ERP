@@ -115,7 +115,7 @@
 
   async function carregar(){
     try {
-      if (!(await checarPermissao('FUNCIONARIOS','VISUALIZAR'))){ setHTML('linhas', '<tr class="empty-row"><td colspan="8">Sem permissão.</td></tr>'); return; }
+      if (!(await checarPermissao('CONTROLE_PONTO','VISUALIZAR'))){ setHTML('linhas', '<tr class="empty-row"><td colspan="8">Sem permissão.</td></tr>'); return; }
       [registros, funcionarios, empresas] = await Promise.all([dbGetAll('PONTO_REGISTROS'), dbGetAll('USUARIOS'), dbGetAll('EMPRESAS')]);
       funcionarios = funcionarios.filter(f => f.STATUS !== 'Excluído');
 
@@ -244,10 +244,10 @@
 
     try {
       if (registroAtual) {
-        if (!(await checarPermissao('FUNCIONARIOS','EDITAR'))){ mostrarToast('Sem permissão.', 'erro'); return; }
+        if (!(await checarPermissao('CONTROLE_PONTO','EDITAR'))){ mostrarToast('Sem permissão.', 'erro'); return; }
         await dbUpdate('PONTO_REGISTROS', registroAtual.ID, dados);
       } else {
-        if (!(await checarPermissao('FUNCIONARIOS','CADASTRAR'))){ mostrarToast('Sem permissão.', 'erro'); return; }
+        if (!(await checarPermissao('CONTROLE_PONTO','CADASTRAR'))){ mostrarToast('Sem permissão.', 'erro'); return; }
         await dbInsert('PONTO_REGISTROS', Object.assign({ USUARIO_REGISTRO_ID: usuarioAtual.ID }, dados));
       }
       mostrarToast('Ponto salvo.');
@@ -259,7 +259,7 @@
   window.__excluirPonto = async (id) => {
     if (!confirm('Excluir esse registro de ponto?')) return;
     try {
-      if (!(await checarPermissao('FUNCIONARIOS','EXCLUIR'))){ mostrarToast('Sem permissão.', 'erro'); return; }
+      if (!(await checarPermissao('CONTROLE_PONTO','EXCLUIR'))){ mostrarToast('Sem permissão.', 'erro'); return; }
       await dbDelete('PONTO_REGISTROS', id);
       mostrarToast('Registro excluído.');
       carregar();

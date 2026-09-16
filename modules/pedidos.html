@@ -82,7 +82,7 @@
 
   async function carregarListas(){
     try {
-      if (!(await checarPermissao('ESTOQUE','VISUALIZAR'))){ setHTML('colunaListas', 'Sem permissão.'); return; }
+      if (!(await checarPermissao('PEDIDOS','VISUALIZAR'))){ setHTML('colunaListas', 'Sem permissão.'); return; }
       listas = (await dbGetAll('LISTAS_COMPRAS')).sort((a,b) => new Date(b.DATA_CRIACAO) - new Date(a.DATA_CRIACAO));
       renderColunaListas();
       // Se a lista que estava aberta ainda existe, mantém ela aberta depois de recarregar.
@@ -176,7 +176,7 @@
     const nome = document.getElementById('fNomeLista').value.trim();
     if (!nome){ mostrarToast('Dá um nome pra lista.', 'erro'); return; }
     try {
-      if (!(await checarPermissao('ESTOQUE','CADASTRAR'))){ mostrarToast('Sem permissão.', 'erro'); return; }
+      if (!(await checarPermissao('PEDIDOS','CADASTRAR'))){ mostrarToast('Sem permissão.', 'erro'); return; }
       const nova = await dbInsert('LISTAS_COMPRAS', { NOME: nome, DATA_CRIACAO: new Date().toISOString(), USUARIO_ID: usuarioAtual.ID });
       mostrarToast('Lista criada.');
       modalNovaLista.classList.remove('open');
@@ -189,7 +189,7 @@
     const lista = listas.find(l => l.ID === listaId);
     if (!confirm('Excluir a lista "' + (lista?lista.NOME:'') + '" e todos os itens dela? Não dá pra desfazer.')) return;
     try {
-      if (!(await checarPermissao('ESTOQUE','EXCLUIR'))){ mostrarToast('Sem permissão.', 'erro'); return; }
+      if (!(await checarPermissao('PEDIDOS','EXCLUIR'))){ mostrarToast('Sem permissão.', 'erro'); return; }
       const itens = await dbQuery('LISTA_COMPRAS', { LISTA_ID: listaId });
       for (const item of itens) await dbDelete('LISTA_COMPRAS', item.ID);
       await dbDelete('LISTAS_COMPRAS', listaId);
@@ -249,10 +249,10 @@
 
     try {
       if (itemAtual) {
-        if (!(await checarPermissao('ESTOQUE','EDITAR'))){ mostrarToast('Sem permissão.', 'erro'); return; }
+        if (!(await checarPermissao('PEDIDOS','EDITAR'))){ mostrarToast('Sem permissão.', 'erro'); return; }
         await dbUpdate('LISTA_COMPRAS', itemAtual.ID, dados);
       } else {
-        if (!(await checarPermissao('ESTOQUE','CADASTRAR'))){ mostrarToast('Sem permissão.', 'erro'); return; }
+        if (!(await checarPermissao('PEDIDOS','CADASTRAR'))){ mostrarToast('Sem permissão.', 'erro'); return; }
         await dbInsert('LISTA_COMPRAS', Object.assign({ LISTA_ID: listaAtivaId, DATA_ADICIONADO: new Date().toISOString(), USUARIO_ID: usuarioAtual.ID }, dados));
       }
       mostrarToast('Item salvo.');
@@ -264,7 +264,7 @@
   window.__excluirItemPedido = async (id) => {
     if (!confirm('Remover esse item da lista?')) return;
     try {
-      if (!(await checarPermissao('ESTOQUE','EXCLUIR'))){ mostrarToast('Sem permissão.', 'erro'); return; }
+      if (!(await checarPermissao('PEDIDOS','EXCLUIR'))){ mostrarToast('Sem permissão.', 'erro'); return; }
       await dbDelete('LISTA_COMPRAS', id);
       mostrarToast('Item removido.');
       await abrirLista(listaAtivaId);

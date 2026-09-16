@@ -17,6 +17,18 @@ const NOMES_MODULO = {
 };
 
 // ---------- Toast global ----------
+/** Manda uma mensagem de texto por um Bot do Telegram — chamada direto do
+ * navegador, sem precisar de servidor. Retorna a resposta crua da API do
+ * Telegram ({ok:true,...} ou {ok:false, description:"..."}). */
+window.enviarMensagemTelegram = async function(token, chatId, texto){
+  const resp = await fetch('https://api.telegram.org/bot' + token + '/sendMessage', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ chat_id: chatId, text: texto, parse_mode: 'Markdown' })
+  });
+  return await resp.json();
+};
+
 function mostrarToast(mensagem, tipo){
   const wrap = document.getElementById('toastWrap');
   const el = document.createElement('div');

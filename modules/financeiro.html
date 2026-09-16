@@ -388,9 +388,9 @@
         </div>
         <div id="resultadoFechamento" style="margin-top:14px; font-size:13px;"></div>`;
 
-      document.getElementById('btnResumoWpp').addEventListener('click', () => {
+      function montarTextoResumoDia(diferenca){
         const linha = '- - - - - - - - - - -';
-        const texto = `📊 *Resumo do dia — ${nomeLoja(lojaId)}*\n${new Date().toLocaleDateString('pt-BR')}\n${linha}\n`
+        let texto = `📊 *Resumo do dia — ${nomeLoja(lojaId)}*\n${new Date().toLocaleDateString('pt-BR')}\n${linha}\n`
           + `Abertura de caixa: ${moeda(caixaHoje.VALOR_ABERTURA)}\n\n`
           + `💵 Dinheiro: ${moeda(porForma['Dinheiro'])}\n`
           + `💠 PIX: ${moeda(porForma['PIX'])}\n`
@@ -398,7 +398,19 @@
           + `💳 Crédito: ${moeda(porForma['Cartão de Crédito'])}\n`
           + `${linha}\n*Total vendido: ${moeda(totalVendidoHoje)}*\n`
           + `Esperado em caixa (dinheiro): ${moeda(esperadoEmCaixa)}`;
-        window.open('https://wa.me/?text=' + encodeURIComponent(texto), '_blank');
+        if (diferenca !== undefined && !isNaN(diferenca)) {
+          texto += `\n${linha}\n` + (diferenca === 0 ? '✅ Caixa bateu certinho!' : diferenca > 0 ? `🔵 Sobrou ${moeda(diferenca)} no caixa.` : `🔴 Faltou ${moeda(Math.abs(diferenca))} no caixa.`);
+        }
+        return texto;
+      }
+
+      async function copiarResumoParaAreaTransferencia(texto){
+        try { await navigator.clipboard.writeText(texto); mostrarToast('Resumo copiado — já pode colar onde quiser.'); }
+        catch (e) { mostrarToast('Não consegui copiar automaticamente. Copia manualmente o texto que apareceu.', 'erro'); }
+      }
+
+      document.getElementById('btnResumoWpp').addEventListener('click', () => {
+        window.open('https://wa.me/?text=' + encodeURIComponent(montarTextoResumoDia()), '_blank');
       });
 
       document.getElementById('btnFecharCaixa').addEventListener('click', async () => {
@@ -409,9 +421,29 @@
           if (!(await checarPermissao('FINANCEIRO','EDITAR'))){ mostrarToast('Sem permissão.', 'erro'); return; }
           await dbUpdate('CAIXA', idDia, { STATUS: 'Fechado', VALOR_ESPERADO: esperadoEmCaixa, VALOR_CONTADO: contado, DIFERENCA: diferenca, USUARIO_FECHAMENTO: usuarioAtual.ID, DATA_FECHAMENTO: new Date().toISOString() });
           const cor = diferenca === 0 ? 'var(--mint)' : (diferenca > 0 ? 'var(--blue)' : 'var(--red)');
-          const texto = diferenca === 0 ? 'Caixa bateu certinho! 🎉' : (diferenca > 0 ? `Sobrou ${moeda(diferenca)} no caixa.` : `Faltou ${moeda(Math.abs(diferenca))} no caixa.`);
-          setHTML('resultadoFechamento', `<b style="color:${cor};">${texto}</b>`);
+          const textoResultado = diferenca === 0 ? 'Caixa bateu certinho! 🎉' : (diferenca > 0 ? `Sobrou ${moeda(diferenca)} no caixa.` : `Faltou ${moeda(Math.abs(diferenca))} no caixa.`);
+          const textoResumo = montarTextoResumoDia(diferenca);
+
+          setHTML('resultadoFechamento', `<b style="color:${cor};">${textoResultado}</b><p style="color:var(--text-tertiary); font-size:11.5px; margin-top:8px;" id="statusEnvioTelegram">Enviando resumo pro Telegram…</p><button class="btn" style="margin-top:6px;" id="btnCopiarResumo">📋 Copiar resumo do dia</button>`);
+          document.getElementById('btnCopiarResumo').addEventListener('click', () => copiarResumoParaAreaTransferencia(textoResumo));
           mostrarToast('Caixa fechado.');
+
+          // Manda pro Telegram sozinho, se já tiver configurado em Configurações — se não
+          // tiver, ou der erro, o botão de copiar acima já resolve na mesma hora.
+          try {
+            const cfgTelegram = await dbGetById('CONFIG', 'telegram_resumo_caixa');
+            const statusEl = document.getElementById('statusEnvioTelegram');
+            if (cfgTelegram && cfgTelegram.BOT_TOKEN && cfgTelegram.CHAT_ID) {
+              const resultado = await window.enviarMensagemTelegram(cfgTelegram.BOT_TOKEN, cfgTelegram.CHAT_ID, textoResumo);
+              if (statusEl) { statusEl.textContent = resultado.ok ? '✓ Resumo enviado pro Telegram.' : 'Não consegui enviar pro Telegram — usa o botão de copiar acima.'; statusEl.style.color = resultado.ok ? 'var(--mint)' : 'var(--amber)'; }
+            } else if (statusEl) {
+              statusEl.textContent = 'Telegram não configurado ainda (Configurações → Telegram) — usa o botão de copiar acima.';
+              statusEl.style.color = 'var(--text-tertiary)';
+            }
+          } catch (e) {
+            const statusEl = document.getElementById('statusEnvioTelegram');
+            if (statusEl) { statusEl.textContent = 'Não consegui enviar pro Telegram — usa o botão de copiar acima.'; statusEl.style.color = 'var(--amber)'; }
+          }
         } catch (e) { mostrarToast('Erro: ' + e.message, 'erro'); }
       });
     } catch (e) { el.textContent = 'Erro: ' + e.message; }

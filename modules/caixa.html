@@ -171,7 +171,9 @@
             <div style="background:#ffffff; border-radius:16px; overflow:hidden; box-shadow:0 10px 30px rgba(0,0,0,0.12);">
 
               <div style="background:linear-gradient(135deg,#e2401c,#f5a623); padding:26px 28px 24px; display:flex; align-items:center; gap:14px;">
-                <div style="width:46px; height:46px; border-radius:50%; background:rgba(255,255,255,0.22); display:flex; align-items:center; justify-content:center; font-size:22px; flex-shrink:0;">${E.loja}</div>
+                ${logoDataUrl
+                  ? `<img src="${logoDataUrl}" style="height:44px; width:auto; max-width:70px; object-fit:contain; flex-shrink:0;">`
+                  : `<div style="width:46px; height:46px; border-radius:50%; background:rgba(255,255,255,0.22); display:flex; align-items:center; justify-content:center; font-size:22px; flex-shrink:0;">${E.loja}</div>`}
                 <div>
                   <div style="font-size:17px; font-weight:800; color:#fff;">${nomeLoja(lojaId)}</div>
                   <div style="font-size:11px; color:rgba(255,255,255,0.9); margin-top:2px; text-transform:uppercase; letter-spacing:1.2px;">${E.graf} Resumo do Dia</div>
@@ -218,9 +220,12 @@
         await carregarHtml2Canvas();
         if (!window.html2canvas) { mostrarToast('Não consegui carregar a biblioteca de imagem (sem internet?).', 'erro'); return; }
 
+        let logoDataUrl = null;
+        try { const logo = await carregarLogoComoDataUrl(); logoDataUrl = logo ? logo.url : null; } catch (e) { logoDataUrl = null; }
+
         const holder = document.createElement('div');
         holder.style.cssText = 'position:fixed; left:-9999px; top:0; z-index:-1;';
-        holder.innerHTML = montarHtmlImagemResumo(diferenca);
+        holder.innerHTML = montarHtmlImagemResumo(diferenca, logoDataUrl);
         document.body.appendChild(holder);
 
         const imgLogo = holder.querySelector('img');

@@ -34,7 +34,7 @@
   function nomeCliente(id, clientes){ const c = clientes.find(x=>x.ID===id); return c?c.NOME:'—'; }
 
   try {
-    if (!(await checarPermissao('ASSISTENCIA','VISUALIZAR'))){ setHTML('agendaLista', 'Sem permissão.'); return; }
+    if (!(await checarPermissao('AGENDA','VISUALIZAR'))){ setHTML('agendaLista', 'Sem permissão.'); return; }
 
     const [ordens, clientes] = await Promise.all([dbGetAll('ASSISTENCIAS'), dbGetAll('CLIENTES')]);
     const pendentes = ordens.filter(o => o.STATUS !== 'Entregue' && o.PRAZO);
@@ -72,7 +72,7 @@
 
   // ---------- Garantias perto de vencer ----------
   try {
-    if (!(await checarPermissao('GARANTIAS','VISUALIZAR'))){ setHTML('listaGarantiasVencendo', 'Sem permissão.'); return; }
+    if (!(await checarPermissao('AGENDA','VISUALIZAR'))){ setHTML('listaGarantiasVencendo', 'Sem permissão.'); return; }
     const [garantias, clientesGar] = await Promise.all([dbGetAll('GARANTIAS'), dbGetAll('CLIENTES')]);
     const hoje = new Date();
 

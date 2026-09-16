@@ -264,7 +264,7 @@
     if (!produto) return;
     const faltam = Math.max(1, Number(produto.ESTOQUE_MINIMO||0) - Number(produto.ESTOQUE_ATUAL||0));
     try {
-      if (!(await checarPermissao('ESTOQUE','CADASTRAR'))){ mostrarToast('Sem permissão.', 'erro'); return; }
+      if (!(await checarPermissao('PEDIDOS','CADASTRAR'))){ mostrarToast('Sem permissão pra usar a lista de Pedidos.', 'erro'); return; }
 
       // Usa (ou cria, se ainda não existir) uma lista fixa "Reposição de Estoque",
       // já que agora existem várias listas separadas — assim não precisa perguntar

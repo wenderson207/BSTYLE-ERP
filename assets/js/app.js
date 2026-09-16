@@ -111,6 +111,7 @@ auth.onAuthStateChanged(async (user) => {
     telaLogin.style.display = 'none';
     telaApp.classList.add('ativo');
     await popularSeletorLoja();
+    await filtrarMenuPorPermissao();
     carregarModulo('DASHBOARD');
   } catch (e) {
     mostrarToast('Erro ao carregar seu usuário: ' + e.message, 'erro');
@@ -172,6 +173,17 @@ document.querySelectorAll('.menu-item').forEach(item => {
     carregarModulo(item.getAttribute('data-modulo'));
   });
 });
+
+/** Esconde do menu lateral as abas que esse funcionário não pode acessar —
+ * administrador sempre vê tudo, o resto vê só o que foi marcado no cadastro dele. */
+async function filtrarMenuPorPermissao(){
+  const souAdmin = await perfilEhAdministrador(usuarioAtual.PERFIL_ID);
+  const permitidos = usuarioAtual.MODULOS_PERMITIDOS || [];
+  document.querySelectorAll('.menu-item').forEach(item => {
+    const modulo = item.getAttribute('data-modulo');
+    item.style.display = (souAdmin || permitidos.includes(modulo)) ? '' : 'none';
+  });
+}
 
 async function carregarModulo(modulo){
   document.getElementById('crumbAtual').textContent = NOMES_MODULO[modulo] || modulo;

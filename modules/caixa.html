@@ -144,67 +144,71 @@
 
       // ---------- Gerar imagem do resumo (mesmo padrão visual do comprovante de venda) ----------
       function montarHtmlImagemResumo(diferenca, logoDataUrl){
-        const linha = '- - - - - - - - - - - - - - - -';
+        // Emojis em \u{...} — mesmo motivo de sempre, à prova de corrupção de byte.
+        const E = {
+          loja: '\u{1F3EA}', dinheiro: '\u{1F4B5}', pix: '\u{26A1}', cartao: '\u{1F4B3}',
+          certo: '\u{2705}', azul: '\u{1F535}', vermelho: '\u{1F534}', graf: '\u{1F4C8}'
+        };
         const linhasForma = [
-          { rotulo: 'Dinheiro', valor: porForma['Dinheiro'], cor: '#2fe1a8', icone: 'R$' },
-          { rotulo: 'PIX', valor: porForma['PIX'], cor: '#4c8dff', icone: 'PIX' },
-          { rotulo: 'Cartão de Débito', valor: porForma['Cartão de Débito'], cor: '#f5a623', icone: 'DÉB' },
-          { rotulo: 'Cartão de Crédito', valor: porForma['Cartão de Crédito'], cor: '#a970ff', icone: 'CRÉD' }
+          { rotulo: 'Dinheiro', valor: porForma['Dinheiro'], cor: '#2fe1a8', icone: E.dinheiro },
+          { rotulo: 'PIX', valor: porForma['PIX'], cor: '#4c8dff', icone: E.pix },
+          { rotulo: 'Cartão de Débito', valor: porForma['Cartão de Débito'], cor: '#f5a623', icone: E.cartao },
+          { rotulo: 'Cartão de Crédito', valor: porForma['Cartão de Crédito'], cor: '#a970ff', icone: E.cartao }
         ];
         const statusInfo = diferenca === undefined || isNaN(diferenca) ? null
-          : diferenca === 0 ? { texto: 'Caixa bateu certinho!', cor: '#2fe1a8' }
-          : diferenca > 0 ? { texto: 'Sobrou ' + moeda(diferenca) + ' no caixa.', cor: '#4c8dff' }
-          : { texto: 'Faltou ' + moeda(Math.abs(diferenca)) + ' no caixa.', cor: '#ff5c5c' };
+          : diferenca === 0 ? { texto: E.certo + ' Caixa bateu certinho!', cor: '#2fe1a8' }
+          : diferenca > 0 ? { texto: E.azul + ' Sobrou ' + moeda(diferenca) + ' no caixa.', cor: '#4c8dff' }
+          : { texto: E.vermelho + ' Faltou ' + moeda(Math.abs(diferenca)) + ' no caixa.', cor: '#ff5c5c' };
+
+        // Barra de proporção — dá pra ver de relance qual forma de pagamento dominou o dia.
+        const somaFormas = linhasForma.reduce((s,f) => s + f.valor, 0) || 1;
+        const barraProporcao = linhasForma.filter(f => f.valor > 0).map(f =>
+          `<div style="width:${(f.valor/somaFormas*100).toFixed(1)}%; background:${f.cor};"></div>`
+        ).join('');
 
         return `
-          <div style="width:480px; background:#f4f5f7; font-family:'Segoe UI',Arial,sans-serif; color:#1a1a1a; padding:18px;">
+          <div style="width:480px; background:#eef0f3; font-family:'Segoe UI',Arial,sans-serif; color:#1a1a1a; padding:18px;">
             <div style="background:#ffffff; border-radius:16px; overflow:hidden; box-shadow:0 10px 30px rgba(0,0,0,0.12);">
 
-              <div style="background:linear-gradient(135deg,#e2401c,#f5a623); padding:26px 28px 22px; display:flex; align-items:center; gap:14px;">
-                ${logoDataUrl ? `<div style="background:#fff; border-radius:10px; padding:6px 9px; flex-shrink:0; display:flex; align-items:center; box-shadow:0 2px 6px rgba(0,0,0,0.15);"><img src="${logoDataUrl}" style="height:34px; width:auto; object-fit:contain; display:block;"></div>` : ''}
+              <div style="background:linear-gradient(135deg,#e2401c,#f5a623); padding:26px 28px 24px; display:flex; align-items:center; gap:14px;">
+                <div style="width:46px; height:46px; border-radius:50%; background:rgba(255,255,255,0.22); display:flex; align-items:center; justify-content:center; font-size:22px; flex-shrink:0;">${E.loja}</div>
                 <div>
-                  <div style="font-size:16.5px; font-weight:800; color:#fff;">BSTYLE - Eletrônicos & Acessórios</div>
-                  <div style="font-size:11px; color:rgba(255,255,255,0.9); margin-top:2px; text-transform:uppercase; letter-spacing:1px;">Resumo do Dia — ${nomeLoja(lojaId)}</div>
+                  <div style="font-size:17px; font-weight:800; color:#fff;">${nomeLoja(lojaId)}</div>
+                  <div style="font-size:11px; color:rgba(255,255,255,0.9); margin-top:2px; text-transform:uppercase; letter-spacing:1.2px;">${E.graf} Resumo do Dia</div>
                 </div>
               </div>
 
-              <div style="height:1px; background:repeating-linear-gradient(90deg, #ddd 0 6px, transparent 6px 12px);"></div>
+              <div style="padding:18px 28px 4px; font-size:12px; color:#999;">${new Date().toLocaleDateString('pt-BR', { weekday:'long', day:'2-digit', month:'long', year:'numeric' })}</div>
 
-              <div style="padding:20px 28px 6px; font-size:11.5px; color:#888;">${new Date().toLocaleDateString('pt-BR', { weekday:'long', day:'2-digit', month:'long', year:'numeric' })}</div>
+              <div style="padding:14px 28px 22px;">
 
-              <div style="padding:6px 28px 20px;">
-                <div style="display:flex; justify-content:space-between; padding:10px 0; border-bottom:1px solid #f2f2f2; font-size:13px;">
-                  <span style="color:#777;">Abertura de caixa</span><span style="font-weight:700;">${moeda(caixaHoje.VALOR_ABERTURA)}</span>
+                <div style="background:linear-gradient(135deg,#fff4e8,#fff8f0); border-radius:14px; padding:16px 18px; margin-bottom:18px; text-align:center;">
+                  <div style="font-size:11px; color:#b5762a; text-transform:uppercase; letter-spacing:0.8px; font-weight:700;">Total vendido hoje</div>
+                  <div style="font-size:32px; font-weight:800; color:#e2401c; margin-top:4px;">${moeda(totalVendidoHoje)}</div>
                 </div>
 
-                <div style="font-size:10px; color:#aaa; text-transform:uppercase; letter-spacing:0.8px; font-weight:700; margin:16px 0 10px;">Por forma de pagamento</div>
+                <div style="display:flex; height:10px; border-radius:6px; overflow:hidden; margin-bottom:22px; background:#f0f0f0;">${barraProporcao}</div>
+
                 ${linhasForma.map(f => `
-                  <div style="display:flex; align-items:center; justify-content:space-between; padding:9px 0; border-bottom:1px solid #f7f7f7;">
-                    <div style="display:flex; align-items:center; gap:10px;">
-                      <div style="width:34px; height:34px; border-radius:9px; background:${f.cor}1a; color:${f.cor}; display:flex; align-items:center; justify-content:center; font-size:9px; font-weight:800;">${f.icone}</div>
-                      <span style="font-size:13.5px; color:#333;">${f.rotulo}</span>
+                  <div style="display:flex; align-items:center; justify-content:space-between; padding:11px 0; border-bottom:1px solid #f5f5f5;">
+                    <div style="display:flex; align-items:center; gap:12px;">
+                      <div style="width:38px; height:38px; border-radius:10px; background:${f.cor}22; display:flex; align-items:center; justify-content:center; font-size:17px;">${f.icone}</div>
+                      <span style="font-size:14px; color:#333; font-weight:500;">${f.rotulo}</span>
                     </div>
-                    <b style="font-size:14px;">${moeda(f.valor)}</b>
+                    <b style="font-size:15px; color:#222;">${moeda(f.valor)}</b>
                   </div>`).join('')}
 
-                <div style="background:#fff8f0; border:1.5px dashed #f0c896; border-radius:12px; padding:14px 16px; margin-top:16px;">
-                  <div style="display:flex; justify-content:space-between; align-items:center;">
-                    <div>
-                      <div style="font-size:10.5px; color:#b5762a; text-transform:uppercase; letter-spacing:0.6px; font-weight:700;">Total vendido</div>
-                      <div style="font-size:22px; font-weight:800; color:#e2401c; margin-top:2px;">${moeda(totalVendidoHoje)}</div>
-                    </div>
-                    <div style="text-align:right;">
-                      <div style="font-size:10.5px; color:#b5762a;">Esperado em caixa</div>
-                      <div style="font-size:14px; font-weight:700; color:#444;">${moeda(esperadoEmCaixa)}</div>
-                    </div>
-                  </div>
+                <div style="display:flex; justify-content:space-between; padding:14px 0 0; margin-top:10px; font-size:12.5px; color:#888;">
+                  <span>Abertura de caixa</span><span style="font-weight:700; color:#555;">${moeda(caixaHoje.VALOR_ABERTURA)}</span>
+                </div>
+                <div style="display:flex; justify-content:space-between; padding:6px 0 0; font-size:12.5px; color:#888;">
+                  <span>Esperado em caixa</span><span style="font-weight:700; color:#555;">${moeda(esperadoEmCaixa)}</span>
                 </div>
 
-                ${statusInfo ? `<div style="text-align:center; margin-top:14px; padding:10px; border-radius:10px; background:${statusInfo.cor}1a; color:${statusInfo.cor}; font-weight:700; font-size:13px;">${statusInfo.texto}</div>` : ''}
+                ${statusInfo ? `<div style="text-align:center; margin-top:18px; padding:12px; border-radius:10px; background:${statusInfo.cor}18; color:${statusInfo.cor}; font-weight:700; font-size:13.5px;">${statusInfo.texto}</div>` : ''}
               </div>
 
-              <div style="height:1px; background:repeating-linear-gradient(90deg, #ddd 0 6px, transparent 6px 12px); margin:0 28px;"></div>
-              <div style="text-align:center; padding:14px 28px 20px; font-size:10.5px; color:#aaa;">Gerado pelo BSTYLE ERP — ${new Date().toLocaleString('pt-BR')}</div>
+              <div style="text-align:center; padding:14px 28px 20px; border-top:1px solid #f2f2f2; font-size:10.5px; color:#bbb;">Gerado pelo BSTYLE ERP — ${new Date().toLocaleString('pt-BR')}</div>
             </div>
           </div>`;
       }
@@ -214,12 +218,9 @@
         await carregarHtml2Canvas();
         if (!window.html2canvas) { mostrarToast('Não consegui carregar a biblioteca de imagem (sem internet?).', 'erro'); return; }
 
-        let logoDataUrl = null;
-        try { const logo = await carregarLogoComoDataUrl(); logoDataUrl = logo ? logo.url : null; } catch (e) { logoDataUrl = null; }
-
         const holder = document.createElement('div');
         holder.style.cssText = 'position:fixed; left:-9999px; top:0; z-index:-1;';
-        holder.innerHTML = montarHtmlImagemResumo(diferenca, logoDataUrl);
+        holder.innerHTML = montarHtmlImagemResumo(diferenca);
         document.body.appendChild(holder);
 
         const imgLogo = holder.querySelector('img');

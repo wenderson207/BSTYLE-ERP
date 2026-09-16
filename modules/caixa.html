@@ -85,8 +85,17 @@
         <div style="display:flex; gap:10px; flex-wrap:wrap;">
           <button class="btn btn-primary" id="btnFecharCaixa">Fechar caixa</button>
           <button class="btn" id="btnResumoWpp">\u{1F4AC} Mandar resumo do dia no WhatsApp</button>
+          <button class="btn" id="btnResumoImagem">\u{1F4F8} Gerar imagem do resumo</button>
         </div>
-        <div id="resultadoFechamento" style="margin-top:14px; font-size:13px;"></div>`;
+        <div id="resultadoFechamento" style="margin-top:14px; font-size:13px;"></div>
+
+        <div style="margin-top:20px; border-top:1px solid var(--hairline); padding-top:16px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+            <label style="font-size:12px; color:var(--text-secondary);">Texto do resumo (se o WhatsApp não abrir certo, copia daqui)</label>
+            <button class="btn" id="btnCopiarTextoResumo" style="padding:6px 10px; font-size:11.5px;">\u{1F4CB} Copiar texto</button>
+          </div>
+          <textarea id="textoResumoVisivel" readonly style="width:100%; min-height:150px; background:var(--bg-elevated); border:1px solid var(--hairline); color:var(--text-primary); padding:12px; border-radius:8px; font-size:12.5px; font-family:var(--font-mono); box-sizing:border-box; resize:vertical;"></textarea>
+        </div>`;
 
       // Emojis escritos como \u{...} em vez do caractere literal — o navegador
       // reconstrói o caractere certinho a partir do código, sem depender da
@@ -115,12 +124,136 @@
 
       async function copiarResumoParaAreaTransferencia(texto){
         try { await navigator.clipboard.writeText(texto); mostrarToast('Resumo copiado — já pode colar onde quiser.'); }
-        catch (e) { mostrarToast('Não consegui copiar automaticamente. Copia manualmente o texto que apareceu.', 'erro'); }
+        catch (e) {
+          // Se a API de área de transferência não deixar (precisa de permissão, ou
+          // navegador mais antigo), seleciona o texto sozinho — só falta Ctrl+C.
+          const area = document.getElementById('textoResumoVisivel');
+          if (area) { area.focus(); area.select(); mostrarToast('Não consegui copiar sozinho — o texto já tá selecionado, só apertar Ctrl+C.', 'erro'); }
+          else mostrarToast('Não consegui copiar automaticamente.', 'erro');
+        }
       }
+
+      // O bloco de texto fica sempre visível e atualizado, desde o carregamento —
+      // não precisa esperar fechar o caixa pra ter algo pronto pra copiar.
+      document.getElementById('textoResumoVisivel').value = montarTextoResumoDia();
+      document.getElementById('btnCopiarTextoResumo').addEventListener('click', () => copiarResumoParaAreaTransferencia(document.getElementById('textoResumoVisivel').value));
 
       document.getElementById('btnResumoWpp').addEventListener('click', () => {
         window.open('https://wa.me/?text=' + encodeURIComponent(montarTextoResumoDia()), '_blank');
       });
+
+      // ---------- Gerar imagem do resumo (mesmo padrão visual do comprovante de venda) ----------
+      function montarHtmlImagemResumo(diferenca, logoDataUrl){
+        const linha = '- - - - - - - - - - - - - - - -';
+        const linhasForma = [
+          { rotulo: 'Dinheiro', valor: porForma['Dinheiro'], cor: '#2fe1a8', icone: 'R$' },
+          { rotulo: 'PIX', valor: porForma['PIX'], cor: '#4c8dff', icone: 'PIX' },
+          { rotulo: 'Cartão de Débito', valor: porForma['Cartão de Débito'], cor: '#f5a623', icone: 'DÉB' },
+          { rotulo: 'Cartão de Crédito', valor: porForma['Cartão de Crédito'], cor: '#a970ff', icone: 'CRÉD' }
+        ];
+        const statusInfo = diferenca === undefined || isNaN(diferenca) ? null
+          : diferenca === 0 ? { texto: 'Caixa bateu certinho!', cor: '#2fe1a8' }
+          : diferenca > 0 ? { texto: 'Sobrou ' + moeda(diferenca) + ' no caixa.', cor: '#4c8dff' }
+          : { texto: 'Faltou ' + moeda(Math.abs(diferenca)) + ' no caixa.', cor: '#ff5c5c' };
+
+        return `
+          <div style="width:480px; background:#f4f5f7; font-family:'Segoe UI',Arial,sans-serif; color:#1a1a1a; padding:18px;">
+            <div style="background:#ffffff; border-radius:16px; overflow:hidden; box-shadow:0 10px 30px rgba(0,0,0,0.12);">
+
+              <div style="background:linear-gradient(135deg,#e2401c,#f5a623); padding:26px 28px 22px; display:flex; align-items:center; gap:14px;">
+                ${logoDataUrl ? `<div style="background:#fff; border-radius:10px; padding:6px 9px; flex-shrink:0; display:flex; align-items:center; box-shadow:0 2px 6px rgba(0,0,0,0.15);"><img src="${logoDataUrl}" style="height:34px; width:auto; object-fit:contain; display:block;"></div>` : ''}
+                <div>
+                  <div style="font-size:16.5px; font-weight:800; color:#fff;">BSTYLE - Eletrônicos & Acessórios</div>
+                  <div style="font-size:11px; color:rgba(255,255,255,0.9); margin-top:2px; text-transform:uppercase; letter-spacing:1px;">Resumo do Dia — ${nomeLoja(lojaId)}</div>
+                </div>
+              </div>
+
+              <div style="height:1px; background:repeating-linear-gradient(90deg, #ddd 0 6px, transparent 6px 12px);"></div>
+
+              <div style="padding:20px 28px 6px; font-size:11.5px; color:#888;">${new Date().toLocaleDateString('pt-BR', { weekday:'long', day:'2-digit', month:'long', year:'numeric' })}</div>
+
+              <div style="padding:6px 28px 20px;">
+                <div style="display:flex; justify-content:space-between; padding:10px 0; border-bottom:1px solid #f2f2f2; font-size:13px;">
+                  <span style="color:#777;">Abertura de caixa</span><span style="font-weight:700;">${moeda(caixaHoje.VALOR_ABERTURA)}</span>
+                </div>
+
+                <div style="font-size:10px; color:#aaa; text-transform:uppercase; letter-spacing:0.8px; font-weight:700; margin:16px 0 10px;">Por forma de pagamento</div>
+                ${linhasForma.map(f => `
+                  <div style="display:flex; align-items:center; justify-content:space-between; padding:9px 0; border-bottom:1px solid #f7f7f7;">
+                    <div style="display:flex; align-items:center; gap:10px;">
+                      <div style="width:34px; height:34px; border-radius:9px; background:${f.cor}1a; color:${f.cor}; display:flex; align-items:center; justify-content:center; font-size:9px; font-weight:800;">${f.icone}</div>
+                      <span style="font-size:13.5px; color:#333;">${f.rotulo}</span>
+                    </div>
+                    <b style="font-size:14px;">${moeda(f.valor)}</b>
+                  </div>`).join('')}
+
+                <div style="background:#fff8f0; border:1.5px dashed #f0c896; border-radius:12px; padding:14px 16px; margin-top:16px;">
+                  <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <div>
+                      <div style="font-size:10.5px; color:#b5762a; text-transform:uppercase; letter-spacing:0.6px; font-weight:700;">Total vendido</div>
+                      <div style="font-size:22px; font-weight:800; color:#e2401c; margin-top:2px;">${moeda(totalVendidoHoje)}</div>
+                    </div>
+                    <div style="text-align:right;">
+                      <div style="font-size:10.5px; color:#b5762a;">Esperado em caixa</div>
+                      <div style="font-size:14px; font-weight:700; color:#444;">${moeda(esperadoEmCaixa)}</div>
+                    </div>
+                  </div>
+                </div>
+
+                ${statusInfo ? `<div style="text-align:center; margin-top:14px; padding:10px; border-radius:10px; background:${statusInfo.cor}1a; color:${statusInfo.cor}; font-weight:700; font-size:13px;">${statusInfo.texto}</div>` : ''}
+              </div>
+
+              <div style="height:1px; background:repeating-linear-gradient(90deg, #ddd 0 6px, transparent 6px 12px); margin:0 28px;"></div>
+              <div style="text-align:center; padding:14px 28px 20px; font-size:10.5px; color:#aaa;">Gerado pelo BSTYLE ERP — ${new Date().toLocaleString('pt-BR')}</div>
+            </div>
+          </div>`;
+      }
+
+      async function gerarImagemResumo(diferenca){
+        mostrarToast('Gerando imagem…');
+        await carregarHtml2Canvas();
+        if (!window.html2canvas) { mostrarToast('Não consegui carregar a biblioteca de imagem (sem internet?).', 'erro'); return; }
+
+        let logoDataUrl = null;
+        try { const logo = await carregarLogoComoDataUrl(); logoDataUrl = logo ? logo.url : null; } catch (e) { logoDataUrl = null; }
+
+        const holder = document.createElement('div');
+        holder.style.cssText = 'position:fixed; left:-9999px; top:0; z-index:-1;';
+        holder.innerHTML = montarHtmlImagemResumo(diferenca, logoDataUrl);
+        document.body.appendChild(holder);
+
+        const imgLogo = holder.querySelector('img');
+        if (imgLogo && !imgLogo.complete) {
+          await new Promise(res => { imgLogo.onload = res; imgLogo.onerror = res; setTimeout(res, 1500); });
+        }
+
+        let canvas;
+        try {
+          canvas = await window.html2canvas(holder.firstElementChild, { scale: 2, backgroundColor: '#ffffff', useCORS: true, allowTaint: false, logging: false });
+        } finally {
+          document.body.removeChild(holder);
+        }
+
+        canvas.toBlob(async (blob) => {
+          if (!blob) { mostrarToast('Não consegui gerar a imagem.', 'erro'); return; }
+          // Tenta copiar a imagem direto pra área de transferência — assim já dá
+          // pra colar (Ctrl+V) direto no WhatsApp Web ou onde quiser, sem precisar
+          // salvar arquivo nenhum. Se o navegador não deixar, abre a imagem numa
+          // aba nova, pra copiar manualmente (clique direito → copiar imagem).
+          try {
+            if (navigator.clipboard && window.ClipboardItem) {
+              await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+              mostrarToast('Imagem copiada — já pode colar (Ctrl+V) onde quiser.');
+              return;
+            }
+          } catch (e) { /* segue pro alternativo abaixo */ }
+          const url = URL.createObjectURL(blob);
+          window.open(url, '_blank');
+          mostrarToast('Não consegui copiar sozinho — a imagem abriu numa aba nova, clica com o botão direito nela e escolhe "Copiar imagem".');
+        }, 'image/png');
+      }
+
+      document.getElementById('btnResumoImagem').addEventListener('click', () => gerarImagemResumo());
 
       document.getElementById('btnFecharCaixa').addEventListener('click', async () => {
         const contado = Number(document.getElementById('valorContado').value);
@@ -132,9 +265,11 @@
           const cor = diferenca === 0 ? 'var(--mint)' : (diferenca > 0 ? 'var(--blue)' : 'var(--red)');
           const textoResultado = diferenca === 0 ? 'Caixa bateu certinho! \u{1F389}' : (diferenca > 0 ? `Sobrou ${moeda(diferenca)} no caixa.` : `Faltou ${moeda(Math.abs(diferenca))} no caixa.`);
           const textoResumo = montarTextoResumoDia(diferenca);
+          document.getElementById('textoResumoVisivel').value = textoResumo;
 
-          setHTML('resultadoFechamento', `<b style="color:${cor};">${textoResultado}</b><p style="color:var(--text-tertiary); font-size:11.5px; margin-top:8px;" id="statusEnvioTelegram">Enviando resumo pro Telegram…</p><button class="btn" style="margin-top:6px;" id="btnCopiarResumo">\u{1F4CB} Copiar resumo do dia</button>`);
+          setHTML('resultadoFechamento', `<b style="color:${cor};">${textoResultado}</b><p style="color:var(--text-tertiary); font-size:11.5px; margin-top:8px;" id="statusEnvioTelegram">Enviando resumo pro Telegram…</p><div style="display:flex; gap:8px; margin-top:6px;"><button class="btn" id="btnCopiarResumo">\u{1F4CB} Copiar resumo do dia</button><button class="btn" id="btnImagemResumoFinal">\u{1F4F8} Gerar imagem</button></div>`);
           document.getElementById('btnCopiarResumo').addEventListener('click', () => copiarResumoParaAreaTransferencia(textoResumo));
+          document.getElementById('btnImagemResumoFinal').addEventListener('click', () => gerarImagemResumo(diferenca));
           mostrarToast('Caixa fechado.');
 
           // Manda pro Telegram sozinho, se já tiver configurado em Configurações — se não

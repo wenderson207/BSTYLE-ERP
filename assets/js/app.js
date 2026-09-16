@@ -20,6 +20,18 @@ const NOMES_MODULO = {
 /** Manda uma mensagem de texto por um Bot do Telegram — chamada direto do
  * navegador, sem precisar de servidor. Retorna a resposta crua da API do
  * Telegram ({ok:true,...} ou {ok:false, description:"..."}). */
+/** Carrega a biblioteca html2canvas sob demanda (só quando alguma tela
+ * realmente precisa gerar imagem) — compartilhada entre todos os módulos. */
+window.carregarHtml2Canvas = function(){
+  return new Promise(resolve => {
+    if (window.html2canvas) return resolve();
+    const s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+    s.onload = resolve; s.onerror = resolve;
+    document.head.appendChild(s);
+  });
+};
+
 window.enviarMensagemTelegram = async function(token, chatId, texto){
   const resp = await fetch('https://api.telegram.org/bot' + token + '/sendMessage', {
     method: 'POST',

@@ -145,6 +145,20 @@
       linha: c => [dataBR(c.DATA), moeda(c.VALOR_TOTAL), c.STATUS],
       resumo: lista => [ ['Total de compras', lista.length], ['Valor total', moeda(lista.reduce((s,c)=>s+Number(c.VALOR_TOTAL||0),0))] ],
       campoData: 'DATA', campoCategoria: c => c.STATUS || 'Sem status', rotuloCategoria: 'Por status', campoValor: c => Number(c.VALOR_TOTAL)||0
+    },
+    { id:'caixa', nome:'Caixa', colecao:'CAIXA', temFiltroLoja: true,
+      colunas: ['Data','Loja','Abertura','Esperado','Contado','Diferença','Status'],
+      linha: c => {
+        const dif = Number(c.DIFERENCA);
+        const textoDif = c.STATUS !== 'Fechado' ? '—' : (dif === 0 ? 'Bateu' : dif > 0 ? '+' + moeda(dif) : '-' + moeda(Math.abs(dif)));
+        return [dataBR(c.DATA), nomeLoja(c.EMPRESA_ID), moeda(c.VALOR_ABERTURA), c.STATUS==='Fechado'?moeda(c.VALOR_ESPERADO):'—', c.STATUS==='Fechado'?moeda(c.VALOR_CONTADO):'—', textoDif, c.STATUS];
+      },
+      resumo: lista => [
+        ['Dias registrados', lista.length],
+        ['Sobras acumuladas', moeda(lista.filter(c=>Number(c.DIFERENCA)>0).reduce((s,c)=>s+Number(c.DIFERENCA),0))],
+        ['Faltas acumuladas', moeda(Math.abs(lista.filter(c=>Number(c.DIFERENCA)<0).reduce((s,c)=>s+Number(c.DIFERENCA),0)))]
+      ],
+      campoData: 'DATA', campoCategoria: c => c.STATUS || 'Sem status', rotuloCategoria: 'Por status', campoValor: null
     }
   ];
 

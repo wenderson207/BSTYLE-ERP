@@ -67,6 +67,7 @@ async function perfilEhAdministrador(perfilId) {
  */
 async function checarPermissao(modulo, acao) {
   if (!usuarioAtual) return false;
+  if (modulo === 'AJUDA') return true; // ajuda/suporte fica liberado pra todo mundo, sempre
   if (await perfilEhAdministrador(usuarioAtual.PERFIL_ID)) return true;
 
   const permitidos = usuarioAtual.MODULOS_PERMITIDOS || [];

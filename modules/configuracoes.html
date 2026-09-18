@@ -258,9 +258,10 @@
 
   // ---------- Ajuda e Suporte (número de WhatsApp) ----------
   async function carregarSuporte(){
+    const NUMERO_PADRAO = '5511983223602';
     let cfg;
     try { cfg = await dbGetById('CONFIG', 'suporte_whatsapp'); } catch (e) { cfg = null; }
-    document.getElementById('suporteNumero').value = cfg ? cfg.NUMERO||'' : '';
+    document.getElementById('suporteNumero').value = (cfg && cfg.NUMERO) ? cfg.NUMERO : NUMERO_PADRAO;
   }
   document.getElementById('btnSalvarSuporte').addEventListener('click', async () => {
     try {

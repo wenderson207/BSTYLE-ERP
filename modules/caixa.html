@@ -278,14 +278,20 @@
           document.getElementById('btnImagemResumoFinal').addEventListener('click', () => gerarImagemResumo(diferenca));
           mostrarToast('Caixa fechado.');
 
-          // Manda pro Telegram sozinho, se já tiver configurado em Configurações — se não
-          // tiver, ou der erro, o botão de copiar acima já resolve na mesma hora.
+          // Manda pro Telegram sozinho pra todo mundo da lista, se já tiver configurado em
+          // Configurações — se não tiver, ou der erro, o botão de copiar acima já resolve.
           try {
             const cfgTelegram = await dbGetById('CONFIG', 'telegram_resumo_caixa');
             const statusEl = document.getElementById('statusEnvioTelegram');
-            if (cfgTelegram && cfgTelegram.BOT_TOKEN && cfgTelegram.CHAT_ID) {
-              const resultado = await window.enviarMensagemTelegram(cfgTelegram.BOT_TOKEN, cfgTelegram.CHAT_ID, textoResumo);
-              if (statusEl) { statusEl.textContent = resultado.ok ? '\u{2713} Resumo enviado pro Telegram.' : 'Não consegui enviar pro Telegram — usa o botão de copiar acima.'; statusEl.style.color = resultado.ok ? 'var(--mint)' : 'var(--amber)'; }
+            const chatIds = cfgTelegram && Array.isArray(cfgTelegram.CHAT_IDS) ? cfgTelegram.CHAT_IDS
+              : (cfgTelegram && cfgTelegram.CHAT_ID ? [cfgTelegram.CHAT_ID] : []); // formato antigo, de quem configurou antes
+            if (cfgTelegram && cfgTelegram.BOT_TOKEN && chatIds.length) {
+              const resultados = await Promise.all(chatIds.map(id => window.enviarMensagemTelegram(cfgTelegram.BOT_TOKEN, id, textoResumo)));
+              const sucesso = resultados.filter(r => r.ok).length;
+              if (statusEl) {
+                statusEl.textContent = sucesso === chatIds.length ? '\u{2713} Resumo enviado pro Telegram (' + sucesso + ' pessoa' + (sucesso>1?'s':'') + ').' : sucesso + ' de ' + chatIds.length + ' receberam — confere Configurações → Telegram.';
+                statusEl.style.color = sucesso === chatIds.length ? 'var(--mint)' : 'var(--amber)';
+              }
             } else if (statusEl) {
               statusEl.textContent = 'Telegram não configurado ainda (Configurações → Telegram) — usa o botão de copiar acima.';
               statusEl.style.color = 'var(--text-tertiary)';

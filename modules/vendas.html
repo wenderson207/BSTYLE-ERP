@@ -496,8 +496,20 @@
   // ---------- Finalizar venda ----------
   document.getElementById('btnFinalizar').addEventListener('click', async () => {
     if (!carrinho.length){ mostrarToast('Adicione ao menos um item.', 'erro'); return; }
-    if (!document.getElementById('fEmpresaVenda').value){ mostrarToast('Selecione para qual loja é esta venda.', 'erro'); return; }
+    const lojaDaVenda = document.getElementById('fEmpresaVenda').value;
+    if (!lojaDaVenda){ mostrarToast('Selecione para qual loja é esta venda.', 'erro'); return; }
     if (!(await checarPermissao('VENDAS','CADASTRAR'))){ mostrarToast('Sem permissão.', 'erro'); return; }
+
+    // Não deixa vender sem o caixa do dia estar aberto — é o jeito de garantir que
+    // ninguém esquece de abrir o caixa antes de começar a trabalhar.
+    try {
+      const idDiaCaixa = lojaDaVenda + '_' + new Date().toISOString().substring(0,10);
+      const caixaDeHoje = await dbGetById('CAIXA', idDiaCaixa);
+      if (!caixaDeHoje || caixaDeHoje.STATUS !== 'Aberto') {
+        mostrarToast('O caixa de hoje ainda não foi aberto — vai na aba "Caixa Diário" e abre antes de vender.', 'erro');
+        return;
+      }
+    } catch (e) { mostrarToast('Não consegui confirmar se o caixa está aberto: ' + e.message, 'erro'); return; }
 
     const combinando = document.getElementById('chkCombinarPagamento').checked;
     let formaPagamento = document.getElementById('formaPagamento').value;

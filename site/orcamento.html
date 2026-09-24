@@ -1,0 +1,346 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Solicitar Orçamento | BStyle</title>
+<meta name="description" content="Solicite um orçamento com a BStyle. Conte o que você precisa e nossa equipe entra em contato pelo WhatsApp.">
+<meta name="robots" content="index, follow">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+
+  <!-- ===== HEADER ===== -->
+  <header class="header">
+    <div class="container header-inner">
+      <a href="index.html" class="marca">B<span>Style</span></a>
+      <nav class="nav-desktop">
+        <a href="index.html#home">Home</a>
+        <a href="index.html#servicos">Serviços</a>
+        <a href="index.html#lojas">Nossas Lojas</a>
+        <a href="index.html#quem-somos">Quem Somos</a>
+        <a href="index.html#contato">Contato</a>
+      </nav>
+      <div class="header-acoes">
+        <a href="orcamento.html" class="btn btn-laranja">Solicitar orçamento</a>
+        <button class="btn-hamburguer" id="btnHamburguerSite" aria-label="Abrir menu">☰</button>
+      </div>
+    </div>
+  </header>
+
+  <div class="menu-mobile" id="menuMobileSite">
+    <a href="index.html#home">Home</a>
+    <a href="index.html#servicos">Serviços</a>
+    <a href="index.html#lojas">Nossas Lojas</a>
+    <a href="index.html#quem-somos">Quem Somos</a>
+    <a href="index.html#contato">Contato</a>
+    <a class="btn btn-laranja btn-bloco" href="orcamento.html">Solicitar orçamento</a>
+  </div>
+
+  <section class="secao secao-cinza" style="padding-top:110px;">
+    <div class="container">
+
+      <!-- ---------- Estado 1: formulário ---------- -->
+      <div id="blocoFormulario">
+        <span class="eyebrow centralizado">Orçamento</span>
+        <h2 class="titulo-secao centralizado">Solicite seu orçamento</h2>
+        <p class="subtitulo-secao centralizado">Conte para a gente o que você precisa. Nossa equipe irá analisar sua solicitação e entrar em contato com você.</p>
+
+        <form class="form-orcamento" id="formOrcamento" novalidate>
+          <h3 style="font-size:15px; margin-bottom:16px;">Dados do cliente</h3>
+
+          <div class="campo" id="campoNome">
+            <label>Nome completo <span class="obrigatorio">*</span></label>
+            <input type="text" id="fNome" name="nome" autocomplete="name" maxlength="150">
+            <span class="erro-campo">Digite seu nome completo.</span>
+          </div>
+
+          <div class="linha-2">
+            <div class="campo" id="campoWhatsapp">
+              <label>WhatsApp <span class="obrigatorio">*</span></label>
+              <input type="tel" id="fWhatsapp" name="whatsapp" placeholder="(11) 90000-0000" autocomplete="tel" maxlength="20">
+              <span class="erro-campo">Digite um WhatsApp válido com DDD.</span>
+            </div>
+            <div class="campo" id="campoEmail">
+              <label>E-mail <span style="color:var(--cinza-texto); font-weight:400;">(opcional)</span></label>
+              <input type="email" id="fEmail" name="email" autocomplete="email" maxlength="150">
+              <span class="erro-campo">Digite um e-mail válido.</span>
+            </div>
+          </div>
+
+          <h3 style="font-size:15px; margin:26px 0 16px;">Informações da solicitação</h3>
+
+          <div class="linha-2">
+            <div class="campo" id="campoTipo">
+              <label>Tipo de atendimento <span class="obrigatorio">*</span></label>
+              <select id="fTipo" name="tipo">
+                <option value="">Selecione…</option>
+              </select>
+              <span class="erro-campo">Escolha o tipo de atendimento.</span>
+            </div>
+            <div class="campo" id="campoLoja">
+              <label>Loja de preferência <span class="obrigatorio">*</span></label>
+              <select id="fLoja" name="loja">
+                <option value="">Selecione…</option>
+              </select>
+              <span class="erro-campo">Escolha a loja de preferência.</span>
+            </div>
+          </div>
+
+          <div class="campo" id="campoProduto">
+            <label>Produto / aparelho</label>
+            <input type="text" id="fProduto" name="produto" placeholder="Ex.: iPhone 12, notebook, fone bluetooth…" maxlength="150">
+          </div>
+
+          <div class="campo" id="campoDescricao">
+            <label>Descrição <span class="obrigatorio">*</span></label>
+            <textarea id="fDescricao" name="descricao" maxlength="2000" placeholder="Descreva o que você precisa ou o problema do aparelho…"></textarea>
+            <span class="erro-campo">Conte pra gente o que você precisa.</span>
+          </div>
+
+          <div class="campo">
+            <label>Anexos <span style="color:var(--cinza-texto); font-weight:400;">(opcional)</span></label>
+            <div class="upload-fotos" id="areaUpload">
+              <span>📷 Adicione fotos para facilitar nossa análise.</span><br>
+              <small>Até 3 fotos.</small>
+              <input type="file" id="fFotos" accept="image/*" multiple>
+            </div>
+            <div class="previa-fotos" id="previaFotos"></div>
+          </div>
+
+          <button type="submit" class="btn btn-laranja btn-bloco" id="btnEnviarOrcamento" style="margin-top:10px;">Enviar solicitação</button>
+          <div class="mensagem-envio" id="mensagemEnvio"></div>
+          <a class="btn btn-whatsapp btn-bloco mt-16" id="btnWhatsappErro" data-whatsapp-padrao target="_blank" rel="noopener" style="display:none;">💬 Falar pelo WhatsApp</a>
+        </form>
+      </div>
+
+      <!-- ---------- Estado 2: confirmação ---------- -->
+      <div class="tela-confirmacao" id="blocoConfirmacao" style="display:none;">
+        <div class="icone-check">✅</div>
+        <h2>Solicitação recebida!</h2>
+        <p>Recebemos sua solicitação de orçamento. Nossa equipe irá analisar as informações e entrar em contato pelo WhatsApp informado.</p>
+        <div class="numero-solicitacao" id="numeroSolicitacao">#BST-000000</div>
+        <div class="botoes">
+          <a class="btn btn-whatsapp" id="linkWhatsappConfirmacao" target="_blank" rel="noopener">💬 Falar com a BStyle pelo WhatsApp</a>
+          <a class="btn btn-outline" href="index.html">🏠 Voltar para o início</a>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ===== FOOTER ===== -->
+  <footer class="footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div>
+          <div class="marca">B<span style="color:var(--laranja);">Style</span></div>
+          <p>Tecnologia, acessórios e soluções para você.</p>
+        </div>
+        <div>
+          <h4>Links</h4>
+          <ul>
+            <li><a href="index.html#home">Início</a></li>
+            <li><a href="index.html#servicos">Serviços</a></li>
+            <li><a href="index.html#lojas">Nossas Lojas</a></li>
+            <li><a href="index.html#quem-somos">Quem Somos</a></li>
+            <li><a href="index.html#contato">Contato</a></li>
+          </ul>
+        </div>
+        <div id="footerLojas"></div>
+      </div>
+      <div class="footer-baixo">
+        <span>© <span id="anoAtual"></span> BStyle — Todos os direitos reservados.</span>
+        <div class="footer-social"><a href="https://instagram.com/bstyle_clp" target="_blank" rel="noopener">📸 @bstyle_clp</a></div>
+      </div>
+    </div>
+  </footer>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="assets/js/firebase-init-site.js"></script>
+<script src="assets/js/config.js"></script>
+<script src="assets/js/site.js"></script>
+<script>
+  document.getElementById('footerLojas').innerHTML = '<h4>Nossas lojas</h4>' + CONFIG_BSTYLE.LOJAS.map(l => `
+    <div class="loja-footer"><b>${l.NOME}</b>${l.ENDERECO} — ${l.CIDADE_UF}<br>${l.TELEFONE}</div>
+  `).join('');
+
+  // ---------- Preenche selects a partir do config ----------
+  const selTipo = document.getElementById('fTipo');
+  CONFIG_BSTYLE.TIPOS_ATENDIMENTO.forEach(t => {
+    const opt = document.createElement('option'); opt.value = t; opt.textContent = t; selTipo.appendChild(opt);
+  });
+  const selLoja = document.getElementById('fLoja');
+  CONFIG_BSTYLE.LOJAS.forEach(l => {
+    const opt = document.createElement('option'); opt.value = l.CHAVE; opt.textContent = l.NOME; selLoja.appendChild(opt);
+  });
+
+  // Se veio de um botão "Solicitar orçamento" de um serviço específico (?tipo=...), pré-seleciona.
+  const paramsUrl = new URLSearchParams(window.location.search);
+  const tipoPreSelecionado = paramsUrl.get('tipo');
+  if (tipoPreSelecionado) {
+    const existeOpcao = [...selTipo.options].some(o => o.value === tipoPreSelecionado);
+    selTipo.value = existeOpcao ? tipoPreSelecionado : 'Outro';
+  }
+
+  // ---------- Upload/preview/compressão de fotos ----------
+  let fotosBase64 = []; // array de strings base64 (dataURL) já comprimidas
+
+  document.getElementById('areaUpload').addEventListener('click', () => document.getElementById('fFotos').click());
+
+  function comprimirImagem(file) {
+    return new Promise((resolve, reject) => {
+      const leitor = new FileReader();
+      leitor.onerror = () => reject(new Error('Não foi possível ler a imagem.'));
+      leitor.onload = () => {
+        const img = new Image();
+        img.onerror = () => reject(new Error('Não foi possível processar a imagem.'));
+        img.onload = () => {
+          const maxLado = CONFIG_BSTYLE.MAX_LARGURA_FOTO_PX;
+          let { width, height } = img;
+          if (width > maxLado || height > maxLado) {
+            if (width >= height) { height = Math.round(height * (maxLado / width)); width = maxLado; }
+            else { width = Math.round(width * (maxLado / height)); height = maxLado; }
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = width; canvas.height = height;
+          canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+          resolve(canvas.toDataURL('image/jpeg', CONFIG_BSTYLE.QUALIDADE_JPEG_FOTO));
+        };
+        img.src = leitor.result;
+      };
+      leitor.readAsDataURL(file);
+    });
+  }
+
+  function renderPreviaFotos() {
+    const el = document.getElementById('previaFotos');
+    el.innerHTML = fotosBase64.map((f, i) => `
+      <div class="miniatura"><img src="${f}"><button type="button" data-i="${i}" aria-label="Remover foto">✕</button></div>
+    `).join('');
+    el.querySelectorAll('button[data-i]').forEach(b => b.addEventListener('click', () => {
+      fotosBase64.splice(Number(b.dataset.i), 1);
+      renderPreviaFotos();
+    }));
+  }
+
+  document.getElementById('fFotos').addEventListener('change', async (e) => {
+    const arquivos = [...e.target.files].filter(f => f.type.startsWith('image/'));
+    const vagas = CONFIG_BSTYLE.MAX_FOTOS - fotosBase64.length;
+    if (vagas <= 0) { mostrarMensagem('erro', 'Você já adicionou o máximo de ' + CONFIG_BSTYLE.MAX_FOTOS + ' fotos.'); e.target.value = ''; return; }
+    const selecionados = arquivos.slice(0, vagas);
+    try {
+      const comprimidas = await Promise.all(selecionados.map(comprimirImagem));
+      fotosBase64 = fotosBase64.concat(comprimidas);
+      renderPreviaFotos();
+    } catch (err) {
+      mostrarMensagem('erro', 'Não conseguimos processar uma das fotos. Tente novamente.');
+    }
+    e.target.value = '';
+  });
+
+  // ---------- Validação ----------
+  function marcarInvalido(idCampo, invalido) {
+    document.getElementById(idCampo).classList.toggle('invalido', invalido);
+  }
+
+  function validarWhatsapp(v) {
+    return v.replace(/\D/g, '').length >= 10;
+  }
+  function validarEmail(v) {
+    if (!v) return true; // opcional
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
+  }
+
+  function validarFormulario() {
+    let ok = true;
+    const nome = document.getElementById('fNome').value.trim();
+    const whatsapp = document.getElementById('fWhatsapp').value.trim();
+    const email = document.getElementById('fEmail').value.trim();
+    const tipo = document.getElementById('fTipo').value;
+    const loja = document.getElementById('fLoja').value;
+    const descricao = document.getElementById('fDescricao').value.trim();
+
+    marcarInvalido('campoNome', !nome); if (!nome) ok = false;
+    marcarInvalido('campoWhatsapp', !validarWhatsapp(whatsapp)); if (!validarWhatsapp(whatsapp)) ok = false;
+    marcarInvalido('campoEmail', !validarEmail(email)); if (!validarEmail(email)) ok = false;
+    marcarInvalido('campoTipo', !tipo); if (!tipo) ok = false;
+    marcarInvalido('campoLoja', !loja); if (!loja) ok = false;
+    marcarInvalido('campoDescricao', !descricao); if (!descricao) ok = false;
+
+    return ok;
+  }
+
+  function mostrarMensagem(tipo, texto, comWhatsapp) {
+    const el = document.getElementById('mensagemEnvio');
+    el.className = 'mensagem-envio mostrar ' + tipo;
+    el.textContent = texto;
+    document.getElementById('btnWhatsappErro').style.display = comWhatsapp ? 'inline-flex' : 'none';
+  }
+
+  // ---------- Numeração sequencial (transação no Firestore) ----------
+  async function proximoNumeroOrcamento() {
+    const ref = dbSite.collection('CONFIG').doc('contador_orcamentos_site');
+    const numero = await dbSite.runTransaction(async (tx) => {
+      const snap = await tx.get(ref);
+      const atual = (snap.exists && snap.data().NUMERO) || 0;
+      const proximo = atual + 1;
+      if (snap.exists) tx.update(ref, { NUMERO: proximo });
+      else tx.set(ref, { NUMERO: proximo });
+      return proximo;
+    });
+    return 'BST-' + String(numero).padStart(6, '0');
+  }
+
+  // ---------- Envio ----------
+  document.getElementById('formOrcamento').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    document.getElementById('mensagemEnvio').className = 'mensagem-envio';
+    if (!validarFormulario()) {
+      mostrarMensagem('erro', 'Confere os campos destacados antes de enviar.');
+      return;
+    }
+
+    const btn = document.getElementById('btnEnviarOrcamento');
+    btn.disabled = true; btn.textContent = 'Enviando…';
+
+    const lojaEscolhida = CONFIG_BSTYLE.LOJAS.find(l => l.CHAVE === document.getElementById('fLoja').value);
+
+    try {
+      const numeroFormatado = await proximoNumeroOrcamento();
+      await dbSite.collection('ORCAMENTOS_SITE').add({
+        NUMERO: numeroFormatado,
+        DATA_CRIACAO: new Date().toISOString(),
+        NOME: document.getElementById('fNome').value.trim(),
+        WHATSAPP: document.getElementById('fWhatsapp').value.trim(),
+        EMAIL: document.getElementById('fEmail').value.trim(),
+        TIPO_ATENDIMENTO: document.getElementById('fTipo').value,
+        PRODUTO: document.getElementById('fProduto').value.trim(),
+        DESCRICAO: document.getElementById('fDescricao').value.trim(),
+        LOJA_ID: lojaEscolhida ? lojaEscolhida.CHAVE : '',
+        LOJA_NOME: lojaEscolhida ? lojaEscolhida.NOME : '',
+        FOTOS: fotosBase64,
+        ORIGEM: 'Site BStyle',
+        STATUS: 'Novo'
+      });
+
+      document.getElementById('numeroSolicitacao').textContent = '#' + numeroFormatado;
+      document.getElementById('linkWhatsappConfirmacao').href = linkWhatsapp(
+        (lojaEscolhida || {}).WHATSAPP || CONFIG_BSTYLE.MARCA.WHATSAPP_PADRAO,
+        'Olá! Acabei de enviar uma solicitação de orçamento pelo site (número #' + numeroFormatado + ').'
+      );
+      document.getElementById('blocoFormulario').style.display = 'none';
+      document.getElementById('blocoConfirmacao').style.display = 'block';
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } catch (err) {
+      console.error('Erro ao registrar orçamento:', err);
+      mostrarMensagem('erro', 'Não conseguimos registrar sua solicitação neste momento. Por favor, tente novamente ou fale diretamente com nossa equipe pelo WhatsApp.', true);
+      btn.disabled = false; btn.textContent = 'Enviar solicitação';
+    }
+  });
+</script>
+</body>
+</html>

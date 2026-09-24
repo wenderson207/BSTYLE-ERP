@@ -1,0 +1,202 @@
+/* ============================================================
+   BStyle — Site institucional
+   Identidade: preto/grafite + branco + laranja de destaque.
+   Mobile-first, bastante espaço negativo, cards elegantes.
+   ============================================================ */
+
+:root{
+  --preto:#0B0C0E;
+  --grafite:#17181B;
+  --grafite-2:#202226;
+  --branco:#FFFFFF;
+  --cinza-claro:#F5F5F6;
+  --cinza-texto:#6B6E76;
+  --linha:#2A2C31;
+  --laranja:#FF6A1A;
+  --laranja-escuro:#E4590F;
+  --laranja-suave:rgba(255,106,26,0.12);
+  --sombra:0 10px 30px rgba(0,0,0,0.08);
+  --font-display:'Space Grotesk', sans-serif;
+  --font-body:'Inter', sans-serif;
+  --raio:14px;
+}
+
+*{ box-sizing:border-box; }
+html{ scroll-behavior:smooth; }
+body{
+  margin:0; font-family:var(--font-body); color:var(--preto); background:var(--branco);
+  -webkit-font-smoothing:antialiased; padding-bottom:70px; /* espaço pro CTA fixo mobile */
+}
+img{ max-width:100%; display:block; }
+a{ color:inherit; text-decoration:none; }
+h1,h2,h3,h4{ font-family:var(--font-display); margin:0; line-height:1.15; }
+p{ margin:0; line-height:1.6; color:var(--cinza-texto); }
+.container{ width:100%; max-width:1120px; margin:0 auto; padding:0 20px; }
+.secao{ padding:64px 0; }
+.secao-escura{ background:var(--preto); color:var(--branco); }
+.secao-escura p{ color:#B8BAC2; }
+.secao-cinza{ background:var(--cinza-claro); }
+.eyebrow{ font-family:var(--font-body); font-size:12.5px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--laranja); display:block; margin-bottom:10px; }
+.titulo-secao{ font-size:26px; font-weight:600; margin-bottom:12px; }
+.subtitulo-secao{ font-size:15px; max-width:560px; margin-bottom:36px; }
+.centralizado{ text-align:center; margin-left:auto; margin-right:auto; }
+
+/* ---------- Botões ---------- */
+.btn{
+  display:inline-flex; align-items:center; justify-content:center; gap:8px;
+  padding:14px 22px; border-radius:999px; font-family:var(--font-body); font-weight:600; font-size:14.5px;
+  border:none; cursor:pointer; transition:transform .15s ease, box-shadow .15s ease, background .15s ease; white-space:nowrap;
+}
+.btn:active{ transform:scale(0.97); }
+.btn-laranja{ background:var(--laranja); color:#fff; box-shadow:0 8px 20px rgba(255,106,26,0.35); }
+.btn-laranja:hover{ background:var(--laranja-escuro); }
+.btn-outline{ background:transparent; color:var(--preto); border:1.5px solid var(--linha); }
+.btn-outline:hover{ border-color:var(--preto); }
+.btn-outline-claro{ background:transparent; color:#fff; border:1.5px solid rgba(255,255,255,0.35); }
+.btn-outline-claro:hover{ border-color:#fff; }
+.btn-whatsapp{ background:#1F2124; color:#fff; }
+.btn-whatsapp:hover{ background:#000; }
+.btn-bloco{ width:100%; }
+
+/* ---------- Header ---------- */
+.header{
+  position:fixed; top:0; left:0; right:0; z-index:200; background:rgba(11,12,14,0.92); backdrop-filter:blur(10px);
+  border-bottom:1px solid rgba(255,255,255,0.08);
+}
+.header-inner{ display:flex; align-items:center; justify-content:space-between; height:64px; }
+.marca{ font-family:var(--font-display); font-weight:700; font-size:20px; color:#fff; letter-spacing:-0.02em; }
+.marca span{ color:var(--laranja); }
+.nav-desktop{ display:none; align-items:center; gap:28px; }
+.nav-desktop a{ color:#D6D7DC; font-size:14px; font-weight:500; transition:color .15s ease; }
+.nav-desktop a:hover{ color:#fff; }
+.header-acoes{ display:flex; align-items:center; gap:14px; }
+.header-acoes .btn{ padding:10px 18px; font-size:13.5px; }
+.btn-hamburguer{ background:none; border:none; color:#fff; font-size:22px; cursor:pointer; padding:4px; display:flex; }
+.menu-mobile{
+  position:fixed; inset:64px 0 0 0; background:var(--preto); z-index:199; display:none; flex-direction:column;
+  padding:24px 20px; gap:4px; overflow-y:auto;
+}
+.menu-mobile.aberto{ display:flex; }
+.menu-mobile a{ color:#fff; font-size:17px; font-weight:600; padding:16px 4px; border-bottom:1px solid rgba(255,255,255,0.08); }
+.menu-mobile .btn{ margin-top:18px; }
+
+@media (min-width:900px){
+  .nav-desktop{ display:flex; }
+  .btn-hamburguer{ display:none; }
+}
+
+/* ---------- Hero ---------- */
+.hero{
+  padding:150px 0 70px; background:radial-gradient(circle at 80% 0%, rgba(255,106,26,0.18), transparent 55%), var(--preto);
+  color:#fff;
+}
+.hero h1{ font-size:40px; font-weight:700; letter-spacing:-0.02em; margin-bottom:8px; }
+.hero h1 span{ color:var(--laranja); }
+.hero h2{ font-size:19px; font-weight:500; color:#D6D7DC; margin-bottom:18px; }
+.hero p{ font-size:15.5px; max-width:520px; margin-bottom:30px; color:#B8BAC2; }
+.hero-botoes{ display:flex; flex-wrap:wrap; gap:12px; }
+@media (min-width:700px){
+  .hero h1{ font-size:56px; }
+  .hero h2{ font-size:22px; }
+}
+
+/* ---------- Cards de serviço ---------- */
+.grid-servicos{ display:grid; grid-template-columns:1fr; gap:18px; }
+@media (min-width:640px){ .grid-servicos{ grid-template-columns:1fr 1fr; } }
+@media (min-width:980px){ .grid-servicos{ grid-template-columns:1fr 1fr 1fr; } }
+.card-servico{
+  background:#fff; border:1px solid var(--linha); border-radius:var(--raio); padding:26px 24px;
+  transition:transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+}
+.card-servico:hover{ transform:translateY(-3px); box-shadow:var(--sombra); border-color:transparent; }
+.card-servico .icone{ font-size:30px; width:56px; height:56px; border-radius:14px; background:var(--laranja-suave); display:flex; align-items:center; justify-content:center; margin-bottom:16px; }
+.card-servico h3{ font-size:17px; font-weight:600; margin-bottom:8px; }
+.card-servico p{ font-size:13.5px; margin-bottom:16px; }
+.card-servico .link-orcamento{ font-size:13px; font-weight:700; color:var(--laranja); display:inline-flex; align-items:center; gap:6px; }
+
+/* ---------- Lojas ---------- */
+.grid-lojas{ display:grid; grid-template-columns:1fr; gap:20px; }
+@media (min-width:800px){ .grid-lojas{ grid-template-columns:1fr 1fr; } }
+.card-loja{ background:#fff; border:1px solid var(--linha); border-radius:var(--raio); padding:28px; }
+.card-loja h3{ font-size:19px; font-weight:600; margin-bottom:16px; }
+.card-loja .linha-info{ display:flex; gap:10px; font-size:13.5px; color:var(--preto); margin-bottom:10px; align-items:flex-start; }
+.card-loja .linha-info .ico{ flex:0 0 auto; }
+.card-loja .botoes-loja{ display:flex; flex-wrap:wrap; gap:10px; margin-top:20px; }
+.card-loja .btn{ font-size:13px; padding:11px 16px; }
+
+/* ---------- Quem somos ---------- */
+.bloco-quem-somos{ display:grid; grid-template-columns:1fr; gap:30px; align-items:center; }
+@media (min-width:900px){ .bloco-quem-somos{ grid-template-columns:1.1fr 0.9fr; } }
+.selo-confianca{ display:flex; gap:16px; margin-top:24px; flex-wrap:wrap; }
+.selo-confianca .item{ background:var(--cinza-claro); border-radius:12px; padding:14px 18px; font-size:13px; font-weight:600; flex:1 1 140px; }
+.selo-confianca .item span{ display:block; font-family:var(--font-display); font-size:22px; color:var(--laranja); margin-bottom:2px; }
+
+/* ---------- CTA genérico ---------- */
+.cta-secao{ background:var(--preto); color:#fff; text-align:center; padding:70px 0; }
+.cta-secao h2{ font-size:26px; margin-bottom:10px; }
+.cta-secao p{ margin-bottom:26px; }
+
+/* ---------- Formulário de orçamento ---------- */
+.form-orcamento{ background:#fff; border:1px solid var(--linha); border-radius:18px; padding:28px 22px; max-width:640px; margin:0 auto; box-shadow:var(--sombra); }
+.campo{ margin-bottom:18px; }
+.campo label{ display:block; font-size:13px; font-weight:600; margin-bottom:7px; }
+.campo .obrigatorio{ color:var(--laranja); }
+.campo input, .campo select, .campo textarea{
+  width:100%; border:1.5px solid var(--linha); border-radius:10px; padding:12px 14px; font-size:14.5px;
+  font-family:var(--font-body); background:#fff; color:var(--preto);
+}
+.campo input:focus, .campo select:focus, .campo textarea:focus{ outline:none; border-color:var(--laranja); }
+.campo textarea{ min-height:110px; resize:vertical; }
+.campo small{ display:block; margin-top:6px; font-size:12px; color:var(--cinza-texto); }
+.linha-2{ display:grid; grid-template-columns:1fr; gap:14px; }
+@media (min-width:600px){ .linha-2{ grid-template-columns:1fr 1fr; } }
+.upload-fotos{ border:1.5px dashed var(--linha); border-radius:12px; padding:20px; text-align:center; cursor:pointer; transition:border-color .15s ease; }
+.upload-fotos:hover{ border-color:var(--laranja); }
+.upload-fotos input[type=file]{ display:none; }
+.previa-fotos{ display:flex; gap:10px; flex-wrap:wrap; margin-top:12px; }
+.previa-fotos .miniatura{ position:relative; width:72px; height:72px; border-radius:10px; overflow:hidden; border:1px solid var(--linha); }
+.previa-fotos .miniatura img{ width:100%; height:100%; object-fit:cover; }
+.previa-fotos .miniatura button{ position:absolute; top:2px; right:2px; background:rgba(0,0,0,0.65); color:#fff; border:none; border-radius:50%; width:20px; height:20px; font-size:12px; cursor:pointer; line-height:1; }
+.erro-campo{ color:#D33; font-size:12px; margin-top:6px; display:none; }
+.campo.invalido input, .campo.invalido select, .campo.invalido textarea{ border-color:#D33; }
+.campo.invalido .erro-campo{ display:block; }
+.mensagem-envio{ font-size:13px; margin-top:16px; padding:12px 14px; border-radius:10px; display:none; }
+.mensagem-envio.mostrar{ display:block; }
+.mensagem-envio.sucesso{ background:#EAF7EE; color:#1D8A3E; }
+.mensagem-envio.erro{ background:#FDEAEA; color:#C0392B; }
+
+/* ---------- Tela de confirmação ---------- */
+.tela-confirmacao{ text-align:center; max-width:520px; margin:0 auto; padding:20px 0; }
+.tela-confirmacao .icone-check{ width:76px; height:76px; border-radius:50%; background:var(--laranja-suave); color:var(--laranja); display:flex; align-items:center; justify-content:center; font-size:38px; margin:0 auto 22px; }
+.tela-confirmacao h2{ font-size:24px; margin-bottom:12px; }
+.tela-confirmacao p{ margin-bottom:20px; }
+.numero-solicitacao{ display:inline-block; background:var(--cinza-claro); border-radius:10px; padding:10px 18px; font-family:var(--font-display); font-weight:700; font-size:17px; margin-bottom:24px; }
+.tela-confirmacao .botoes{ display:flex; flex-direction:column; gap:12px; }
+@media (min-width:480px){ .tela-confirmacao .botoes{ flex-direction:row; justify-content:center; } }
+
+/* ---------- Footer ---------- */
+.footer{ background:var(--preto); color:#B8BAC2; padding:56px 0 28px; }
+.footer-grid{ display:grid; grid-template-columns:1fr; gap:32px; margin-bottom:36px; }
+@media (min-width:700px){ .footer-grid{ grid-template-columns:1.2fr 1fr 1fr; } }
+.footer h4{ color:#fff; font-size:14px; margin-bottom:14px; }
+.footer .marca{ margin-bottom:10px; }
+.footer ul{ list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:10px; }
+.footer a{ font-size:13.5px; color:#B8BAC2; }
+.footer a:hover{ color:#fff; }
+.footer .loja-footer{ font-size:13px; margin-bottom:16px; }
+.footer .loja-footer b{ color:#fff; display:block; margin-bottom:4px; }
+.footer-baixo{ border-top:1px solid rgba(255,255,255,0.1); padding-top:22px; display:flex; flex-direction:column; gap:10px; font-size:12.5px; }
+@media (min-width:700px){ .footer-baixo{ flex-direction:row; justify-content:space-between; align-items:center; } }
+.footer-social{ display:flex; gap:14px; }
+
+/* ---------- CTA fixo mobile ---------- */
+.cta-fixo-mobile{
+  position:fixed; bottom:0; left:0; right:0; z-index:150; background:#fff; border-top:1px solid var(--linha);
+  padding:10px 16px; display:flex;
+}
+.cta-fixo-mobile .btn{ width:100%; padding:14px; font-size:14.5px; }
+@media (min-width:900px){ .cta-fixo-mobile{ display:none; } body{ padding-bottom:0; } }
+
+/* ---------- Utilidades ---------- */
+.mt-8{ margin-top:8px; } .mt-16{ margin-top:16px; } .mt-24{ margin-top:24px; }
+.sr-only{ position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; }

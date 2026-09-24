@@ -40,6 +40,19 @@
   .pattern-dot{ width:40px; height:40px; border-radius:50%; border:2px solid var(--hairline); background:var(--bg-elevated); cursor:pointer; position:relative; display:flex; align-items:center; justify-content:center; font-size:14px; font-weight:700; color:transparent; font-family:var(--font-mono); }
   .pattern-dot.active{ border-color:var(--mint); background:rgba(47,225,168,0.15); color:var(--mint); }
 
+  .dropdown-results{ position:absolute; top:calc(100% + 6px); left:0; right:0; background:var(--bg-elevated); border:1px solid var(--hairline);
+    border-radius:10px; max-height:280px; overflow-y:auto; z-index:20; display:none; box-shadow:0 8px 24px rgba(0,0,0,0.3); }
+  .dropdown-results.open{ display:block; }
+  .dropdown-results .opt{ padding:10px 12px; font-size:12.5px; cursor:pointer; border-bottom:1px solid var(--hairline); }
+  .dropdown-results .opt:hover{ background:var(--bg-surface); }
+  .dropdown-results .opt:last-child{ border-bottom:none; }
+  .dropdown-results .opt-vazio{ padding:12px; font-size:12px; color:var(--text-tertiary); text-align:center; }
+  .selected-client{ display:flex; align-items:center; justify-content:space-between; background:var(--bg-elevated); border:1px solid var(--hairline); border-radius:8px; padding:9px 12px; font-size:12.5px; margin-top:8px; }
+  .selected-client button{ background:none; border:none; color:var(--text-tertiary); cursor:pointer; font-size:12px; }
+  .ordenar-cliente{ display:flex; gap:6px; padding:8px 12px; border-bottom:1px solid var(--hairline); flex-wrap:wrap; position:sticky; top:0; background:var(--bg-elevated); }
+  .ordenar-cliente button{ background:var(--bg-surface); border:1px solid var(--hairline); color:var(--text-secondary); border-radius:20px; padding:4px 10px; font-size:10.5px; cursor:pointer; font-family:inherit; }
+  .ordenar-cliente button.ativo{ background:var(--mint); border-color:var(--mint); color:#04120c; font-weight:600; }
+
   .diagramas-wrap{ display:flex; gap:24px; justify-content:center; flex-wrap:wrap; }
   .diagrama-col{ text-align:center; }
   .diagrama-col .titulo{ font-size:11.5px; color:var(--text-tertiary); font-family:var(--font-mono); margin-bottom:8px; }
@@ -136,7 +149,16 @@
     <div class="modal-body">
       <div class="section-title">Cliente e aparelho</div>
       <div class="frow2">
-        <div class="ffield"><label>Cliente *</label><select id="fCliente"><option value="">Selecione…</option></select></div>
+        <div class="ffield" style="position:relative;">
+          <label>Cliente *</label>
+          <input type="hidden" id="fCliente">
+          <input id="buscaClienteNovaOS" placeholder="Digite o nome do cliente…" autocomplete="off">
+          <div class="dropdown-results" id="resultadosClienteNovaOS"></div>
+          <div id="clienteNovaOSSelecionadoWrap" style="display:none;" class="selected-client">
+            <span id="clienteNovaOSSelecionadoTexto"></span>
+            <button type="button" id="btnRemoverClienteNovaOS">✕ Trocar</button>
+          </div>
+        </div>
         <div class="ffield"><label>Técnico responsável</label><input id="fTecnico" placeholder="Nome do técnico"></div>
       </div>
       <div class="frow3">
@@ -603,7 +625,7 @@
       clientes = await dbGetAll('CLIENTES');
       empresas = await dbGetAll('EMPRESAS');
       ordens = (await dbGetAll('ASSISTENCIAS')).sort((a,b) => new Date(b.DATA_ABERTURA||0) - new Date(a.DATA_ABERTURA||0));
-      setHTML('fCliente', '<option value="">Selecione…</option>' + clientes.map(c => `<option value="${c.ID}">${c.NOME}</option>`).join(''));
+      // (cliente da Nova OS agora é escolhido pela busca — ver ligarBuscaClienteNovaOS)
       renderKanban();
       renderCalendario();
     } catch (e) { mostrarToast('Erro: ' + e.message, 'erro'); }
@@ -748,9 +770,82 @@
     document.querySelectorAll('#patternGrid .pattern-dot').forEach(d => { d.classList.remove('active'); d.textContent = ''; });
   }
 
+  // ---------- Busca/ordenação de cliente na Nova OS ----------
+  let ordemClienteNovaOS = 'recente'; // 'az' | 'za' | 'antigo' | 'recente'
+
+  function clientesOrdenadosFiltrados(termo){
+    const t = (termo || '').trim().toLowerCase();
+    let lista = clientes.filter(c => !t || (c.NOME || '').toLowerCase().includes(t));
+    lista = lista.slice();
+    if (ordemClienteNovaOS === 'az') lista.sort((a,b) => (a.NOME||'').localeCompare(b.NOME||''));
+    else if (ordemClienteNovaOS === 'za') lista.sort((a,b) => (b.NOME||'').localeCompare(a.NOME||''));
+    else if (ordemClienteNovaOS === 'antigo') lista.sort((a,b) => new Date(a.DATA_CRIACAO||0) - new Date(b.DATA_CRIACAO||0));
+    else lista.sort((a,b) => new Date(b.DATA_CRIACAO||0) - new Date(a.DATA_CRIACAO||0)); // 'recente'
+    return lista;
+  }
+
+  function renderResultadosClienteNovaOS(termo){
+    const wrap = document.getElementById('resultadosClienteNovaOS');
+    const lista = clientesOrdenadosFiltrados(termo);
+    const botoes = [
+      { chave:'recente', label:'Mais recente' },
+      { chave:'antigo', label:'Mais antigo' },
+      { chave:'az', label:'A → Z' },
+      { chave:'za', label:'Z → A' }
+    ].map(b => `<button type="button" data-ordem="${b.chave}" class="${ordemClienteNovaOS===b.chave?'ativo':''}">${b.label}</button>`).join('');
+    const linhas = lista.length
+      ? lista.map(c => `<div class="opt" data-id="${c.ID}">${c.NOME}</div>`).join('')
+      : '<div class="opt-vazio">Nenhum cliente encontrado.</div>';
+    wrap.innerHTML = `<div class="ordenar-cliente">${botoes}</div>${linhas}`;
+    wrap.querySelectorAll('.ordenar-cliente button').forEach(btn => btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      ordemClienteNovaOS = btn.dataset.ordem;
+      renderResultadosClienteNovaOS(document.getElementById('buscaClienteNovaOS').value);
+    }));
+    wrap.querySelectorAll('.opt[data-id]').forEach(opt => opt.addEventListener('click', () => {
+      const c = clientes.find(x => x.ID === opt.dataset.id);
+      if (!c) return;
+      document.getElementById('fCliente').value = c.ID;
+      document.getElementById('clienteNovaOSSelecionadoTexto').textContent = c.NOME;
+      document.getElementById('buscaClienteNovaOS').style.display = 'none';
+      document.getElementById('clienteNovaOSSelecionadoWrap').style.display = 'flex';
+      wrap.classList.remove('open');
+    }));
+  }
+
+  function resetarBuscaClienteNovaOS(){
+    ordemClienteNovaOS = 'recente';
+    document.getElementById('buscaClienteNovaOS').value = '';
+    document.getElementById('buscaClienteNovaOS').style.display = 'block';
+    document.getElementById('clienteNovaOSSelecionadoWrap').style.display = 'none';
+    document.getElementById('resultadosClienteNovaOS').classList.remove('open');
+  }
+
+  document.getElementById('buscaClienteNovaOS').addEventListener('input', (e) => {
+    document.getElementById('resultadosClienteNovaOS').classList.add('open');
+    renderResultadosClienteNovaOS(e.target.value);
+  });
+  document.getElementById('buscaClienteNovaOS').addEventListener('focus', (e) => {
+    document.getElementById('resultadosClienteNovaOS').classList.add('open');
+    renderResultadosClienteNovaOS(e.target.value);
+  });
+  document.getElementById('btnRemoverClienteNovaOS').addEventListener('click', () => {
+    document.getElementById('fCliente').value = '';
+    document.getElementById('clienteNovaOSSelecionadoWrap').style.display = 'none';
+    document.getElementById('buscaClienteNovaOS').style.display = 'block';
+    document.getElementById('buscaClienteNovaOS').value = '';
+    document.getElementById('buscaClienteNovaOS').focus();
+  });
+  document.addEventListener('click', (e) => {
+    const wrap = document.getElementById('resultadosClienteNovaOS');
+    const busca = document.getElementById('buscaClienteNovaOS');
+    if (wrap && !wrap.contains(e.target) && e.target !== busca) wrap.classList.remove('open');
+  });
+
   document.getElementById('btnNovaOS').addEventListener('click', () => {
     defeitosFrenteNova = []; defeitosVersoNova = [];
     ['fCliente','fTecnico','fMarca','fModelo','fImei','fAcessorios','fDefeito','fDiagnostico','fValor','fPrazo','fSenhaPin','fSenhaTexto'].forEach(id => document.getElementById(id).value = '');
+    resetarBuscaClienteNovaOS();
     limparPadraoDesenho();
     gerarLinhasPecas('linhasPecasNova', 'totalPecasNova', []);
     renderDiagrama('diagramaFrenteNova', defeitosFrenteNova, true);

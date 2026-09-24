@@ -602,7 +602,7 @@
       if (!(await checarPermissao('ASSISTENCIA','VISUALIZAR'))){ setHTML('kanban', 'Sem permissão.'); return; }
       clientes = await dbGetAll('CLIENTES');
       empresas = await dbGetAll('EMPRESAS');
-      ordens = await dbGetAll('ASSISTENCIAS');
+      ordens = (await dbGetAll('ASSISTENCIAS')).sort((a,b) => new Date(b.DATA_ABERTURA||0) - new Date(a.DATA_ABERTURA||0));
       setHTML('fCliente', '<option value="">Selecione…</option>' + clientes.map(c => `<option value="${c.ID}">${c.NOME}</option>`).join(''));
       renderKanban();
       renderCalendario();

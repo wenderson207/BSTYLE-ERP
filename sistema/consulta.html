@@ -7,7 +7,9 @@
 <link rel="icon" type="image/png" href="assets/img/fav.png">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="assets/js/firebase-init.js"></script>
 <style>
   :root{ --mint:#2FE1A8; --blue:#4C8DFF; --amber:#F5A623; --red:#FF5C5C; }
   *{ box-sizing:border-box; }
@@ -40,16 +42,11 @@
   </div>
 
   <script>
-    const firebaseConfig = {
-      apiKey: "AIzaSyCxWovMBgicwnEK2yzyYHm7clDeIO-m4vU",
-      authDomain: "bstyle-ab14a.firebaseapp.com",
-      projectId: "bstyle-ab14a",
-      storageBucket: "bstyle-ab14a.firebasestorage.app",
-      messagingSenderId: "1065822284388",
-      appId: "1:1065822284388:web:1a00706fd06ae4a35ccd71"
-    };
-    firebase.initializeApp(firebaseConfig);
-    const db = firebase.firestore();
+    // A configuração do Firebase e a conexão (variável "db") já vêm prontas do
+    // assets/js/firebase-init.js, carregado no <head> — o mesmo arquivo que o
+    // resto do sistema usa. Assim, ao duplicar o sistema pra uma loja nova, só
+    // precisa trocar a configuração NAQUELE arquivo — essa página já acompanha
+    // sozinha, sem precisar lembrar de atualizar aqui também.
 
     const ETAPAS = ['Aberta','Em diagnóstico','Aguardando peça','Em reparo','Pronto','Entregue'];
 

@@ -29,7 +29,6 @@ body{
   opacity:1; transition:opacity 220ms ease;
 }
 /* ---------- Transição entre páginas (sem corte seco no clique) ---------- */
-html.pagina-preparando-entrada body,
 html.pagina-saindo body{ opacity:0; }
 /* ---------- Transição entre "telas" da mesma página (ex.: form → confirmação) ---------- */
 .tela-saindo{ opacity:0; transition:opacity 220ms ease; }

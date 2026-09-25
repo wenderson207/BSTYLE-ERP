@@ -72,26 +72,29 @@
 
           <h3 style="font-size:15px; margin:26px 0 16px;">Informações da solicitação</h3>
 
-          <div class="linha-2">
-            <div class="campo" id="campoTipo">
-              <label>Tipo de atendimento <span class="obrigatorio">*</span></label>
-              <select id="fTipo" name="tipo">
-                <option value="">Selecione…</option>
-              </select>
-              <span class="erro-campo">Escolha o tipo de atendimento.</span>
-            </div>
-            <div class="campo" id="campoLoja">
-              <label>Loja de preferência <span class="obrigatorio">*</span></label>
-              <select id="fLoja" name="loja">
-                <option value="">Selecione…</option>
-              </select>
-              <span class="erro-campo">Escolha a loja de preferência.</span>
-            </div>
+          <div class="campo" id="campoTipo">
+            <label>Tipo de atendimento <span class="obrigatorio">*</span></label>
+            <div class="opcoes-tipo" id="opcoesTipo"></div>
+            <span class="erro-campo">Escolha o tipo de atendimento.</span>
           </div>
 
-          <div class="campo" id="campoProduto">
-            <label>Produto / aparelho</label>
-            <input type="text" id="fProduto" name="produto" placeholder="Ex.: iPhone 12, notebook, fone bluetooth…" maxlength="150">
+          <div class="linha-2">
+            <div class="campo" id="campoMarca">
+              <label>Marca do aparelho</label>
+              <select id="fMarca" name="marca">
+                <option value="">Selecione…</option>
+              </select>
+            </div>
+            <div class="campo" id="campoModelo">
+              <label>Modelo</label>
+              <select id="fModelo" name="modelo" disabled>
+                <option value="">Escolha a marca primeiro…</option>
+              </select>
+            </div>
+          </div>
+          <div class="campo campo-modelo-outro" id="campoModeloOutro">
+            <label>Qual o modelo?</label>
+            <input type="text" id="fModeloOutro" placeholder="Digite a marca e o modelo do aparelho…" maxlength="150">
           </div>
 
           <div class="campo" id="campoDescricao">
@@ -168,22 +171,70 @@
     <div class="loja-footer"><b>${l.NOME}</b>${l.ENDERECO} — ${l.CIDADE_UF}<br>${l.TELEFONE}</div>
   `).join('');
 
-  // ---------- Preenche selects a partir do config ----------
-  const selTipo = document.getElementById('fTipo');
-  CONFIG_BSTYLE.TIPOS_ATENDIMENTO.forEach(t => {
-    const opt = document.createElement('option'); opt.value = t; opt.textContent = t; selTipo.appendChild(opt);
-  });
-  const selLoja = document.getElementById('fLoja');
-  CONFIG_BSTYLE.LOJAS.forEach(l => {
-    const opt = document.createElement('option'); opt.value = l.CHAVE; opt.textContent = l.NOME; selLoja.appendChild(opt);
+  // ---------- Tipo de atendimento: cards com "?" explicativo ----------
+  const opcoesTipoEl = document.getElementById('opcoesTipo');
+  opcoesTipoEl.innerHTML = CONFIG_BSTYLE.TIPOS_ATENDIMENTO.map((t, i) => `
+    <label class="opcao-tipo" for="tipo_${i}">
+      <input type="radio" name="tipo" id="tipo_${i}" value="${t.NOME}">
+      <span>${t.NOME}</span>
+      <button type="button" class="btn-ajuda" data-i="${i}" aria-label="O que é ${t.NOME}?">?</button>
+      <div class="tooltip-ajuda" id="tooltipTipo_${i}">${t.DESCRICAO}</div>
+    </label>
+  `).join('');
+
+  opcoesTipoEl.querySelectorAll('input[type=radio]').forEach(r => r.addEventListener('change', () => {
+    opcoesTipoEl.querySelectorAll('.opcao-tipo').forEach(l => l.classList.remove('selecionada'));
+    r.closest('.opcao-tipo').classList.add('selecionada');
+  }));
+
+  opcoesTipoEl.querySelectorAll('.btn-ajuda').forEach(btn => btn.addEventListener('click', (e) => {
+    e.preventDefault(); // não marca o radio ao clicar só no "?"
+    const tooltip = document.getElementById('tooltipTipo_' + btn.dataset.i);
+    const jaAberto = tooltip.classList.contains('aberto');
+    opcoesTipoEl.querySelectorAll('.tooltip-ajuda').forEach(t => t.classList.remove('aberto'));
+    if (!jaAberto) tooltip.classList.add('aberto');
+  }));
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.opcao-tipo')) opcoesTipoEl.querySelectorAll('.tooltip-ajuda').forEach(t => t.classList.remove('aberto'));
   });
 
-  // Se veio de um botão "Solicitar orçamento" de um serviço específico (?tipo=...), pré-seleciona.
-  const paramsUrl = new URLSearchParams(window.location.search);
-  const tipoPreSelecionado = paramsUrl.get('tipo');
-  if (tipoPreSelecionado) {
-    const existeOpcao = [...selTipo.options].some(o => o.value === tipoPreSelecionado);
-    selTipo.value = existeOpcao ? tipoPreSelecionado : 'Outro';
+  // ---------- Marca / Modelo (cascata) ----------
+  const selMarca = document.getElementById('fMarca');
+  const selModelo = document.getElementById('fModelo');
+  const campoModeloOutro = document.getElementById('campoModeloOutro');
+  const inputModeloOutro = document.getElementById('fModeloOutro');
+
+  Object.keys(CONFIG_BSTYLE.CATALOGO_APARELHOS).forEach(marca => {
+    const opt = document.createElement('option'); opt.value = marca; opt.textContent = marca; selMarca.appendChild(opt);
+  });
+
+  function atualizarCampoModeloOutro() {
+    const precisaTexto = !selMarca.value || selMarca.value === 'Outra marca / não sei' || selModelo.value === '__outro__';
+    campoModeloOutro.classList.toggle('mostrar', precisaTexto);
+  }
+
+  selMarca.addEventListener('change', () => {
+    const modelos = CONFIG_BSTYLE.CATALOGO_APARELHOS[selMarca.value] || [];
+    if (!selMarca.value || !modelos.length) {
+      selModelo.innerHTML = '<option value="">—</option>';
+      selModelo.disabled = true;
+    } else {
+      selModelo.disabled = false;
+      selModelo.innerHTML = '<option value="">Selecione…</option>' +
+        modelos.map(m => `<option value="${m}">${m}</option>`).join('') +
+        '<option value="__outro__">Outro modelo desta marca</option>';
+    }
+    atualizarCampoModeloOutro();
+  });
+  selModelo.addEventListener('change', atualizarCampoModeloOutro);
+  atualizarCampoModeloOutro();
+
+  function produtoEscolhido() {
+    if (campoModeloOutro.classList.contains('mostrar')) {
+      const livre = inputModeloOutro.value.trim();
+      return selMarca.value && selMarca.value !== 'Outra marca / não sei' ? (selMarca.value + (livre ? ' — ' + livre : '')) : livre;
+    }
+    return selMarca.value && selModelo.value ? (selMarca.value + ' ' + selModelo.value) : '';
   }
 
   // ---------- Upload/preview/compressão de fotos ----------
@@ -260,15 +311,13 @@
     const nome = document.getElementById('fNome').value.trim();
     const whatsapp = document.getElementById('fWhatsapp').value.trim();
     const email = document.getElementById('fEmail').value.trim();
-    const tipo = document.getElementById('fTipo').value;
-    const loja = document.getElementById('fLoja').value;
+    const tipo = document.querySelector('input[name=tipo]:checked');
     const descricao = document.getElementById('fDescricao').value.trim();
 
     marcarInvalido('campoNome', !nome); if (!nome) ok = false;
     marcarInvalido('campoWhatsapp', !validarWhatsapp(whatsapp)); if (!validarWhatsapp(whatsapp)) ok = false;
     marcarInvalido('campoEmail', !validarEmail(email)); if (!validarEmail(email)) ok = false;
     marcarInvalido('campoTipo', !tipo); if (!tipo) ok = false;
-    marcarInvalido('campoLoja', !loja); if (!loja) ok = false;
     marcarInvalido('campoDescricao', !descricao); if (!descricao) ok = false;
 
     return ok;
@@ -307,7 +356,7 @@
     const btn = document.getElementById('btnEnviarOrcamento');
     btn.disabled = true; btn.textContent = 'Enviando…';
 
-    const lojaEscolhida = CONFIG_BSTYLE.LOJAS.find(l => l.CHAVE === document.getElementById('fLoja').value);
+    const tipoEscolhido = document.querySelector('input[name=tipo]:checked').value;
 
     try {
       const numeroFormatado = await proximoNumeroOrcamento();
@@ -317,11 +366,9 @@
         NOME: document.getElementById('fNome').value.trim(),
         WHATSAPP: document.getElementById('fWhatsapp').value.trim(),
         EMAIL: document.getElementById('fEmail').value.trim(),
-        TIPO_ATENDIMENTO: document.getElementById('fTipo').value,
-        PRODUTO: document.getElementById('fProduto').value.trim(),
+        TIPO_ATENDIMENTO: tipoEscolhido,
+        PRODUTO: produtoEscolhido(),
         DESCRICAO: document.getElementById('fDescricao').value.trim(),
-        LOJA_ID: lojaEscolhida ? lojaEscolhida.CHAVE : '',
-        LOJA_NOME: lojaEscolhida ? lojaEscolhida.NOME : '',
         FOTOS: fotosBase64,
         ORIGEM: 'Site BStyle',
         STATUS: 'Novo'
@@ -329,12 +376,10 @@
 
       document.getElementById('numeroSolicitacao').textContent = '#' + numeroFormatado;
       document.getElementById('linkWhatsappConfirmacao').href = linkWhatsapp(
-        (lojaEscolhida || {}).WHATSAPP || CONFIG_BSTYLE.MARCA.WHATSAPP_PADRAO,
+        CONFIG_BSTYLE.MARCA.WHATSAPP_PADRAO,
         'Olá! Acabei de enviar uma solicitação de orçamento pelo site (número #' + numeroFormatado + ').'
       );
-      document.getElementById('blocoFormulario').style.display = 'none';
-      document.getElementById('blocoConfirmacao').style.display = 'block';
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      trocarTela(document.getElementById('blocoFormulario'), document.getElementById('blocoConfirmacao'));
     } catch (err) {
       console.error('Erro ao registrar orçamento:', err);
       mostrarMensagem('erro', 'Não conseguimos registrar sua solicitação neste momento. Por favor, tente novamente ou fale diretamente com nossa equipe pelo WhatsApp.', true);

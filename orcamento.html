@@ -122,7 +122,7 @@
 
           <button type="submit" class="btn btn-laranja btn-bloco" id="btnEnviarOrcamento" style="margin-top:10px;">Enviar solicitação</button>
           <div class="mensagem-envio" id="mensagemEnvio"></div>
-          <a class="btn btn-whatsapp btn-bloco mt-16" id="btnWhatsappErro" data-whatsapp-padrao target="_blank" rel="noopener" style="display:none;">💬 Falar pelo WhatsApp</a>
+          <a class="btn btn-whatsapp btn-bloco mt-16" id="btnWhatsappErro" href="#" target="_blank" rel="noopener" style="display:none;">💬 Falar pelo WhatsApp</a>
         </form>
       </div>
 
@@ -334,7 +334,16 @@
     const el = document.getElementById('mensagemEnvio');
     el.className = 'mensagem-envio mostrar ' + tipo;
     el.textContent = texto;
-    document.getElementById('btnWhatsappErro').style.display = comWhatsapp ? 'inline-flex' : 'none';
+    const btnWpp = document.getElementById('btnWhatsappErro');
+    if (comWhatsapp) {
+      // Vai direto pro WhatsApp da loja São José, já com uma mensagem
+      // explicando que a pessoa tentou enviar o orçamento pelo site e deu erro.
+      btnWpp.href = linkWhatsapp(
+        CONFIG_BSTYLE.MARCA.WHATSAPP_CONTATO,
+        'Olá! Tentei enviar uma solicitação de orçamento pelo site, mas apareceu um erro. Pode me ajudar?'
+      );
+    }
+    btnWpp.style.display = comWhatsapp ? 'inline-flex' : 'none';
   }
 
   // ---------- Numeração sequencial (transação no Firestore) ----------

@@ -1,6 +1,7 @@
 /**
  * site.js — comportamentos compartilhados do site institucional
- * (menu mobile, link de WhatsApp, montagem dinâmica de serviços/lojas).
+ * (menu mobile, transição entre páginas, link de WhatsApp, montagem
+ * dinâmica de serviços/lojas).
  */
 
 function linkWhatsapp(numero, mensagem) {
@@ -16,6 +17,50 @@ function ligarMenuMobile() {
   menu.querySelectorAll('a').forEach(a => a.addEventListener('click', () => menu.classList.remove('aberto')));
 }
 
+/**
+ * Transição suave entre páginas (nada de corte seco no clique): a página
+ * atual entra com um fade, e um link interno primeiro faz um fade-out
+ * rapidinho antes de navegar de verdade.
+ */
+const DURACAO_TRANSICAO_MS = 220;
+
+function ligarTransicaoDePaginas() {
+  document.documentElement.classList.add('pagina-preparando-entrada');
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => document.documentElement.classList.remove('pagina-preparando-entrada'));
+  });
+
+  document.addEventListener('click', (e) => {
+    const link = e.target.closest('a[href]');
+    if (!link) return;
+    const href = link.getAttribute('href');
+    if (!href || href.startsWith('#') || href.startsWith('http') || href.startsWith('mailto:') || href.startsWith('tel:')) return;
+    if (link.target === '_blank' || link.hasAttribute('download')) return;
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+
+    e.preventDefault();
+    document.documentElement.classList.add('pagina-saindo');
+    setTimeout(() => { window.location.href = href; }, DURACAO_TRANSICAO_MS);
+  });
+}
+
+/**
+ * Faz a troca com fade entre dois blocos da mesma página (ex.: formulário
+ * de orçamento → tela de confirmação), em vez de um display:none seco.
+ */
+function trocarTela(elEsconder, elMostrar) {
+  elEsconder.classList.add('tela-saindo');
+  setTimeout(() => {
+    elEsconder.style.display = 'none';
+    elMostrar.style.display = 'block';
+    elMostrar.classList.add('tela-entrando-prep');
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => elMostrar.classList.remove('tela-entrando-prep'));
+    });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, DURACAO_TRANSICAO_MS);
+}
+
 /** Preenche o grid de serviços (usado na Home e em Serviços) a partir do config. */
 function renderServicos(containerId, comBotaoOrcamento) {
   const el = document.getElementById(containerId);
@@ -25,7 +70,7 @@ function renderServicos(containerId, comBotaoOrcamento) {
       <div class="icone">${s.ICONE}</div>
       <h3>${s.NOME}</h3>
       <p>${s.DESCRICAO}</p>
-      ${comBotaoOrcamento ? `<a class="link-orcamento" href="orcamento.html?tipo=${encodeURIComponent(s.NOME)}">Solicitar orçamento →</a>` : ''}
+      ${comBotaoOrcamento ? `<a class="link-orcamento" href="orcamento.html">Solicitar orçamento →</a>` : ''}
     </div>
   `).join('');
 }
@@ -47,6 +92,8 @@ function renderLojas(containerId) {
     </div>
   `).join('');
 }
+
+ligarTransicaoDePaginas();
 
 document.addEventListener('DOMContentLoaded', () => {
   ligarMenuMobile();

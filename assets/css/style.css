@@ -29,11 +29,39 @@ body{
   opacity:1; transition:opacity 220ms ease;
 }
 /* ---------- Transição entre páginas (sem corte seco no clique) ---------- */
-html.pagina-saindo body{ opacity:0; }
+html.pagina-saindo body{ opacity:0; transition:opacity 260ms ease; }
+
+/* ---------- Overlay "tecnológico" de transição entre páginas ---------- */
+#overlayTransicao{
+  position:fixed; inset:0; z-index:9999; pointer-events:none; opacity:0;
+  background:
+    linear-gradient(100deg, transparent 32%, rgba(255,106,26,0.55) 48%, rgba(255,106,26,0.95) 50%, rgba(255,106,26,0.55) 52%, transparent 68%),
+    repeating-linear-gradient(90deg, rgba(255,255,255,0.05) 0 1px, transparent 1px 34px);
+  background-size:260% 100%, 100% 100%;
+  background-position:160% 0, 0 0;
+}
+#overlayTransicao.ativo{
+  opacity:1;
+  transition:opacity 60ms ease;
+  animation:varrerTransicao 300ms cubic-bezier(.4,0,.2,1) forwards;
+}
+@keyframes varrerTransicao{
+  from{ background-position:160% 0, 0 0; }
+  to{ background-position:-60% 0, 0 0; }
+}
+
 /* ---------- Transição entre "telas" da mesma página (ex.: form → confirmação) ---------- */
 .tela-saindo{ opacity:0; transition:opacity 220ms ease; }
 .tela-entrando-prep{ opacity:0; }
 #blocoConfirmacao{ opacity:1; transition:opacity 220ms ease; }
+
+/* ---------- Revelação suave dos blocos ao rolar ---------- */
+.reveal{ opacity:0; transform:translateY(18px); transition:opacity 560ms ease, transform 560ms cubic-bezier(.2,.7,.3,1); }
+.reveal-visivel{ opacity:1; transform:translateY(0); }
+@media (prefers-reduced-motion: reduce){
+  .reveal{ opacity:1; transform:none; transition:none; }
+  #overlayTransicao{ display:none; }
+}
 img{ max-width:100%; display:block; }
 a{ color:inherit; text-decoration:none; }
 h1,h2,h3,h4{ font-family:var(--font-display); margin:0; line-height:1.15; }
@@ -71,6 +99,8 @@ p{ margin:0; line-height:1.6; color:var(--cinza-texto); }
   border-bottom:1px solid rgba(255,255,255,0.08);
 }
 .header-inner{ display:flex; align-items:center; justify-content:space-between; height:64px; }
+.marca-link{ display:flex; align-items:center; gap:10px; }
+.logo-img{ height:34px; width:auto; max-width:140px; object-fit:contain; }
 .marca{ font-family:var(--font-display); font-weight:700; font-size:20px; color:#fff; letter-spacing:-0.02em; }
 .marca span{ color:var(--laranja); }
 .nav-desktop{ display:none; align-items:center; gap:28px; }
@@ -94,9 +124,21 @@ p{ margin:0; line-height:1.6; color:var(--cinza-texto); }
 
 /* ---------- Hero ---------- */
 .hero{
-  padding:150px 0 70px; background:radial-gradient(circle at 80% 0%, rgba(255,106,26,0.18), transparent 55%), var(--preto);
+  position:relative; overflow:hidden;
+  padding:150px 0 70px;
+  background:
+    radial-gradient(circle at 80% 0%, rgba(255,106,26,0.18), transparent 55%),
+    repeating-linear-gradient(0deg, rgba(255,255,255,0.035) 0 1px, transparent 1px 42px),
+    repeating-linear-gradient(90deg, rgba(255,255,255,0.035) 0 1px, transparent 1px 42px),
+    var(--preto);
   color:#fff;
 }
+.hero::after{
+  content:''; position:absolute; inset:auto -20% -60% auto; width:60%; padding-top:60%;
+  background:radial-gradient(circle, rgba(255,106,26,0.22), transparent 70%);
+  pointer-events:none;
+}
+.hero .container{ position:relative; z-index:1; }
 .hero h1{ font-size:40px; font-weight:700; letter-spacing:-0.02em; margin-bottom:8px; }
 .hero h1 span{ color:var(--laranja); }
 .hero h2{ font-size:19px; font-weight:500; color:#D6D7DC; margin-bottom:18px; }
@@ -214,9 +256,11 @@ p{ margin:0; line-height:1.6; color:var(--cinza-texto); }
 .footer a:hover{ color:#fff; }
 .footer .loja-footer{ font-size:13px; margin-bottom:16px; }
 .footer .loja-footer b{ color:#fff; display:block; margin-bottom:4px; }
-.footer-baixo{ border-top:1px solid rgba(255,255,255,0.1); padding-top:22px; display:flex; flex-direction:column; gap:10px; font-size:12.5px; }
+.footer-baixo{ border-top:1px solid rgba(255,255,255,0.1); padding-top:22px; display:flex; flex-direction:column; gap:10px; font-size:12.5px; color:#8D9099; }
 @media (min-width:700px){ .footer-baixo{ flex-direction:row; justify-content:space-between; align-items:center; } }
-.footer-social{ display:flex; gap:14px; }
+.footer-social{ display:flex; align-items:center; gap:14px; flex-wrap:wrap; }
+#creditoDesenvolvedor a{ color:var(--laranja); font-weight:600; }
+#creditoDesenvolvedor a:hover{ color:#fff; }
 
 /* ---------- CTA fixo mobile ---------- */
 .cta-fixo-mobile{

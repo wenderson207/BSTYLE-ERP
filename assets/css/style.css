@@ -26,7 +26,15 @@ html{ scroll-behavior:smooth; }
 body{
   margin:0; font-family:var(--font-body); color:var(--preto); background:var(--branco);
   -webkit-font-smoothing:antialiased; padding-bottom:70px; /* espaço pro CTA fixo mobile */
+  opacity:1; transition:opacity 220ms ease;
 }
+/* ---------- Transição entre páginas (sem corte seco no clique) ---------- */
+html.pagina-preparando-entrada body,
+html.pagina-saindo body{ opacity:0; }
+/* ---------- Transição entre "telas" da mesma página (ex.: form → confirmação) ---------- */
+.tela-saindo{ opacity:0; transition:opacity 220ms ease; }
+.tela-entrando-prep{ opacity:0; }
+#blocoConfirmacao{ opacity:1; transition:opacity 220ms ease; }
 img{ max-width:100%; display:block; }
 a{ color:inherit; text-decoration:none; }
 h1,h2,h3,h4{ font-family:var(--font-display); margin:0; line-height:1.15; }
@@ -157,6 +165,28 @@ p{ margin:0; line-height:1.6; color:var(--cinza-texto); }
 .previa-fotos .miniatura{ position:relative; width:72px; height:72px; border-radius:10px; overflow:hidden; border:1px solid var(--linha); }
 .previa-fotos .miniatura img{ width:100%; height:100%; object-fit:cover; }
 .previa-fotos .miniatura button{ position:absolute; top:2px; right:2px; background:rgba(0,0,0,0.65); color:#fff; border:none; border-radius:50%; width:20px; height:20px; font-size:12px; cursor:pointer; line-height:1; }
+/* ---------- Opções "Tipo de atendimento" (cards com "?" explicativo) ---------- */
+.opcoes-tipo{ display:grid; grid-template-columns:1fr; gap:10px; }
+@media (min-width:520px){ .opcoes-tipo{ grid-template-columns:1fr 1fr; } }
+.opcao-tipo{ position:relative; display:flex; align-items:center; gap:10px; border:1.5px solid var(--linha); border-radius:12px; padding:14px 16px; cursor:pointer; font-size:14px; font-weight:600; transition:border-color .15s ease, background .15s ease; }
+.opcao-tipo:hover{ border-color:var(--laranja); }
+.opcao-tipo input[type=radio]{ width:auto; accent-color:var(--laranja); margin:0; }
+.opcao-tipo.selecionada{ border-color:var(--laranja); background:var(--laranja-suave); }
+.opcao-tipo .btn-ajuda{
+  margin-left:auto; width:22px; height:22px; border-radius:50%; border:1.5px solid var(--linha); background:#fff;
+  color:var(--cinza-texto); font-size:12px; font-weight:700; cursor:pointer; display:flex; align-items:center; justify-content:center; flex:0 0 auto;
+}
+.opcao-tipo .btn-ajuda:hover{ border-color:var(--laranja); color:var(--laranja); }
+.tooltip-ajuda{
+  position:absolute; z-index:10; top:calc(100% + 8px); left:0; right:0; background:var(--preto); color:#fff; font-size:12.5px;
+  font-weight:400; padding:10px 12px; border-radius:10px; display:none; line-height:1.5;
+}
+.tooltip-ajuda.aberto{ display:block; }
+
+/* ---------- Marca / Modelo (cascata) ---------- */
+.campo-modelo-outro{ display:none; margin-top:10px; }
+.campo-modelo-outro.mostrar{ display:block; }
+
 .erro-campo{ color:#D33; font-size:12px; margin-top:6px; display:none; }
 .campo.invalido input, .campo.invalido select, .campo.invalido textarea{ border-color:#D33; }
 .campo.invalido .erro-campo{ display:block; }

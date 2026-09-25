@@ -17,11 +17,20 @@ const CONFIG_BSTYLE = {
     NOME: 'BStyle',
     SLOGAN: 'Tecnologia, acessórios e soluções para você.',
     INSTAGRAM_HANDLE: '@bstyle_clp',
-    INSTAGRAM_URL: 'https://instagram.com/bstyle_clp',
+    INSTAGRAM_URL: 'https://www.instagram.com/bstyle_clp',
     EMAIL: 'vendas.bstyle@gmail.com',
     // WhatsApp padrão usado quando a solicitação não está ligada a uma loja específica
-    // (ex.: botão genérico "Falar pelo WhatsApp" no topo/contato).
-    WHATSAPP_PADRAO: '5511945507628'
+    // (ex.: botão genérico "Falar pelo WhatsApp" no topo).
+    WHATSAPP_PADRAO: '5511945507628',
+    // Botão "Entrar em contato" (seção Contato) vai direto pro WhatsApp
+    // da unidade São José, por pedido do Wenderson.
+    WHATSAPP_CONTATO: '5511947856426'
+  },
+
+  // Créditos do rodapé.
+  DESENVOLVEDOR: {
+    NOME: 'Wenderson Silva',
+    INSTAGRAM_URL: 'https://www.instagram.com/eo_wenderson'
   },
 
   // Cada loja tem uma CHAVE (usada internamente e no formulário de orçamento)
@@ -39,7 +48,7 @@ const CONFIG_BSTYLE = {
       WHATSAPP: '5511945507628',
       EMAIL: 'vendas.bstyle@gmail.com',
       HORARIO: '', // ex.: 'Seg a Sex 9h–18h · Sáb 9h–13h' — preencher
-      INSTAGRAM_URL: 'https://instagram.com/bstyle_clp',
+      INSTAGRAM_URL: 'https://www.instagram.com/bstyle_clp',
       get MAPS_URL() {
         return mapsLinkPorEndereco(this.ENDERECO + ', ' + this.CIDADE_UF + ', ' + this.CEP);
       }
@@ -54,7 +63,7 @@ const CONFIG_BSTYLE = {
       WHATSAPP: '5511947856426',
       EMAIL: 'vendas.bstyle@gmail.com',
       HORARIO: '', // preencher
-      INSTAGRAM_URL: 'https://instagram.com/bstyle_clp',
+      INSTAGRAM_URL: 'https://www.instagram.com/bstyle_clp',
       get MAPS_URL() {
         return mapsLinkPorEndereco(this.ENDERECO + ', ' + this.CIDADE_UF + ', ' + this.CEP);
       }

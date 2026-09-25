@@ -12,13 +12,23 @@
  * mais daquela função ehVerdadeiro() nem de conversões de String() pra
  * comparar. Isso elimina uma classe inteira de bugs que tivemos antes.
  *
- * CACHE: cada troca de aba antes buscava tudo de novo do Firestore, o que
- * gastava a cota diária de leituras muito rápido. Agora, dbGetAll guarda o
- * resultado por 45 segundos — trocar de aba e voltar não gasta leitura
- * nova nesse intervalo. Qualquer escrita (inserir/atualizar/excluir) na
- * coleção invalida o cache dela na hora, então você sempre vê o dado
- * fresco depois de salvar algo — o cache nunca mostra informação velha
- * por causa disso, só evita reler o que não mudou.
+ * CACHE: cada leitura de coleção inteira (dbGetAll) é cara — custa 1
+ * "leitura" do Firestore POR DOCUMENTO da coleção, e isso conta pra cota
+ * diária gratuita (50 mil leituras/dia no plano Spark). Duas proteções:
+ *
+ * 1) O cache agora fica guardado no sessionStorage (não só na memória do
+ *    navegador) — ou seja, ele SOBREVIVE a um F5 / recarregar a página /
+ *    logar de novo, dentro da mesma aba. Antes, cada recarregamento jogava
+ *    o cache fora e buscava tudo de novo do zero, mesmo sem nada ter
+ *    mudado — foi isso que estourou a cota num dia de bastante teste.
+ * 2) O tempo do cache subiu de 45s pra alguns minutos (ver TEMPO_CACHE_MS
+ *    abaixo). Qualquer escrita (inserir/atualizar/excluir) invalida o
+ *    cache da coleção NA HORA — então isso nunca faz alguém ver um dado
+ *    desatualizado depois de salvar algo; só evita reler o que não mudou.
+ *
+ * Se o sessionStorage não estiver disponível por algum motivo (aba anônima
+ * bloqueando armazenamento, etc.), o sistema simplesmente não usa cache
+ * nesse caso — continua funcionando normalmente, só sem essa economia.
  * -----------------------------------------------------------------------
  */
 
@@ -29,29 +39,54 @@ function gerarId(prefixo) {
   return `${prefixo || 'ID'}-${timestamp}-${aleatorio}`;
 }
 
-const TEMPO_CACHE_MS = 45000; // 45 segundos
-const _cacheColecoes = {}; // { colecao: { dados: [...], quando: timestampMs } }
-const _cacheConsultas = {}; // { 'colecao|filtroJSON': { dados: [...], quando: timestampMs } } -- cache das buscas filtradas (dbQuery), separado do cache de coleção inteira pra não misturar resultado parcial com resultado completo
+// Pode ajustar esse número se quiser um equilíbrio diferente entre
+// "economia de leituras" e "dado sempre fresquinho". 3 minutos é um bom
+// meio-termo pra um sistema de loja: reduz muito o custo de recarregar a
+// página várias vezes, sem deixar a informação velha por muito tempo.
+const TEMPO_CACHE_MS = 3 * 60 * 1000; // 3 minutos
 
-function _cacheValido(colecao) {
-  const entrada = _cacheColecoes[colecao];
-  return entrada && (Date.now() - entrada.quando) < TEMPO_CACHE_MS;
+function _chaveColecao(colecao) { return 'bstyle_cache_col_' + colecao; }
+function _chaveConsulta(chave) { return 'bstyle_cache_qry_' + chave; }
+
+/** Lê uma entrada do cache (sessionStorage), respeitando o prazo de validade. */
+function _lerCache(chave) {
+  try {
+    const bruto = sessionStorage.getItem(chave);
+    if (!bruto) return null;
+    const entrada = JSON.parse(bruto);
+    if (!entrada || (Date.now() - entrada.quando) >= TEMPO_CACHE_MS) return null;
+    return entrada.dados;
+  } catch (e) {
+    return null; // sessionStorage indisponível/corrompido — segue sem cache
+  }
+}
+
+/** Grava uma entrada no cache. Silencioso se o navegador recusar (ex.: espaço cheio). */
+function _gravarCache(chave, dados) {
+  try { sessionStorage.setItem(chave, JSON.stringify({ dados, quando: Date.now() })); }
+  catch (e) { /* sem cache dessa vez, sem quebrar a aplicação */ }
 }
 
 /** Limpa o cache de uma coleção (chamado sempre que ela é escrita) — tanto
  * o cache de "coleção inteira" quanto qualquer busca filtrada guardada dela. */
 function _invalidarCache(colecao) {
-  delete _cacheColecoes[colecao];
-  Object.keys(_cacheConsultas).forEach(chave => { if (chave.startsWith(colecao + '|')) delete _cacheConsultas[chave]; });
+  try {
+    sessionStorage.removeItem(_chaveColecao(colecao));
+    const prefixo = _chaveConsulta(colecao + '|');
+    Object.keys(sessionStorage)
+      .filter(chave => chave.startsWith(prefixo))
+      .forEach(chave => sessionStorage.removeItem(chave));
+  } catch (e) { /* nada a limpar se sessionStorage não estiver disponível */ }
 }
 window.invalidarCache = _invalidarCache; // exposto pra debug manual, se precisar
 
 /** Lê todos os documentos de uma coleção — usa cache quando disponível. */
 async function dbGetAll(colecao) {
-  if (_cacheValido(colecao)) return _cacheColecoes[colecao].dados.map(d => Object.assign({}, d));
+  const emCache = _lerCache(_chaveColecao(colecao));
+  if (emCache) return emCache.map(d => Object.assign({}, d));
   const snap = await db.collection(colecao).get();
   const dados = snap.docs.map(doc => Object.assign({ ID: doc.id }, doc.data()));
-  _cacheColecoes[colecao] = { dados, quando: Date.now() };
+  _gravarCache(_chaveColecao(colecao), dados);
   return dados.map(d => Object.assign({}, d));
 }
 
@@ -63,8 +98,9 @@ async function dbGetAll(colecao) {
  */
 async function dbGetById(colecao, id) {
   if (!id) return null;
-  if (_cacheValido(colecao)) {
-    const achado = _cacheColecoes[colecao].dados.find(d => d.ID === String(id));
+  const emCache = _lerCache(_chaveColecao(colecao));
+  if (emCache) {
+    const achado = emCache.find(d => d.ID === String(id));
     return achado ? Object.assign({}, achado) : null;
   }
   const doc = await db.collection(colecao).doc(String(id)).get();
@@ -75,27 +111,28 @@ async function dbGetById(colecao, id) {
  * Busca documentos que casem com um filtro simples de igualdade.
  * filtro = { EMPRESA_ID: 'xxx', STATUS: 'Ativo' }
  * Se a coleção já estiver em cache, filtra em memória (sem leitura nova).
- * Senão, faz a consulta direto no Firestore, como antes.
+ * Senão, faz a consulta direto no Firestore, como antes (e guarda o
+ * resultado filtrado em cache também).
  */
 async function dbQuery(colecao, filtro) {
-  if (_cacheValido(colecao)) {
+  const emCacheColecao = _lerCache(_chaveColecao(colecao));
+  if (emCacheColecao) {
     const chaves = Object.keys(filtro || {});
-    return _cacheColecoes[colecao].dados
+    return emCacheColecao
       .filter(d => chaves.every(chave => d[chave] === filtro[chave]))
       .map(d => Object.assign({}, d));
   }
-  const chaveConsulta = colecao + '|' + JSON.stringify(filtro || {});
-  const entradaConsulta = _cacheConsultas[chaveConsulta];
-  if (entradaConsulta && (Date.now() - entradaConsulta.quando) < TEMPO_CACHE_MS) {
-    return entradaConsulta.dados.map(d => Object.assign({}, d));
-  }
+  const chaveConsulta = _chaveConsulta(colecao + '|' + JSON.stringify(filtro || {}));
+  const emCacheConsulta = _lerCache(chaveConsulta);
+  if (emCacheConsulta) return emCacheConsulta.map(d => Object.assign({}, d));
+
   let ref = db.collection(colecao);
   if (filtro) {
     Object.keys(filtro).forEach(chave => { ref = ref.where(chave, '==', filtro[chave]); });
   }
   const snap = await ref.get();
   const dados = snap.docs.map(doc => Object.assign({ ID: doc.id }, doc.data()));
-  _cacheConsultas[chaveConsulta] = { dados, quando: Date.now() };
+  _gravarCache(chaveConsulta, dados);
   return dados.map(d => Object.assign({}, d));
 }
 

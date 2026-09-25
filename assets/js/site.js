@@ -18,18 +18,15 @@ function ligarMenuMobile() {
 }
 
 /**
- * Transição suave entre páginas (nada de corte seco no clique): a página
- * atual entra com um fade, e um link interno primeiro faz um fade-out
- * rapidinho antes de navegar de verdade.
+ * Transição suave ao SAIR de uma página (nada de corte seco no clique): um
+ * link interno primeiro faz um fade-out rapidinho antes de navegar de
+ * verdade. (Não mexemos na entrada da página — um fade-in feito por script,
+ * rodando depois que a página já apareceu na tela, causava um "flash"
+ * branco chato; o próprio carregamento normal do navegador já é suave.)
  */
-const DURACAO_TRANSICAO_MS = 220;
+const DURACAO_TRANSICAO_MS = 180;
 
 function ligarTransicaoDePaginas() {
-  document.documentElement.classList.add('pagina-preparando-entrada');
-  requestAnimationFrame(() => {
-    requestAnimationFrame(() => document.documentElement.classList.remove('pagina-preparando-entrada'));
-  });
-
   document.addEventListener('click', (e) => {
     const link = e.target.closest('a[href]');
     if (!link) return;
@@ -41,6 +38,14 @@ function ligarTransicaoDePaginas() {
     e.preventDefault();
     document.documentElement.classList.add('pagina-saindo');
     setTimeout(() => { window.location.href = href; }, DURACAO_TRANSICAO_MS);
+  });
+
+  // Se a pessoa voltar pelo botão do navegador, o Chrome/Safari às vezes
+  // restauram a página exatamente como ela ficou antes de sair (inclusive
+  // com a classe de fade-out ainda ativa) — isso garante que ela sempre
+  // volta visível.
+  window.addEventListener('pageshow', () => {
+    document.documentElement.classList.remove('pagina-saindo');
   });
 }
 

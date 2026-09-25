@@ -233,7 +233,7 @@ async function carregarModulo(modulo){
       return;
     }
 
-    const resp = await fetch('modules/' + modulo.toLowerCase() + '.html');
+    const resp = await fetch('/sistema/modules/' + modulo.toLowerCase() + '.html');
     if (!resp.ok) throw new Error('Módulo ainda não foi construído (' + resp.status + ').');
     // Usar resp.text() aqui deixa o navegador "adivinhar" a codificação a partir do
     // cabeçalho que o servidor manda — e o GitHub Pages nem sempre declara UTF-8
@@ -334,7 +334,7 @@ window.carregarLogoComoDataUrl = function(){
       } catch (e) { finalizar(null); }
     };
     img.onerror = () => finalizar(null);
-    img.src = 'assets/img/Logo.png';
+    img.src = '/sistema/assets/img/Logo.png';
 
     setTimeout(() => finalizar(null), 2500); // não deixa travar pra sempre se a imagem nunca responder
   });

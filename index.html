@@ -7,6 +7,8 @@
 <meta name="description" content="Conheça a BStyle. Eletrônicos, acessórios, assistência técnica e soluções para você. Encontre nossas lojas e solicite seu orçamento.">
 <meta name="robots" content="index, follow">
 <link rel="canonical" href="./index.html">
+<link rel="icon" type="image/png" href="assets/img/favicon.png">
+<link rel="apple-touch-icon" href="assets/img/favicon.png">
 
 <!-- Open Graph -->
 <meta property="og:type" content="website">
@@ -47,10 +49,15 @@
 </head>
 <body>
 
+  <div id="overlayTransicao"></div>
+
   <!-- ===== HEADER ===== -->
   <header class="header">
     <div class="container header-inner">
-      <a href="index.html" class="marca">B<span>Style</span></a>
+      <a href="index.html" class="marca-link">
+        <img class="logo-img" src="assets/img/logo.png" alt="BStyle" onerror="this.style.display='none'; this.nextElementSibling.style.display='inline-flex';">
+        <span class="marca" style="display:none;">B<span>Style</span></span>
+      </a>
       <nav class="nav-desktop">
         <a href="index.html#home">Home</a>
         <a href="index.html#servicos">Serviços</a>
@@ -111,7 +118,7 @@
   <!-- ===== QUEM SOMOS ===== -->
   <section class="secao" id="quem-somos">
     <div class="container">
-      <div class="bloco-quem-somos">
+      <div class="bloco-quem-somos reveal">
         <div>
           <span class="eyebrow">Quem somos</span>
           <h2 class="titulo-secao">Proximidade, transparência e confiança</h2>
@@ -137,7 +144,7 @@
   </section>
 
   <!-- ===== CTA ===== -->
-  <section class="cta-secao">
+  <section class="cta-secao reveal">
     <div class="container">
       <h2>Precisa de um orçamento?</h2>
       <p>Conte pra gente o que você precisa — nossa equipe entra em contato rapidinho.</p>
@@ -153,7 +160,7 @@
       <p class="subtitulo-secao centralizado">Fale com a equipe BStyle.</p>
       <div class="grid-lojas" id="gridLojasContato"></div>
       <div class="centralizado mt-24" style="max-width:100%;">
-        <a class="btn btn-laranja" href="#" data-whatsapp-padrao target="_blank" rel="noopener">Entrar em contato</a>
+        <a class="btn btn-laranja" href="#" data-whatsapp-contato target="_blank" rel="noopener">Entrar em contato</a>
       </div>
     </div>
   </section>
@@ -180,9 +187,9 @@
         <div id="footerLojas"></div>
       </div>
       <div class="footer-baixo">
-        <span>© <span id="anoAtual"></span> BStyle — Todos os direitos reservados.</span>
+        <span>© <span id="anoAtual"></span> BStyle — Todos os direitos reservados. <span id="creditoDesenvolvedor"></span></span>
         <div class="footer-social">
-          <a href="https://instagram.com/bstyle_clp" target="_blank" rel="noopener">📸 @bstyle_clp</a>
+          <a href="https://www.instagram.com/bstyle_clp" target="_blank" rel="noopener">📸 @bstyle_clp</a>
         </div>
       </div>
     </div>

@@ -18,35 +18,77 @@ function ligarMenuMobile() {
 }
 
 /**
- * Transição suave ao SAIR de uma página (nada de corte seco no clique): um
- * link interno primeiro faz um fade-out rapidinho antes de navegar de
- * verdade. (Não mexemos na entrada da página — um fade-in feito por script,
- * rodando depois que a página já apareceu na tela, causava um "flash"
- * branco chato; o próprio carregamento normal do navegador já é suave.)
+ * Transição suave ao SAIR de uma página de verdade (index.html <-> orcamento.html):
+ * um "overlay" tecnológico varre a tela em laranja antes de navegar. (Não
+ * mexemos na entrada da página — um fade-in feito por script, rodando depois
+ * que a página já apareceu na tela, causava um "flash" branco chato; o
+ * próprio carregamento normal do navegador já é suave.)
+ *
+ * Importante: um link do tipo "index.html#servicos" clicado enquanto já se
+ * está em index.html NÃO troca de página de verdade (o navegador só pula
+ * pra âncora, sem recarregar a página) — esse caso é sempre ignorado aqui,
+ * senão a tela ficava esperando pra sempre um recarregamento que nunca
+ * acontece (era exatamente isso que deixava a tela branca ao clicar em
+ * Serviços/Nossas Lojas/Quem Somos/Contato).
  */
-const DURACAO_TRANSICAO_MS = 180;
+const DURACAO_TRANSICAO_MS = 260;
+
+function ehApenasAncoraNaMesmaPagina(link) {
+  let destino;
+  try { destino = new URL(link.href, window.location.href); } catch (e) { return false; }
+  if (!destino.hash) return false;
+  return destino.pathname === window.location.pathname && destino.search === window.location.search;
+}
 
 function ligarTransicaoDePaginas() {
+  const overlay = document.getElementById('overlayTransicao');
+
   document.addEventListener('click', (e) => {
     const link = e.target.closest('a[href]');
     if (!link) return;
     const href = link.getAttribute('href');
-    if (!href || href.startsWith('#') || href.startsWith('http') || href.startsWith('mailto:') || href.startsWith('tel:')) return;
+    if (!href || href.startsWith('http') || href.startsWith('mailto:') || href.startsWith('tel:')) return;
     if (link.target === '_blank' || link.hasAttribute('download')) return;
     if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    if (ehApenasAncoraNaMesmaPagina(link)) return; // deixa o navegador rolar suavemente sozinho
 
     e.preventDefault();
     document.documentElement.classList.add('pagina-saindo');
+    if (overlay) overlay.classList.add('ativo');
     setTimeout(() => { window.location.href = href; }, DURACAO_TRANSICAO_MS);
   });
 
   // Se a pessoa voltar pelo botão do navegador, o Chrome/Safari às vezes
   // restauram a página exatamente como ela ficou antes de sair (inclusive
-  // com a classe de fade-out ainda ativa) — isso garante que ela sempre
+  // com as classes de transição ainda ativas) — isso garante que ela sempre
   // volta visível.
   window.addEventListener('pageshow', () => {
     document.documentElement.classList.remove('pagina-saindo');
+    if (overlay) overlay.classList.remove('ativo');
   });
+}
+
+/**
+ * Revelação suave dos blocos ao rolar a página (fade + leve deslocamento —
+ * dá o toque "tecnológico" sem exagerar). Usa IntersectionObserver; se o
+ * navegador não suportar, os blocos simplesmente já aparecem visíveis.
+ */
+function ligarRevelacaoAoRolar() {
+  const alvos = document.querySelectorAll('.reveal');
+  if (!alvos.length) return;
+  if (!('IntersectionObserver' in window)) {
+    alvos.forEach(el => el.classList.add('reveal-visivel'));
+    return;
+  }
+  const observador = new IntersectionObserver((entradas) => {
+    entradas.forEach(entrada => {
+      if (entrada.isIntersecting) {
+        entrada.target.classList.add('reveal-visivel');
+        observador.unobserve(entrada.target);
+      }
+    });
+  }, { threshold: 0.15, rootMargin: '0px 0px -40px 0px' });
+  alvos.forEach(el => observador.observe(el));
 }
 
 /**
@@ -71,13 +113,14 @@ function renderServicos(containerId, comBotaoOrcamento) {
   const el = document.getElementById(containerId);
   if (!el) return;
   el.innerHTML = CONFIG_BSTYLE.SERVICOS.map(s => `
-    <div class="card-servico">
+    <div class="card-servico reveal">
       <div class="icone">${s.ICONE}</div>
       <h3>${s.NOME}</h3>
       <p>${s.DESCRICAO}</p>
       ${comBotaoOrcamento ? `<a class="link-orcamento" href="orcamento.html">Solicitar orçamento →</a>` : ''}
     </div>
   `).join('');
+  ligarRevelacaoAoRolar();
 }
 
 /** Preenche os cards das duas lojas (Home/Lojas/Contato). */
@@ -85,7 +128,7 @@ function renderLojas(containerId) {
   const el = document.getElementById(containerId);
   if (!el) return;
   el.innerHTML = CONFIG_BSTYLE.LOJAS.map(l => `
-    <div class="card-loja">
+    <div class="card-loja reveal">
       <h3>${l.NOME}</h3>
       <div class="linha-info"><span class="ico">📍</span><span>${l.ENDERECO} — ${l.CIDADE_UF}, ${l.CEP}</span></div>
       <div class="linha-info"><span class="ico">📞</span><span>${l.TELEFONE}</span></div>
@@ -96,17 +139,32 @@ function renderLojas(containerId) {
       </div>
     </div>
   `).join('');
+  ligarRevelacaoAoRolar();
+}
+
+/** Preenche o crédito do rodapé ("Desenvolvido por: ..."), se existir na página. */
+function renderCreditoRodape() {
+  const el = document.getElementById('creditoDesenvolvedor');
+  if (!el || !CONFIG_BSTYLE.DESENVOLVEDOR) return;
+  const d = CONFIG_BSTYLE.DESENVOLVEDOR;
+  el.innerHTML = `· Desenvolvido por: <a href="${d.INSTAGRAM_URL}" target="_blank" rel="noopener">${d.NOME}</a>`;
 }
 
 ligarTransicaoDePaginas();
 
 document.addEventListener('DOMContentLoaded', () => {
   ligarMenuMobile();
+  ligarRevelacaoAoRolar();
+  renderCreditoRodape();
   // Preenche o ano do copyright, se existir na página.
   const anoEl = document.getElementById('anoAtual');
   if (anoEl) anoEl.textContent = new Date().getFullYear();
-  // Link de WhatsApp genérico (topo, contato, footer) usando o número padrão da marca.
+  // Link de WhatsApp genérico (topo/quem-somos) usando o número padrão da marca.
   document.querySelectorAll('[data-whatsapp-padrao]').forEach(a => {
     a.href = linkWhatsapp(CONFIG_BSTYLE.MARCA.WHATSAPP_PADRAO, 'Olá! Vim pelo site da BStyle e gostaria de falar com a equipe.');
+  });
+  // "Entrar em contato" (seção Contato) vai direto pro WhatsApp da unidade São José.
+  document.querySelectorAll('[data-whatsapp-contato]').forEach(a => {
+    a.href = linkWhatsapp(CONFIG_BSTYLE.MARCA.WHATSAPP_CONTATO, 'Olá! Vim pelo site da BStyle e gostaria de falar com a equipe.');
   });
 });

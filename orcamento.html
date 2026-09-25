@@ -9,13 +9,20 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/css/style.css">
+<link rel="icon" type="image/png" href="assets/img/favicon.png">
+<link rel="apple-touch-icon" href="assets/img/favicon.png">
 </head>
 <body>
+
+  <div id="overlayTransicao"></div>
 
   <!-- ===== HEADER ===== -->
   <header class="header">
     <div class="container header-inner">
-      <a href="index.html" class="marca">B<span>Style</span></a>
+      <a href="index.html" class="marca-link">
+        <img class="logo-img" src="assets/img/logo.png" alt="BStyle" onerror="this.style.display='none'; this.nextElementSibling.style.display='inline-flex';">
+        <span class="marca" style="display:none;">B<span>Style</span></span>
+      </a>
       <nav class="nav-desktop">
         <a href="index.html#home">Home</a>
         <a href="index.html#servicos">Serviços</a>
@@ -155,8 +162,8 @@
         <div id="footerLojas"></div>
       </div>
       <div class="footer-baixo">
-        <span>© <span id="anoAtual"></span> BStyle — Todos os direitos reservados.</span>
-        <div class="footer-social"><a href="https://instagram.com/bstyle_clp" target="_blank" rel="noopener">📸 @bstyle_clp</a></div>
+        <span>© <span id="anoAtual"></span> BStyle — Todos os direitos reservados. <span id="creditoDesenvolvedor"></span></span>
+        <div class="footer-social"><a href="https://www.instagram.com/bstyle_clp" target="_blank" rel="noopener">📸 @bstyle_clp</a></div>
       </div>
     </div>
   </footer>

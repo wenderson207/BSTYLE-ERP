@@ -100,7 +100,7 @@ p{ margin:0; line-height:1.6; color:var(--cinza-texto); }
 }
 .header-inner{ display:flex; align-items:center; justify-content:space-between; height:64px; }
 .marca-link{ display:flex; align-items:center; gap:10px; }
-.logo-img{ height:34px; width:auto; max-width:140px; object-fit:contain; }
+.logo-img{ height:40px; width:40px; object-fit:contain; border-radius:8px; }
 .marca{ font-family:var(--font-display); font-weight:700; font-size:20px; color:#fff; letter-spacing:-0.02em; }
 .marca span{ color:var(--laranja); }
 .nav-desktop{ display:none; align-items:center; gap:28px; }
@@ -139,6 +139,30 @@ p{ margin:0; line-height:1.6; color:var(--cinza-texto); }
   pointer-events:none;
 }
 .hero .container{ position:relative; z-index:1; }
+
+/* Logo grande decorativa preenchendo o espaço vazio à direita do hero (só em telas largas) */
+.hero-logo-decorativo{
+  display:none; position:absolute; top:50%; right:7%; transform:translateY(-50%);
+  width:280px; height:280px; z-index:0;
+}
+.hero-logo-decorativo::before{
+  content:''; position:absolute; inset:-50px; border-radius:50%;
+  background:radial-gradient(circle, rgba(255,106,26,0.38), transparent 70%);
+  filter:blur(4px);
+}
+.hero-logo-decorativo img{
+  position:relative; width:100%; height:100%; object-fit:contain;
+  border-radius:32px; border:1px solid rgba(255,255,255,0.1);
+  background:rgba(255,255,255,0.03);
+  box-shadow:0 30px 80px rgba(0,0,0,0.55);
+}
+@media (min-width:900px){
+  .hero-logo-decorativo{ display:block; width:300px; height:300px; }
+}
+@media (min-width:1180px){
+  .hero-logo-decorativo{ width:360px; height:360px; }
+}
+
 .hero h1{ font-size:40px; font-weight:700; letter-spacing:-0.02em; margin-bottom:8px; }
 .hero h1 span{ color:var(--laranja); }
 .hero h2{ font-size:19px; font-weight:500; color:#D6D7DC; margin-bottom:18px; }

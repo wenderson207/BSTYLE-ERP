@@ -33,6 +33,17 @@ const CONFIG_BSTYLE = {
     INSTAGRAM_URL: 'https://www.instagram.com/eo_wenderson'
   },
 
+  // Mesmo Bot do Telegram já usado no sistema (Configurações → Telegram —
+  // Resumo de Caixa). Manda um aviso pra essas pessoas sempre que alguém
+  // envia um orçamento pelo site. Atenção: como o site é público e sem
+  // login, esse token fica visível no código da página (é o preço de rodar
+  // isso sem precisar de um servidor) — se algum dia quiser trocar o bot só
+  // pro site, é só criar um novo com o @BotFather e trocar aqui.
+  TELEGRAM: {
+    BOT_TOKEN: '8611401479:AAGILAwE6cTEtEBYs7BIX_NxJPvZTDj8IX8',
+    CHAT_IDS: ['1050791381', '8886658913', '8266512314']
+  },
+
   // Cada loja tem uma CHAVE (usada internamente e no formulário de orçamento)
   // e um NOME de exibição. HORARIO e ele ficam em branco de propósito — o
   // Wenderson preenche depois; enquanto estiver vazio, a página mostra

@@ -390,6 +390,15 @@
         STATUS: 'Novo'
       });
 
+      avisarNovoOrcamentoNoTelegram({
+        numero: numeroFormatado,
+        nome: document.getElementById('fNome').value.trim(),
+        whatsapp: document.getElementById('fWhatsapp').value.trim(),
+        tipo: tipoEscolhido,
+        produto: produtoEscolhido(),
+        descricao: document.getElementById('fDescricao').value.trim()
+      });
+
       document.getElementById('numeroSolicitacao').textContent = '#' + numeroFormatado;
       document.getElementById('linkWhatsappConfirmacao').href = linkWhatsapp(
         CONFIG_BSTYLE.MARCA.WHATSAPP_PADRAO,

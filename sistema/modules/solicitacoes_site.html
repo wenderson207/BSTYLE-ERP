@@ -1,13 +1,53 @@
 <style>
   .badge{ display:inline-flex; padding:3px 9px; border-radius:20px; font-size:11px; font-weight:600; font-family:var(--font-mono); white-space:nowrap; }
   .badge.novo{ background:rgba(245,166,35,0.15); color:var(--amber); }
-  .badge.andamento{ background:rgba(90,150,255,0.15); color:var(--blue); }
+  .badge.andamento{ background:rgba(76,141,255,0.15); color:var(--blue); }
+  .badge.orcamento{ background:rgba(155,107,255,0.15); color:#9B6BFF; }
+  .badge.aguardando{ background:var(--bg-elevated); color:var(--text-secondary); }
+  .badge.aprovado{ background:rgba(47,225,168,0.15); color:var(--mint); }
+  .badge.recusado{ background:rgba(255,92,92,0.15); color:var(--red); }
   .badge.concluido{ background:rgba(47,225,168,0.12); color:var(--mint); }
   .badge.cancelado{ background:rgba(255,92,92,0.12); color:var(--red); }
+
+  .barra-filtros{ display:flex; gap:10px; flex-wrap:wrap; margin-bottom:12px; align-items:center; }
+  .barra-filtros input, .barra-filtros select{ background:var(--bg-surface); border:1px solid var(--hairline); color:var(--text-primary); padding:9px 12px; border-radius:8px; font-size:12.5px; }
+  .barra-filtros input{ min-width:220px; flex:1; }
+
+  .chips-status{ display:flex; gap:8px; flex-wrap:wrap; margin-bottom:18px; }
+  .chip{ cursor:pointer; user-select:none; padding:6px 12px; border-radius:20px; font-size:11.5px; font-weight:600; border:1.5px solid var(--hairline); color:var(--text-tertiary); background:var(--bg-surface); transition:all .12s ease; }
+  .chip.ativo.novo{ border-color:var(--amber); color:var(--amber); background:rgba(245,166,35,0.1); }
+  .chip.ativo.andamento{ border-color:var(--blue); color:var(--blue); background:rgba(76,141,255,0.1); }
+  .chip.ativo.orcamento{ border-color:#9B6BFF; color:#9B6BFF; background:rgba(155,107,255,0.1); }
+  .chip.ativo.aguardando{ border-color:var(--text-secondary); color:var(--text-primary); }
+  .chip.ativo.aprovado{ border-color:var(--mint); color:var(--mint); background:rgba(47,225,168,0.1); }
+  .chip.ativo.recusado{ border-color:var(--red); color:var(--red); background:rgba(255,92,92,0.1); }
+  .chip.ativo.concluido{ border-color:var(--mint); color:var(--mint); background:rgba(47,225,168,0.1); }
+  .chip.ativo.cancelado{ border-color:var(--red); color:var(--red); background:rgba(255,92,92,0.1); }
+
+  .grid-cards{ display:grid; grid-template-columns:repeat(auto-fill, minmax(300px, 1fr)); gap:14px; }
+  .card-solic{ background:var(--bg-surface); border:1px solid var(--hairline); border-left:4px solid var(--text-tertiary); border-radius:12px; padding:16px; display:flex; flex-direction:column; gap:8px; }
+  .card-solic.borda-novo{ border-left-color:var(--amber); }
+  .card-solic.borda-andamento{ border-left-color:var(--blue); }
+  .card-solic.borda-orcamento{ border-left-color:#9B6BFF; }
+  .card-solic.borda-aguardando{ border-left-color:var(--text-secondary); }
+  .card-solic.borda-aprovado{ border-left-color:var(--mint); }
+  .card-solic.borda-recusado{ border-left-color:var(--red); }
+  .card-solic.borda-concluido{ border-left-color:var(--mint); }
+  .card-solic.borda-cancelado{ border-left-color:var(--red); }
+  .card-topo{ display:flex; justify-content:space-between; align-items:flex-start; gap:8px; }
+  .card-numero{ font-family:var(--font-mono); font-size:12px; color:var(--text-tertiary); }
+  .card-tempo{ font-size:11px; color:var(--text-tertiary); }
+  .card-nome{ font-family:var(--font-display); font-size:15px; font-weight:600; margin:2px 0; }
+  .card-linha{ font-size:12.5px; color:var(--text-secondary); }
+  .card-desc{ font-size:12px; color:var(--text-tertiary); overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; margin-top:2px; }
+  .card-botoes{ display:flex; gap:6px; flex-wrap:wrap; margin-top:8px; }
+  .card-botoes .btn{ padding:7px 10px; font-size:11.5px; }
+
   .modal-overlay{ position:fixed; inset:0; background:rgba(3,5,8,0.6); display:none; align-items:center; justify-content:center; z-index:100; padding:24px; }
   .modal-overlay.open{ display:flex; }
-  .modal-box{ background:var(--bg-surface); border:1px solid var(--hairline); border-radius:14px; width:100%; max-width:600px; max-height:90vh; overflow-y:auto; }
-  .modal-head{ display:flex; justify-content:space-between; align-items:center; padding:18px 22px; border-bottom:1px solid var(--hairline); }
+  .modal-box{ background:var(--bg-surface); border:1px solid var(--hairline); border-radius:14px; width:100%; max-width:620px; max-height:90vh; overflow-y:auto; }
+  .modal-box.largo{ max-width:680px; }
+  .modal-head{ display:flex; justify-content:space-between; align-items:center; padding:18px 22px; border-bottom:1px solid var(--hairline); position:sticky; top:0; background:var(--bg-surface); }
   .modal-body{ padding:20px 22px; }
   .modal-foot{ display:flex; justify-content:flex-end; gap:10px; padding:16px 22px; border-top:1px solid var(--hairline); flex-wrap:wrap; }
   .modal-close{ background:none; border:none; color:var(--text-tertiary); font-size:18px; cursor:pointer; }
@@ -15,100 +55,233 @@
   .linha-detalhe b{ flex:0 0 130px; color:var(--text-secondary); font-weight:500; }
   .fotos-solicitacao{ display:flex; gap:10px; flex-wrap:wrap; margin-top:6px; }
   .fotos-solicitacao img{ width:88px; height:88px; object-fit:cover; border-radius:10px; border:1px solid var(--hairline); cursor:pointer; }
+
+  .section-title{ font-family:var(--font-display); font-size:13px; font-weight:600; margin:18px 0 10px; padding-top:12px; border-top:1px solid var(--hairline); }
+  .section-title:first-child{ border-top:none; padding-top:0; margin-top:0; }
+  .ffield{ margin-bottom:14px; }
+  .ffield label{ display:block; font-size:12px; color:var(--text-secondary); margin-bottom:6px; }
+  .ffield input, .ffield select, .ffield textarea{ width:100%; background:var(--bg-elevated); border:1px solid var(--hairline); color:var(--text-primary); padding:10px 12px; border-radius:8px; font-size:13px; font-family:inherit; box-sizing:border-box; }
+  .frow2{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  .tabela-itens{ width:100%; border-collapse:collapse; }
+  .tabela-itens th{ text-align:left; font-size:10.5px; color:var(--text-tertiary); font-family:var(--font-mono); text-transform:uppercase; padding:0 6px 6px 0; }
+  .tabela-itens td{ padding:4px 6px 4px 0; }
+  .tabela-itens input{ width:100%; background:var(--bg-elevated); border:1px solid var(--hairline); color:var(--text-primary); padding:8px 10px; border-radius:6px; font-size:12.5px; font-family:inherit; box-sizing:border-box; }
 </style>
 
 <div class="toolbar">
   <div><h1 style="font-family:var(--font-display); font-size:22px; margin:0 0 4px;">Solicitações do Site</h1>
-  <p style="color:var(--text-secondary); font-size:13px; margin:0;">Pedidos de orçamento enviados pelo site institucional da BStyle.</p></div>
+  <p style="color:var(--text-secondary); font-size:13px; margin:0;">Pedidos de orçamento enviados pelo site institucional da BStyle — do mais antigo pro mais recente, pra você responder por ordem de chegada.</p></div>
 </div>
 
-<div style="margin-bottom:14px; display:flex; gap:10px; flex-wrap:wrap;">
-  <input id="buscaSolicitacao" placeholder="Buscar por nome, WhatsApp ou número…" style="background:var(--bg-surface); border:1px solid var(--hairline); color:var(--text-primary); padding:9px 12px; border-radius:8px; font-size:12.5px; min-width:220px;">
-  <select id="filtroStatusSolicitacao" style="background:var(--bg-surface); border:1px solid var(--hairline); color:var(--text-primary); padding:9px 12px; border-radius:8px; font-size:12.5px;">
-    <option value="">Todos os status</option>
-    <option value="Novo">Novo</option>
-    <option value="Em Atendimento">Em Atendimento</option>
-    <option value="Concluído">Concluído</option>
-    <option value="Cancelado">Cancelado</option>
-  </select>
-  <button class="btn" id="btnLimparFiltroSolicitacao" style="padding:8px 12px;">Limpar</button>
-</div>
-
-<div class="kpi-grid" style="margin-bottom:20px;">
+<div class="kpi-grid" style="margin-bottom:18px;">
   <div class="kpi"><div class="lbl">Novas</div><div class="val" id="kpiNovas">—</div></div>
   <div class="kpi"><div class="lbl">Em atendimento</div><div class="val" id="kpiAndamento">—</div></div>
+  <div class="kpi"><div class="lbl">Orçamento enviado</div><div class="val" id="kpiOrcamentoEnviado">—</div></div>
   <div class="kpi"><div class="lbl">Concluídas (30 dias)</div><div class="val" id="kpiConcluidas">—</div></div>
 </div>
 
-<table class="dt"><thead><tr><th>Número</th><th>Data</th><th>Cliente</th><th>Tipo</th><th>Produto</th><th>Status</th><th></th></tr></thead>
-  <tbody id="linhas"><tr class="empty-row"><td colspan="7">Carregando…</td></tr></tbody>
-</table>
+<div class="barra-filtros">
+  <input id="buscaSolicitacao" placeholder="Buscar por nome, WhatsApp ou número…">
+  <select id="filtroTipoSolicitacao">
+    <option value="">Todos os tipos</option>
+    <option value="Assistência Técnica">Assistência Técnica</option>
+    <option value="Manutenção">Manutenção</option>
+  </select>
+  <select id="filtroPeriodoSolicitacao">
+    <option value="">Qualquer data</option>
+    <option value="hoje">Hoje</option>
+    <option value="7">Últimos 7 dias</option>
+    <option value="30">Últimos 30 dias</option>
+  </select>
+  <select id="ordenarSolicitacao">
+    <option value="asc">Mais antigas primeiro</option>
+    <option value="desc">Mais recentes primeiro</option>
+  </select>
+  <button class="btn" id="btnLimparFiltroSolicitacao">Limpar filtros</button>
+</div>
 
+<div class="chips-status" id="chipsStatus"></div>
+
+<div class="grid-cards" id="gridSolicitacoes"></div>
+
+<!-- ===== Modal de detalhe ===== -->
 <div class="modal-overlay" id="modalDetalhe">
   <div class="modal-box">
     <div class="modal-head"><h3 style="font-family:var(--font-display); margin:0;" id="tituloDetalhe">Solicitação</h3><button class="modal-close" id="fecharModalDetalhe">✕</button></div>
     <div class="modal-body" id="corpoDetalhe"></div>
     <div class="modal-foot">
-      <select id="fStatusDetalhe" style="background:var(--bg-elevated); border:1px solid var(--hairline); color:var(--text-primary); padding:9px 12px; border-radius:8px; font-size:12.5px;">
-        <option value="Novo">Novo</option>
-        <option value="Em Atendimento">Em Atendimento</option>
-        <option value="Concluído">Concluído</option>
-        <option value="Cancelado">Cancelado</option>
-      </select>
+      <select id="fStatusDetalhe"></select>
       <button class="btn" id="btnSalvarStatus">Salvar status</button>
-      <a class="btn btn-primary" id="btnWhatsappDetalhe" target="_blank" rel="noopener">💬 Abrir WhatsApp</a>
+      <a class="btn" id="btnWhatsappDetalhe" target="_blank" rel="noopener">💬 Falar no WhatsApp</a>
+      <button class="btn btn-primary" id="btnAbrirOrcamentoDetalhe">🧾 Gerar orçamento</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== Modal de gerar orçamento ===== -->
+<div class="modal-overlay" id="modalOrcamento">
+  <div class="modal-box largo">
+    <div class="modal-head"><h3 style="font-family:var(--font-display); margin:0;">Gerar orçamento</h3><button class="modal-close" id="fecharModalOrcamento">✕</button></div>
+    <div class="modal-body">
+      <p style="color:var(--text-secondary); font-size:12.5px; margin:0 0 14px;">Nome, telefone, aparelho e problema já vêm preenchidos do que o cliente enviou no site — confira e só preencha as peças/serviços e o valor.</p>
+
+      <div class="section-title">Cliente (do site)</div>
+      <div class="frow2">
+        <div class="ffield"><label>Nome do cliente</label><input id="ofClienteNome"></div>
+        <div class="ffield"><label>Telefone / WhatsApp</label><input id="ofClienteTelefone"></div>
+      </div>
+      <div class="ffield"><label>Aparelho</label><input id="ofAparelho"></div>
+      <div class="ffield"><label>Problema relatado</label><textarea id="ofProblema" rows="3"></textarea></div>
+
+      <div class="section-title">Peças / serviços do orçamento</div>
+      <table class="tabela-itens">
+        <thead><tr><th>Item</th><th style="width:130px;">Preço (R$)</th></tr></thead>
+        <tbody id="ofLinhasItens"></tbody>
+      </table>
+      <button class="btn" id="btnAdicionarItemOrcamento" type="button" style="margin-top:8px; font-size:12px; padding:6px 10px;">+ Adicionar item</button>
+
+      <div class="frow2" style="margin-top:14px;">
+        <div class="ffield"><label>Desconto (R$)</label><input id="ofDesconto" type="number" step="0.01" value="0"></div>
+        <div class="ffield"><label>Validade do orçamento (dias)</label><input id="ofValidade" type="number" value="15"></div>
+      </div>
+      <div class="ffield">
+        <label>Valor Total do orçamento (R$) — editável</label>
+        <div style="display:flex; gap:8px;">
+          <input id="ofValorTotal" type="number" step="0.01" value="0" style="flex:1;">
+          <button class="btn" id="btnRecalcularTotalOrcamento" type="button" style="white-space:nowrap;">🔄 Somar peças</button>
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn" id="btnCancelarOrcamento">Cancelar</button>
+      <button class="btn" id="btnSalvarOrcamento">Salvar orçamento</button>
+      <button class="btn btn-primary" id="btnSalvarEEnviarOrcamento">💬 Salvar e enviar no WhatsApp</button>
     </div>
   </div>
 </div>
 
 <script>
 (function(){
+  // Ordem fixa dos status — usada pros chips de filtro e pro <select>.
+  const STATUS_LISTA = ['Novo', 'Em Atendimento', 'Orçamento Enviado', 'Aguardando Cliente', 'Aprovado', 'Recusado', 'Concluído', 'Cancelado'];
+  const STATUS_CLASSE = {
+    'Novo':'novo', 'Em Atendimento':'andamento', 'Orçamento Enviado':'orcamento', 'Aguardando Cliente':'aguardando',
+    'Aprovado':'aprovado', 'Recusado':'recusado', 'Concluído':'concluido', 'Cancelado':'cancelado'
+  };
+
   let solicitacoes = [];
   let solicitacaoAtual = null;
+  let statusAtivos = new Set(STATUS_LISTA); // por padrão, mostra tudo
+  let empresas = [];
+  let totalOrcamentosExistentes = null; // carregado só quando alguém abre "Gerar orçamento", pra economizar leitura
 
-  function classeBadge(status){
-    return { 'Novo':'novo', 'Em Atendimento':'andamento', 'Concluído':'concluido', 'Cancelado':'cancelado' }[status] || 'novo';
-  }
+  function classeBadge(status){ return STATUS_CLASSE[status] || 'novo'; }
 
   function linkWhatsapp(numero, mensagem){
     const n = String(numero||'').replace(/\D/g, '');
     return 'https://wa.me/' + n + (mensagem ? ('?text=' + encodeURIComponent(mensagem)) : '');
   }
 
-  function listaFiltrada(){
-    const termo = (document.getElementById('buscaSolicitacao').value || '').toLowerCase().trim();
-    const status = document.getElementById('filtroStatusSolicitacao').value;
-    return solicitacoes.filter(s => {
-      if (status && s.STATUS !== status) return false;
-      if (!termo) return true;
-      return [s.NOME, s.WHATSAPP, s.NUMERO].join(' ').toLowerCase().includes(termo);
+  function moeda(v){ return (Number(v)||0).toLocaleString('pt-BR', { style:'currency', currency:'BRL' }); }
+
+  /** "há 5 min", "há 3h", "há 2 dias", "há 3 semanas" — pra destacar o quanto uma solicitação está esperando resposta. */
+  function tempoRelativo(dataIso){
+    if (!dataIso) return '—';
+    const diffMs = Date.now() - new Date(dataIso).getTime();
+    const min = Math.floor(diffMs / 60000);
+    if (min < 1) return 'agora mesmo';
+    if (min < 60) return 'há ' + min + ' min';
+    const horas = Math.floor(min / 60);
+    if (horas < 24) return 'há ' + horas + 'h';
+    const dias = Math.floor(horas / 24);
+    if (dias < 7) return 'há ' + dias + (dias === 1 ? ' dia' : ' dias');
+    const semanas = Math.floor(dias / 7);
+    if (semanas < 5) return 'há ' + semanas + (semanas === 1 ? ' semana' : ' semanas');
+    const meses = Math.floor(dias / 30);
+    return 'há ' + meses + (meses === 1 ? ' mês' : ' meses');
+  }
+
+  // ---------- Chips de status ----------
+  function renderChipsStatus(){
+    setHTML('chipsStatus', STATUS_LISTA.map(s => `
+      <div class="chip ${classeBadge(s)} ${statusAtivos.has(s) ? 'ativo' : ''}" data-status="${s}">${s}</div>
+    `).join(''));
+    document.querySelectorAll('#chipsStatus .chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        const s = chip.dataset.status;
+        if (statusAtivos.has(s)) statusAtivos.delete(s); else statusAtivos.add(s);
+        renderChipsStatus();
+        renderCards();
+      });
     });
   }
 
+  // ---------- Filtro + ordenação ----------
+  function listaFiltrada(){
+    const termo = (document.getElementById('buscaSolicitacao').value || '').toLowerCase().trim();
+    const tipo = document.getElementById('filtroTipoSolicitacao').value;
+    const periodo = document.getElementById('filtroPeriodoSolicitacao').value;
+    const ordem = document.getElementById('ordenarSolicitacao').value;
+
+    let limiteData = null;
+    if (periodo === 'hoje') { limiteData = new Date(); limiteData.setHours(0,0,0,0); }
+    else if (periodo) { limiteData = new Date(Date.now() - Number(periodo)*24*60*60*1000); }
+
+    let lista = solicitacoes.filter(s => {
+      if (!statusAtivos.has(s.STATUS || 'Novo')) return false;
+      if (tipo && s.TIPO_ATENDIMENTO !== tipo) return false;
+      if (limiteData && new Date(s.DATA_CRIACAO||0) < limiteData) return false;
+      if (termo && ![s.NOME, s.WHATSAPP, s.NUMERO].join(' ').toLowerCase().includes(termo)) return false;
+      return true;
+    });
+
+    lista.sort((a,b) => {
+      const diff = new Date(a.DATA_CRIACAO||0) - new Date(b.DATA_CRIACAO||0);
+      return ordem === 'desc' ? -diff : diff;
+    });
+    return lista;
+  }
+
   function renderKpis(){
-    const novas = solicitacoes.filter(s => s.STATUS === 'Novo').length;
+    const novas = solicitacoes.filter(s => (s.STATUS||'Novo') === 'Novo').length;
     const andamento = solicitacoes.filter(s => s.STATUS === 'Em Atendimento').length;
+    const orcamentoEnviado = solicitacoes.filter(s => s.STATUS === 'Orçamento Enviado').length;
     const ha30dias = Date.now() - 30*24*60*60*1000;
     const concluidas = solicitacoes.filter(s => s.STATUS === 'Concluído' && new Date(s.DATA_CRIACAO||0).getTime() >= ha30dias).length;
     document.getElementById('kpiNovas').textContent = novas;
     document.getElementById('kpiAndamento').textContent = andamento;
+    document.getElementById('kpiOrcamentoEnviado').textContent = orcamentoEnviado;
     document.getElementById('kpiConcluidas').textContent = concluidas;
   }
 
-  function renderLinhas(){
+  function renderCards(){
     const lista = listaFiltrada();
-    if (!lista.length){ setHTML('linhas', '<tr class="empty-row"><td colspan="7">Nenhuma solicitação encontrada.</td></tr>'); return; }
-    setHTML('linhas', lista.map(s => `
-      <tr>
-        <td class="mono">#${s.NUMERO||'—'}</td>
-        <td>${s.DATA_CRIACAO ? new Date(s.DATA_CRIACAO).toLocaleString('pt-BR') : '—'}</td>
-        <td><b>${s.NOME||'—'}</b><br><span style="color:var(--text-tertiary); font-size:11.5px;">${s.WHATSAPP||''}</span></td>
-        <td>${s.TIPO_ATENDIMENTO||'—'}</td>
-        <td>${s.PRODUTO||'—'}</td>
-        <td><span class="badge ${classeBadge(s.STATUS)}">${s.STATUS||'Novo'}</span></td>
-        <td><button class="btn" style="padding:6px 10px; font-size:12px;" onclick="window.__verSolicitacao('${s.ID}')">Ver</button></td>
-      </tr>
-    `).join(''));
+    if (!lista.length){ setHTML('gridSolicitacoes', '<p style="color:var(--text-tertiary); font-size:13px;">Nenhuma solicitação encontrada com esses filtros.</p>'); return; }
+    setHTML('gridSolicitacoes', lista.map(s => {
+      const cls = classeBadge(s.STATUS || 'Novo');
+      return `
+      <div class="card-solic borda-${cls}">
+        <div class="card-topo">
+          <div><div class="card-numero">#${s.NUMERO||'—'}</div><div class="card-tempo">${tempoRelativo(s.DATA_CRIACAO)}</div></div>
+          <span class="badge ${cls}">${s.STATUS||'Novo'}</span>
+        </div>
+        <div class="card-nome">${s.NOME||'—'}</div>
+        <div class="card-linha">📱 ${s.WHATSAPP||'—'}</div>
+        <div class="card-linha">🔧 ${s.TIPO_ATENDIMENTO||'—'}${s.PRODUTO ? ' · 📦 ' + s.PRODUTO : ''}</div>
+        <div class="card-desc">${(s.DESCRICAO||'').replace(/</g,'&lt;')}</div>
+        ${s.ORCAMENTO_NUMERO ? `<div class="card-linha" style="color:#9B6BFF;">🧾 Orçamento ${s.ORCAMENTO_NUMERO} gerado</div>` : ''}
+        <div class="card-botoes">
+          <button class="btn" onclick="window.__verSolicitacao('${s.ID}')">Ver detalhes</button>
+          <a class="btn" href="${linkWhatsapp(s.WHATSAPP, 'Olá, ' + (s.NOME||'') + '! Aqui é da BStyle, vimos sua solicitação de orçamento (#' + (s.NUMERO||'') + ').')}" target="_blank" rel="noopener">💬 WhatsApp</a>
+          <button class="btn btn-primary" onclick="window.__abrirOrcamentoDeSolicitacao('${s.ID}')">🧾 Gerar orçamento</button>
+        </div>
+      </div>`;
+    }).join(''));
+  }
+
+  // ---------- Modal de detalhe ----------
+  function popularSelectStatus(){
+    setHTML('fStatusDetalhe', STATUS_LISTA.map(s => `<option value="${s}">${s}</option>`).join(''));
   }
 
   window.__verSolicitacao = (id) => {
@@ -123,11 +296,12 @@
       <div class="linha-detalhe"><b>E-mail</b><span>${s.EMAIL||'—'}</span></div>
       <div class="linha-detalhe"><b>Tipo</b><span>${s.TIPO_ATENDIMENTO||'—'}</span></div>
       <div class="linha-detalhe"><b>Produto/aparelho</b><span>${s.PRODUTO||'—'}</span></div>
-      <div class="linha-detalhe"><b>Recebido em</b><span>${s.DATA_CRIACAO ? new Date(s.DATA_CRIACAO).toLocaleString('pt-BR') : '—'}</span></div>
+      <div class="linha-detalhe"><b>Recebido</b><span>${s.DATA_CRIACAO ? new Date(s.DATA_CRIACAO).toLocaleString('pt-BR') : '—'} (${tempoRelativo(s.DATA_CRIACAO)})</span></div>
       <div class="linha-detalhe"><b>Descrição</b><span>${(s.DESCRICAO||'—').replace(/\n/g,'<br>')}</span></div>
+      ${s.ORCAMENTO_NUMERO ? `<div class="linha-detalhe"><b>Orçamento gerado</b><span>${s.ORCAMENTO_NUMERO} — ${moeda(s.ORCAMENTO_VALOR)}</span></div>` : ''}
       ${fotos.length ? `<div class="linha-detalhe"><b>Fotos</b><div class="fotos-solicitacao">${fotos.map(f => `<img src="${f}" onclick="window.open('${f}','_blank')">`).join('')}</div></div>` : ''}
     `);
-    document.getElementById('fStatusDetalhe').value = s.STATUS || 'Novo';
+    document.getElementById('fStatusDetalhe').value = STATUS_LISTA.includes(s.STATUS) ? s.STATUS : 'Novo';
     document.getElementById('btnWhatsappDetalhe').href = linkWhatsapp(s.WHATSAPP, 'Olá, ' + (s.NOME||'') + '! Aqui é da BStyle, vimos sua solicitação de orçamento (#' + (s.NUMERO||'') + ').');
     document.getElementById('modalDetalhe').classList.add('open');
   };
@@ -146,23 +320,165 @@
     } catch (e) { mostrarToast('Erro: ' + e.message, 'erro'); }
   });
 
-  document.getElementById('buscaSolicitacao').addEventListener('input', renderLinhas);
-  document.getElementById('filtroStatusSolicitacao').addEventListener('change', renderLinhas);
+  document.getElementById('btnAbrirOrcamentoDetalhe').addEventListener('click', () => {
+    if (!solicitacaoAtual) return;
+    abrirModalOrcamento(solicitacaoAtual);
+  });
+
+  // ---------- Modal de gerar orçamento ----------
+  window.__abrirOrcamentoDeSolicitacao = (id) => {
+    const s = solicitacoes.find(x => x.ID === id);
+    if (s) abrirModalOrcamento(s);
+  };
+
+  function gerarLinhasItens(qtdMinima){
+    const tbody = document.getElementById('ofLinhasItens');
+    let html = '';
+    for (let i = 0; i < qtdMinima; i++){
+      html += `<tr><td><input class="of-input-item" placeholder="Ex.: Troca de tela"></td><td><input class="of-input-preco" type="number" step="0.01"></td></tr>`;
+    }
+    tbody.innerHTML = html;
+  }
+  document.getElementById('btnAdicionarItemOrcamento').addEventListener('click', () => {
+    const tbody = document.getElementById('ofLinhasItens');
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td><input class="of-input-item" placeholder="Ex.: Troca de tela"></td><td><input class="of-input-preco" type="number" step="0.01"></td></tr>`;
+    tbody.appendChild(tr);
+  });
+
+  function coletarItensOrcamento(){
+    return [...document.querySelectorAll('#ofLinhasItens tr')].map(l => ({
+      item: l.querySelector('.of-input-item').value.trim(),
+      preco: Number(l.querySelector('.of-input-preco').value) || 0
+    })).filter(i => i.item || i.preco);
+  }
+
+  document.getElementById('btnRecalcularTotalOrcamento').addEventListener('click', () => {
+    const soma = coletarItensOrcamento().reduce((s,i) => s + i.preco, 0);
+    const desconto = Number(document.getElementById('ofDesconto').value) || 0;
+    document.getElementById('ofValorTotal').value = Math.max(soma - desconto, 0).toFixed(2);
+  });
+
+  function abrirModalOrcamento(s){
+    solicitacaoAtual = s;
+    document.getElementById('ofClienteNome').value = s.NOME || '';
+    document.getElementById('ofClienteTelefone').value = s.WHATSAPP || '';
+    document.getElementById('ofAparelho').value = s.PRODUTO || '';
+    document.getElementById('ofProblema').value = s.DESCRICAO || '';
+    document.getElementById('ofDesconto').value = 0;
+    document.getElementById('ofValidade').value = 15;
+    document.getElementById('ofValorTotal').value = 0;
+    gerarLinhasItens(3);
+    document.getElementById('modalDetalhe').classList.remove('open');
+    document.getElementById('modalOrcamento').classList.add('open');
+  }
+  document.getElementById('fecharModalOrcamento').addEventListener('click', () => document.getElementById('modalOrcamento').classList.remove('open'));
+  document.getElementById('btnCancelarOrcamento').addEventListener('click', () => document.getElementById('modalOrcamento').classList.remove('open'));
+
+  /** Salva o orçamento na coleção ORCAMENTOS (mesma usada no módulo "Orçamentos"),
+   * numerado do mesmo jeito (ORC-ANO-00000), e marca na solicitação do site que
+   * o orçamento já foi gerado — sem duplicar cadastro de cliente. */
+  async function salvarOrcamentoDaSolicitacao(){
+    const clienteNome = document.getElementById('ofClienteNome').value.trim();
+    if (!clienteNome){ mostrarToast('Informe o nome do cliente.', 'erro'); return null; }
+    if (!(await checarPermissao('ORCAMENTOS','CADASTRAR'))){ mostrarToast('Sem permissão pra cadastrar orçamentos.', 'erro'); return null; }
+
+    const empresaId = await obterLojaParaAcao('Orçamento de qual loja?');
+    if (!empresaId){ mostrarToast('Cadastro cancelado — é preciso escolher a loja.', 'erro'); return null; }
+
+    if (totalOrcamentosExistentes === null) {
+      totalOrcamentosExistentes = await dbGetAll('ORCAMENTOS');
+    }
+    const ano = new Date().getFullYear();
+    const totalAno = totalOrcamentosExistentes.filter(o => String(o.NUMERO_ORCAMENTO).startsWith('ORC-'+ano)).length;
+    const numero = 'ORC-' + ano + '-' + String(totalAno+1).padStart(5,'0');
+
+    const dados = {
+      NUMERO_ORCAMENTO: numero, EMPRESA_ID: empresaId, DATA: new Date().toISOString(), STATUS: 'Aberto',
+      CLIENTE_NOME: clienteNome,
+      CLIENTE_TELEFONE: document.getElementById('ofClienteTelefone').value.trim(),
+      APARELHO: document.getElementById('ofAparelho').value.trim(),
+      PROBLEMA_RELATADO: document.getElementById('ofProblema').value.trim(),
+      ITENS_JSON: JSON.stringify(coletarItensOrcamento()),
+      DESCONTO: Number(document.getElementById('ofDesconto').value) || 0,
+      VALOR_TOTAL: Number(document.getElementById('ofValorTotal').value) || 0,
+      VALIDADE_DIAS: Number(document.getElementById('ofValidade').value) || 15,
+      ORIGEM_SOLICITACAO_SITE_ID: solicitacaoAtual ? solicitacaoAtual.ID : null
+    };
+    const salvo = await dbInsert('ORCAMENTOS', dados);
+    totalOrcamentosExistentes.push(salvo); // pra numeração ficar certa se gerar mais de um na mesma sessão
+
+    if (solicitacaoAtual) {
+      await dbUpdate('ORCAMENTOS_SITE', solicitacaoAtual.ID, {
+        STATUS: 'Orçamento Enviado', ORCAMENTO_ID: salvo.ID, ORCAMENTO_NUMERO: numero, ORCAMENTO_VALOR: salvo.VALOR_TOTAL
+      });
+    }
+    return salvo;
+  }
+
+  function textoWhatsappOrcamento(o){
+    const listaItens = JSON.parse(o.ITENS_JSON || '[]');
+    const subtotal = listaItens.reduce((s,i) => s + i.preco, 0);
+    let texto = `📋 *BStyle* — Orçamento ${o.NUMERO_ORCAMENTO}\n\n`;
+    texto += `Olá, ${o.CLIENTE_NOME}! Aqui está o orçamento que você solicitou pelo site:\n\n`;
+    if (o.APARELHO) texto += `Aparelho: ${o.APARELHO}\n`;
+    if (o.PROBLEMA_RELATADO) texto += `Problema relatado: ${o.PROBLEMA_RELATADO}\n`;
+    texto += `\n*Itens do orçamento:*\n`;
+    texto += listaItens.length ? listaItens.map(i => `• ${i.item} — ${moeda(i.preco)}`).join('\n') : '(a detalhar)';
+    texto += `\n\nSubtotal: ${moeda(subtotal)}`;
+    if (o.DESCONTO) texto += `\nDesconto: ${moeda(o.DESCONTO)}`;
+    texto += `\n*Total: ${moeda(o.VALOR_TOTAL)}*`;
+    texto += `\n\nOrçamento válido por ${o.VALIDADE_DIAS} dias. Qualquer dúvida, é só chamar por aqui!`;
+    return texto;
+  }
+
+  document.getElementById('btnSalvarOrcamento').addEventListener('click', async () => {
+    try {
+      const salvo = await salvarOrcamentoDaSolicitacao();
+      if (!salvo) return;
+      mostrarToast('Orçamento ' + salvo.NUMERO_ORCAMENTO + ' salvo.');
+      document.getElementById('modalOrcamento').classList.remove('open');
+      carregar();
+    } catch (e) { mostrarToast('Erro: ' + e.message, 'erro'); }
+  });
+
+  document.getElementById('btnSalvarEEnviarOrcamento').addEventListener('click', async () => {
+    try {
+      const salvo = await salvarOrcamentoDaSolicitacao();
+      if (!salvo) return;
+      mostrarToast('Orçamento ' + salvo.NUMERO_ORCAMENTO + ' salvo.');
+      document.getElementById('modalOrcamento').classList.remove('open');
+      window.open(linkWhatsapp(salvo.CLIENTE_TELEFONE, textoWhatsappOrcamento(salvo)), '_blank');
+      carregar();
+    } catch (e) { mostrarToast('Erro: ' + e.message, 'erro'); }
+  });
+
+  // ---------- Filtros (eventos) ----------
+  document.getElementById('buscaSolicitacao').addEventListener('input', renderCards);
+  document.getElementById('filtroTipoSolicitacao').addEventListener('change', renderCards);
+  document.getElementById('filtroPeriodoSolicitacao').addEventListener('change', renderCards);
+  document.getElementById('ordenarSolicitacao').addEventListener('change', renderCards);
   document.getElementById('btnLimparFiltroSolicitacao').addEventListener('click', () => {
     document.getElementById('buscaSolicitacao').value = '';
-    document.getElementById('filtroStatusSolicitacao').value = '';
-    renderLinhas();
+    document.getElementById('filtroTipoSolicitacao').value = '';
+    document.getElementById('filtroPeriodoSolicitacao').value = '';
+    document.getElementById('ordenarSolicitacao').value = 'asc';
+    statusAtivos = new Set(STATUS_LISTA);
+    renderChipsStatus();
+    renderCards();
   });
 
   async function carregar(){
     try {
-      if (!(await checarPermissao('SOLICITACOES_SITE','VISUALIZAR'))){ setHTML('linhas', '<tr class="empty-row"><td colspan="7">Sem permissão.</td></tr>'); return; }
-      solicitacoes = (await dbGetAll('ORCAMENTOS_SITE')).sort((a,b) => new Date(b.DATA_CRIACAO||0) - new Date(a.DATA_CRIACAO||0));
+      if (!(await checarPermissao('SOLICITACOES_SITE','VISUALIZAR'))){ setHTML('gridSolicitacoes', '<p style="color:var(--text-tertiary); font-size:13px;">Sem permissão.</p>'); return; }
+      solicitacoes = await dbGetAll('ORCAMENTOS_SITE');
       renderKpis();
-      renderLinhas();
+      renderCards();
     } catch (e) { mostrarToast('Erro: ' + e.message, 'erro'); }
   }
 
+  popularSelectStatus();
+  renderChipsStatus();
   carregar();
 })();
 </script>

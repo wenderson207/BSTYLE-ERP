@@ -56,6 +56,12 @@
   .fotos-solicitacao{ display:flex; gap:10px; flex-wrap:wrap; margin-top:6px; }
   .fotos-solicitacao img{ width:88px; height:88px; object-fit:cover; border-radius:10px; border:1px solid var(--hairline); cursor:pointer; }
 
+  .modal-overlay.foto .modal-box{ background:transparent; border:none; max-width:680px; }
+  .modal-overlay.foto .foto-topo{ display:flex; justify-content:flex-end; margin-bottom:8px; }
+  .modal-overlay.foto .modal-close{ color:#fff; font-size:24px; background:rgba(0,0,0,0.4); border-radius:50%; width:34px; height:34px; }
+  .modal-overlay.foto img{ width:100%; max-height:80vh; object-fit:contain; border-radius:12px; display:block; }
+  .modal-overlay.foto .acoes-imagem-orcamento{ display:flex; gap:10px; justify-content:center; margin-top:14px; flex-wrap:wrap; }
+
   .section-title{ font-family:var(--font-display); font-size:13px; font-weight:600; margin:18px 0 10px; padding-top:12px; border-top:1px solid var(--hairline); }
   .section-title:first-child{ border-top:none; padding-top:0; margin-top:0; }
   .ffield{ margin-bottom:14px; }
@@ -155,7 +161,28 @@
     <div class="modal-foot">
       <button class="btn" id="btnCancelarOrcamento">Cancelar</button>
       <button class="btn" id="btnSalvarOrcamento">Salvar orçamento</button>
+      <button class="btn" id="btnGerarImagemOrcamento">🖼️ Ver imagem</button>
       <button class="btn btn-primary" id="btnSalvarEEnviarOrcamento">💬 Salvar e enviar no WhatsApp</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== Foto ampliada (visualizador) ===== -->
+<div class="modal-overlay foto" id="modalFoto">
+  <div class="modal-box">
+    <div class="foto-topo"><button class="modal-close" id="fecharModalFoto">✕</button></div>
+    <img id="imgFotoAmpliada" alt="Foto enviada pelo cliente">
+  </div>
+</div>
+
+<!-- ===== Imagem do orçamento gerada (baixar / compartilhar) ===== -->
+<div class="modal-overlay foto" id="modalImagemOrcamento">
+  <div class="modal-box" style="max-width:520px;">
+    <div class="foto-topo"><button class="modal-close" id="fecharModalImagemOrcamento">✕</button></div>
+    <img id="imgOrcamentoGerado" alt="Imagem do orçamento" style="border-radius:14px; background:#fff;">
+    <div class="acoes-imagem-orcamento">
+      <a class="btn" id="btnBaixarImagemGerada" download="orcamento.png">⬇️ Baixar imagem</a>
+      <button class="btn btn-primary" id="btnCompartilharImagemGerada" type="button">📤 Compartilhar / Enviar</button>
     </div>
   </div>
 </div>
@@ -174,6 +201,8 @@
   let statusAtivos = new Set(STATUS_LISTA); // por padrão, mostra tudo
   let empresas = [];
   let totalOrcamentosExistentes = null; // carregado só quando alguém abre "Gerar orçamento", pra economizar leitura
+  let ultimaImagemGeradaDataUrl = null;
+  let ultimoOrcamentoParaImagem = null;
 
   function classeBadge(status){ return STATUS_CLASSE[status] || 'novo'; }
 
@@ -299,7 +328,7 @@
       <div class="linha-detalhe"><b>Recebido</b><span>${s.DATA_CRIACAO ? new Date(s.DATA_CRIACAO).toLocaleString('pt-BR') : '—'} (${tempoRelativo(s.DATA_CRIACAO)})</span></div>
       <div class="linha-detalhe"><b>Descrição</b><span>${(s.DESCRICAO||'—').replace(/\n/g,'<br>')}</span></div>
       ${s.ORCAMENTO_NUMERO ? `<div class="linha-detalhe"><b>Orçamento gerado</b><span>${s.ORCAMENTO_NUMERO} — ${moeda(s.ORCAMENTO_VALOR)}</span></div>` : ''}
-      ${fotos.length ? `<div class="linha-detalhe"><b>Fotos</b><div class="fotos-solicitacao">${fotos.map(f => `<img src="${f}" onclick="window.open('${f}','_blank')">`).join('')}</div></div>` : ''}
+      ${fotos.length ? `<div class="linha-detalhe"><b>Fotos</b><div class="fotos-solicitacao">${fotos.map((f,i) => `<img src="${f}" onclick="window.__abrirFoto('${s.ID}', ${i})">`).join('')}</div></div>` : ''}
     `);
     document.getElementById('fStatusDetalhe').value = STATUS_LISTA.includes(s.STATUS) ? s.STATUS : 'Novo';
     document.getElementById('btnWhatsappDetalhe').href = linkWhatsapp(s.WHATSAPP, 'Olá, ' + (s.NOME||'') + '! Aqui é da BStyle, vimos sua solicitação de orçamento (#' + (s.NUMERO||'') + ').');
@@ -307,6 +336,26 @@
   };
 
   document.getElementById('fecharModalDetalhe').addEventListener('click', () => document.getElementById('modalDetalhe').classList.remove('open'));
+
+  /**
+   * Abre a foto enviada pelo cliente num visualizador dentro da própria tela.
+   * IMPORTANTE: as fotos são guardadas como "data:image/...;base64,..." — o
+   * Chrome (e outros navegadores) BLOQUEIA window.open()/nova aba direto pra
+   * uma data URL por segurança ("not allowed to navigate top-level frame to
+   * data URL"), então a foto simplesmente não abria. Um <img> normal dentro
+   * da página não tem esse bloqueio, por isso a solução é mostrar a foto
+   * ampliada aqui mesmo, num modal, em vez de tentar abrir aba nova.
+   */
+  window.__abrirFoto = (id, idx) => {
+    const s = solicitacoes.find(x => x.ID === id);
+    if (!s || !Array.isArray(s.FOTOS) || !s.FOTOS[idx]) return;
+    document.getElementById('imgFotoAmpliada').src = s.FOTOS[idx];
+    document.getElementById('modalFoto').classList.add('open');
+  };
+  document.getElementById('fecharModalFoto').addEventListener('click', () => document.getElementById('modalFoto').classList.remove('open'));
+  document.getElementById('modalFoto').addEventListener('click', (e) => {
+    if (e.target.id === 'modalFoto') document.getElementById('modalFoto').classList.remove('open');
+  });
 
   document.getElementById('btnSalvarStatus').addEventListener('click', async () => {
     if (!solicitacaoAtual) return;
@@ -432,6 +481,332 @@
     return texto;
   }
 
+  // ---------- Imagem do orçamento (pra mandar algo mais bonito que só texto) ----------
+
+  /** Espera as fontes da marca carregarem antes de desenhar (Google Fonts já
+   * são carregadas pelo sistema em index.html) — se falhar por algum motivo,
+   * segue com a fonte padrão do navegador, sem travar a geração da imagem. */
+  async function aguardarFontes(){
+    try {
+      await Promise.all([
+        document.fonts.load("700 26px 'Space Grotesk'"),
+        document.fonts.load("700 17px 'Space Grotesk'"),
+        document.fonts.load("400 13px 'Inter'"),
+        document.fonts.load("500 13px 'Inter'"),
+        document.fonts.load("600 13px 'Inter'"),
+        document.fonts.load("600 14px 'JetBrains Mono'")
+      ]);
+      await document.fonts.ready;
+    } catch (e) { /* sem fontes carregadas, a imagem sai com a fonte padrão mesmo */ }
+  }
+
+  function quebrarTextoCanvas(ctx, texto, maxLargura){
+    const palavras = String(texto||'').split(/\s+/).filter(Boolean);
+    const linhas = [];
+    let atual = '';
+    palavras.forEach(p => {
+      const teste = atual ? atual + ' ' + p : p;
+      if (atual && ctx.measureText(teste).width > maxLargura) { linhas.push(atual); atual = p; }
+      else atual = teste;
+    });
+    if (atual) linhas.push(atual);
+    return linhas;
+  }
+
+  /** Formata um telefone (com ou sem DDI 55) como "(11) 90000-0001", só pra
+   * ficar mais legível na imagem do que o número cru salvo no banco. */
+  function formatarTelefoneImagem(numero){
+    const d = String(numero||'').replace(/\D/g, '');
+    if (d.length === 13 && d.startsWith('55')) return '(' + d.slice(2,4) + ') ' + d.slice(4,9) + '-' + d.slice(9);
+    if (d.length === 12 && d.startsWith('55')) return '(' + d.slice(2,4) + ') ' + d.slice(4,8) + '-' + d.slice(8);
+    if (d.length === 11) return '(' + d.slice(0,2) + ') ' + d.slice(2,7) + '-' + d.slice(7);
+    if (d.length === 10) return '(' + d.slice(0,2) + ') ' + d.slice(2,6) + '-' + d.slice(6);
+    return numero || '';
+  }
+
+  function arredondarRetangulo(ctx, x, y, w, h, r){
+    ctx.beginPath();
+    ctx.moveTo(x+r, y);
+    ctx.arcTo(x+w, y, x+w, y+h, r);
+    ctx.arcTo(x+w, y+h, x, y+h, r);
+    ctx.arcTo(x, y+h, x, y, r);
+    ctx.arcTo(x, y, x+w, y, r);
+    ctx.closePath();
+  }
+
+  /**
+   * Desenha o "cartão" do orçamento inteiro num canvas — ou só CALCULA a
+   * altura final que ele vai precisar, sem desenhar nada (desenhar=false).
+   * Rodamos essa mesma função duas vezes: 1ª só pra medir, 2ª (já sabendo o
+   * tamanho certo) pra desenhar de verdade — assim a imagem nunca sobra com
+   * espaço em branco embaixo nem corta conteúdo.
+   */
+  function construirOrcamentoNoCanvas(ctx, o, larguraCss, alturaCanvasFinal, desenhar){
+    const margem = 48;
+    const larguraConteudo = larguraCss - margem*2;
+    const itens = JSON.parse(o.ITENS_JSON || '[]');
+    const listaItens = itens.length ? itens : [{ item:'A detalhar', preco:0 }];
+    const subtotal = itens.reduce((s,i) => s + (Number(i.preco)||0), 0);
+    const alturaHeader = 132;
+
+    ctx.font = "400 13px 'Inter', Arial, sans-serif";
+    const linhasProblema = o.PROBLEMA_RELATADO ? quebrarTextoCanvas(ctx, o.PROBLEMA_RELATADO, larguraConteudo) : [];
+
+    if (desenhar) {
+      ctx.save();
+      arredondarRetangulo(ctx, 0, 0, larguraCss, alturaCanvasFinal, 20);
+      ctx.clip();
+
+      const grad = ctx.createLinearGradient(0, 0, larguraCss, 0);
+      grad.addColorStop(0, '#0A0D12');
+      grad.addColorStop(1, '#181F2C');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, larguraCss, alturaHeader);
+      ctx.fillStyle = '#2FE1A8';
+      ctx.fillRect(0, alturaHeader-4, larguraCss, 4);
+
+      arredondarRetangulo(ctx, margem, 34, 56, 56, 14);
+      ctx.fillStyle = '#2FE1A8';
+      ctx.fill();
+      ctx.fillStyle = '#07130F';
+      ctx.font = "700 26px 'Space Grotesk', Arial, sans-serif";
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('B', margem+28, 34+29);
+      ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+
+      ctx.fillStyle = '#EDEFF3';
+      ctx.font = "700 24px 'Space Grotesk', Arial, sans-serif";
+      ctx.fillText('BStyle', margem+70, 60);
+      ctx.fillStyle = '#8891A3';
+      ctx.font = "400 12.5px 'Inter', Arial, sans-serif";
+      ctx.fillText('Tecnologia, acessórios e assistência técnica', margem+70, 80);
+
+      ctx.textAlign = 'right';
+      ctx.fillStyle = '#EDEFF3';
+      ctx.font = "700 15px 'Space Grotesk', Arial, sans-serif";
+      ctx.fillText('ORÇAMENTO', larguraCss-margem, 48);
+      ctx.fillStyle = '#2FE1A8';
+      ctx.font = "600 14px 'JetBrains Mono', monospace";
+      ctx.fillText(o.NUMERO_ORCAMENTO || '—', larguraCss-margem, 68);
+      ctx.fillStyle = '#8891A3';
+      ctx.font = "400 12px 'Inter', Arial, sans-serif";
+      ctx.fillText(new Date(o.DATA||Date.now()).toLocaleDateString('pt-BR'), larguraCss-margem, 86);
+      ctx.textAlign = 'left';
+    }
+
+    let y = alturaHeader + 40;
+
+    if (desenhar) { ctx.fillStyle = '#0F1522'; ctx.font = "700 17px 'Space Grotesk', Arial, sans-serif"; ctx.fillText(o.CLIENTE_NOME || 'Cliente', margem, y); }
+    y += 24;
+
+    const linhaContato = [formatarTelefoneImagem(o.CLIENTE_TELEFONE), o.APARELHO].filter(Boolean).join('   ·   ');
+    if (linhaContato) {
+      if (desenhar) { ctx.fillStyle = '#5B6472'; ctx.font = "400 13px 'Inter', Arial, sans-serif"; ctx.fillText(linhaContato, margem, y); }
+      y += 22;
+    }
+
+    if (linhasProblema.length){
+      if (desenhar) { ctx.fillStyle = '#8891A3'; ctx.font = "600 10.5px 'Inter', Arial, sans-serif"; ctx.fillText('PROBLEMA RELATADO', margem, y); }
+      y += 18;
+      linhasProblema.forEach(linha => {
+        if (desenhar) { ctx.fillStyle = '#3D4553'; ctx.font = "400 13px 'Inter', Arial, sans-serif"; ctx.fillText(linha, margem, y); }
+        y += 19;
+      });
+    }
+
+    y += 16;
+    if (desenhar) { ctx.strokeStyle = '#E7E9EF'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(margem, y); ctx.lineTo(larguraCss-margem, y); ctx.stroke(); }
+    y += 32;
+
+    if (desenhar) {
+      ctx.fillStyle = '#0F1522';
+      ctx.font = "700 15px 'Space Grotesk', Arial, sans-serif";
+      ctx.fillText('Itens do orçamento', margem, y);
+      ctx.fillStyle = '#2FE1A8';
+      ctx.fillRect(margem, y+8, 34, 3);
+    }
+    y += 36;
+
+    if (desenhar) {
+      ctx.fillStyle = '#F4F6F9';
+      ctx.fillRect(margem, y-18, larguraConteudo, 32);
+      ctx.fillStyle = '#8891A3';
+      ctx.font = "600 10.5px 'Inter', Arial, sans-serif";
+      ctx.fillText('DESCRIÇÃO', margem+12, y+2);
+      ctx.textAlign = 'right';
+      ctx.fillText('VALOR', larguraCss-margem-12, y+2);
+      ctx.textAlign = 'left';
+    }
+    y += 30;
+
+    listaItens.forEach((item, i) => {
+      if (desenhar) {
+        if (i % 2 === 1) { ctx.fillStyle = '#FAFBFC'; ctx.fillRect(margem, y-20, larguraConteudo, 34); }
+        ctx.fillStyle = '#242B38';
+        ctx.font = "500 13.5px 'Inter', Arial, sans-serif";
+        ctx.fillText(item.item || '—', margem+12, y);
+        ctx.textAlign = 'right';
+        ctx.fillStyle = '#0F1522';
+        ctx.font = "600 13.5px 'Inter', Arial, sans-serif";
+        ctx.fillText(moeda(item.preco), larguraCss-margem-12, y);
+        ctx.textAlign = 'left';
+      }
+      y += 40;
+    });
+
+    y += 6;
+    if (desenhar) { ctx.strokeStyle = '#E7E9EF'; ctx.beginPath(); ctx.moveTo(margem, y); ctx.lineTo(larguraCss-margem, y); ctx.stroke(); }
+    y += 32;
+
+    const linhaTotal = (rotulo, valor, destaque) => {
+      if (desenhar) {
+        ctx.textAlign = 'right';
+        ctx.fillStyle = destaque ? '#0F1522' : '#5B6472';
+        ctx.font = destaque ? "700 15px 'Space Grotesk', Arial, sans-serif" : "400 13px 'Inter', Arial, sans-serif";
+        ctx.fillText(rotulo, larguraCss-margem-150, y);
+        ctx.font = destaque ? "700 18px 'Space Grotesk', Arial, sans-serif" : "500 13px 'Inter', Arial, sans-serif";
+        ctx.fillStyle = destaque ? '#0F1522' : '#3D4553';
+        ctx.fillText(valor, larguraCss-margem-12, y);
+        ctx.textAlign = 'left';
+      }
+      y += destaque ? 36 : 26;
+    };
+
+    linhaTotal('Subtotal', moeda(subtotal), false);
+    if (o.DESCONTO) linhaTotal('Desconto', '- ' + moeda(o.DESCONTO), false);
+
+    if (desenhar) {
+      arredondarRetangulo(ctx, larguraCss-margem-270, y-26, 270, 46, 10);
+      ctx.fillStyle = 'rgba(47,225,168,0.14)';
+      ctx.fill();
+    }
+    linhaTotal('Total', moeda(o.VALOR_TOTAL), true);
+
+    y += 22;
+    if (desenhar) { ctx.strokeStyle = '#E7E9EF'; ctx.beginPath(); ctx.moveTo(margem, y); ctx.lineTo(larguraCss-margem, y); ctx.stroke(); }
+    y += 26;
+
+    if (desenhar) { ctx.fillStyle = '#8891A3'; ctx.font = "400 12px 'Inter', Arial, sans-serif"; ctx.fillText('Orçamento válido por ' + (o.VALIDADE_DIAS||15) + ' dias a partir da emissão.', margem, y); }
+    y += 18;
+    if (desenhar) { ctx.fillStyle = '#8891A3'; ctx.font = "400 12px 'Inter', Arial, sans-serif"; ctx.fillText('Dúvidas? Chama a gente pelo WhatsApp — BStyle Eletrônicos & Acessórios.', margem, y); }
+    y += 30;
+
+    if (desenhar) ctx.restore();
+
+    return y;
+  }
+
+  /** Gera a imagem (PNG, em data URL) do orçamento — pra mandar pro cliente
+   * de um jeito mais profissional/bonito do que só texto puro. O cartão
+   * branco "flutua" com uma sombra suave sobre um fundo neutro, em vez de
+   * ocupar a imagem de ponta a ponta — fica com cara de documento mesmo
+   * quando visto em miniatura no WhatsApp. */
+  async function gerarImagemOrcamento(o){
+    await aguardarFontes();
+    const margemExterna = 22;
+    const larguraCard = 880;
+    const larguraTotal = larguraCard + margemExterna*2;
+    const escala = 2; // retina, imagem nítida mesmo se o cliente der zoom
+
+    const canvasMedida = document.createElement('canvas');
+    canvasMedida.width = 10; canvasMedida.height = 10;
+    const alturaCard = Math.ceil(construirOrcamentoNoCanvas(canvasMedida.getContext('2d'), o, larguraCard, 0, false));
+    const alturaTotal = alturaCard + margemExterna*2;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = larguraTotal * escala;
+    canvas.height = alturaTotal * escala;
+    const ctx = canvas.getContext('2d');
+    ctx.scale(escala, escala);
+
+    ctx.fillStyle = '#E3E7EF';
+    ctx.fillRect(0, 0, larguraTotal, alturaTotal);
+
+    ctx.save();
+    ctx.shadowColor = 'rgba(15,21,34,0.22)';
+    ctx.shadowBlur = 28;
+    ctx.shadowOffsetY = 10;
+    arredondarRetangulo(ctx, margemExterna, margemExterna, larguraCard, alturaCard, 20);
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fill();
+    ctx.restore();
+
+    ctx.save();
+    ctx.translate(margemExterna, margemExterna);
+    construirOrcamentoNoCanvas(ctx, o, larguraCard, alturaCard, true);
+    ctx.restore();
+
+    return canvas.toDataURL('image/png');
+  }
+
+  /** Monta um objeto de orçamento a partir do que está no formulário agora
+   * (sem salvar nada) — usado só pra pré-visualizar a imagem. */
+  function montarObjetoOrcamentoDoFormulario(numero){
+    return {
+      NUMERO_ORCAMENTO: numero || 'PRÉVIA',
+      DATA: new Date().toISOString(),
+      CLIENTE_NOME: document.getElementById('ofClienteNome').value.trim(),
+      CLIENTE_TELEFONE: document.getElementById('ofClienteTelefone').value.trim(),
+      APARELHO: document.getElementById('ofAparelho').value.trim(),
+      PROBLEMA_RELATADO: document.getElementById('ofProblema').value.trim(),
+      ITENS_JSON: JSON.stringify(coletarItensOrcamento()),
+      DESCONTO: Number(document.getElementById('ofDesconto').value) || 0,
+      VALOR_TOTAL: Number(document.getElementById('ofValorTotal').value) || 0,
+      VALIDADE_DIAS: Number(document.getElementById('ofValidade').value) || 15
+    };
+  }
+
+  function abrirModalImagemOrcamento(dataUrl, o){
+    ultimaImagemGeradaDataUrl = dataUrl;
+    ultimoOrcamentoParaImagem = o;
+    document.getElementById('imgOrcamentoGerado').src = dataUrl;
+    const nomeArquivo = 'orcamento-' + (o.NUMERO_ORCAMENTO||'bstyle').replace(/[^\w-]/g,'') + '.png';
+    document.getElementById('btnBaixarImagemGerada').href = dataUrl;
+    document.getElementById('btnBaixarImagemGerada').download = nomeArquivo;
+    document.getElementById('modalImagemOrcamento').classList.add('open');
+  }
+
+  /** Tenta mandar a imagem direto pra um app (WhatsApp incluso) usando o
+   * "compartilhar" nativo do navegador/sistema — funciona bem em celular.
+   * Se o navegador não suportar compartilhar arquivo (comum em desktop),
+   * retorna false pra quem chamou decidir o que fazer (baixar + abrir o
+   * WhatsApp com o texto, por exemplo). */
+  async function tentarCompartilharImagem(dataUrl, o){
+    if (!navigator.share || !navigator.canShare) return false;
+    try {
+      const blob = await (await fetch(dataUrl)).blob();
+      const arquivo = new File([blob], 'orcamento-' + (o.NUMERO_ORCAMENTO||'bstyle').replace(/[^\w-]/g,'') + '.png', { type: 'image/png' });
+      if (!navigator.canShare({ files: [arquivo] })) return false;
+      await navigator.share({ files: [arquivo], title: 'Orçamento BStyle', text: 'Olá, ' + (o.CLIENTE_NOME||'') + '! Segue o orçamento ' + o.NUMERO_ORCAMENTO + '.' });
+      return true;
+    } catch (e) {
+      if (e.name === 'AbortError') return true; // a pessoa cancelou a escolha do app — não é erro
+      return false;
+    }
+  }
+
+  document.getElementById('btnGerarImagemOrcamento').addEventListener('click', async () => {
+    try {
+      if (!document.getElementById('ofClienteNome').value.trim()){ mostrarToast('Informe o nome do cliente.', 'erro'); return; }
+      const o = montarObjetoOrcamentoDoFormulario('PRÉVIA');
+      const dataUrl = await gerarImagemOrcamento(o);
+      abrirModalImagemOrcamento(dataUrl, o);
+    } catch (e) { mostrarToast('Erro ao gerar imagem: ' + e.message, 'erro'); }
+  });
+
+  document.getElementById('fecharModalImagemOrcamento').addEventListener('click', () => document.getElementById('modalImagemOrcamento').classList.remove('open'));
+  document.getElementById('modalImagemOrcamento').addEventListener('click', (e) => {
+    if (e.target.id === 'modalImagemOrcamento') document.getElementById('modalImagemOrcamento').classList.remove('open');
+  });
+
+  document.getElementById('btnCompartilharImagemGerada').addEventListener('click', async () => {
+    if (!ultimaImagemGeradaDataUrl || !ultimoOrcamentoParaImagem) return;
+    const enviou = await tentarCompartilharImagem(ultimaImagemGeradaDataUrl, ultimoOrcamentoParaImagem);
+    if (!enviou) {
+      mostrarToast('Seu navegador não deixa compartilhar a imagem direto — clique em "Baixar imagem" e anexe ela manualmente na conversa.');
+    }
+  });
+
   document.getElementById('btnSalvarOrcamento').addEventListener('click', async () => {
     try {
       const salvo = await salvarOrcamentoDaSolicitacao();
@@ -448,8 +823,19 @@
       if (!salvo) return;
       mostrarToast('Orçamento ' + salvo.NUMERO_ORCAMENTO + ' salvo.');
       document.getElementById('modalOrcamento').classList.remove('open');
-      window.open(linkWhatsapp(salvo.CLIENTE_TELEFONE, textoWhatsappOrcamento(salvo)), '_blank');
       carregar();
+
+      // Gera a imagem do orçamento salvo e tenta mandar ela direto (funciona
+      // bem em celular, via o "compartilhar" do sistema). Se o navegador não
+      // deixar (comum em computador), mostra a imagem pra baixar e abre o
+      // WhatsApp com o texto — só falta anexar a imagem baixada na conversa.
+      const dataUrl = await gerarImagemOrcamento(salvo);
+      const enviouPorCompartilhamento = await tentarCompartilharImagem(dataUrl, salvo);
+      if (!enviouPorCompartilhamento) {
+        abrirModalImagemOrcamento(dataUrl, salvo);
+        mostrarToast('Baixe a imagem do orçamento e anexe ela na conversa que abriu no WhatsApp.');
+        window.open(linkWhatsapp(salvo.CLIENTE_TELEFONE, textoWhatsappOrcamento(salvo)), '_blank');
+      }
     } catch (e) { mostrarToast('Erro: ' + e.message, 'erro'); }
   });
 

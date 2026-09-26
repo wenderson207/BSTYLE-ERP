@@ -142,6 +142,40 @@ function renderLojas(containerId) {
   ligarRevelacaoAoRolar();
 }
 
+/**
+ * Manda uma mensagem pelo mesmo Bot do Telegram já usado no sistema
+ * (Resumo de Caixa). Roda direto no navegador de quem está preenchendo o
+ * formulário — se falhar (sem internet, bot indisponível, etc.), não trava
+ * nada: o pedido já foi salvo no Firestore antes disso, o Telegram é só um
+ * aviso extra pra equipe ser avisada mais rápido.
+ */
+async function enviarMensagemTelegram(token, chatId, texto) {
+  const resp = await fetch('https://api.telegram.org/bot' + token + '/sendMessage', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ chat_id: chatId, text: texto })
+  });
+  return await resp.json();
+}
+
+/** Avisa a equipe no Telegram sempre que um orçamento novo chega pelo site. */
+function avisarNovoOrcamentoNoTelegram(dados) {
+  const cfg = CONFIG_BSTYLE.TELEGRAM;
+  if (!cfg || !cfg.BOT_TOKEN || !cfg.CHAT_IDS || !cfg.CHAT_IDS.length) return;
+  const texto = [
+    '🆕 Novo orçamento pelo site (#' + dados.numero + ')',
+    '👤 ' + dados.nome,
+    '📱 ' + dados.whatsapp,
+    '🔧 ' + dados.tipo,
+    dados.produto ? '📦 ' + dados.produto : null,
+    '',
+    dados.descricao
+  ].filter(Boolean).join('\n');
+  cfg.CHAT_IDS.forEach(id => {
+    enviarMensagemTelegram(cfg.BOT_TOKEN, id, texto).catch(() => { /* silencioso — o pedido já está salvo */ });
+  });
+}
+
 /** Preenche o crédito do rodapé ("Desenvolvido por: ..."), se existir na página. */
 function renderCreditoRodape() {
   const el = document.getElementById('creditoDesenvolvedor');

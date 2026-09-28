@@ -567,7 +567,7 @@
     const lojasHtml = empresas.slice(0, 2).map((e, idx) => {
       const linha1 = 'Loja ' + (idx+1) + ' – ' + [e.RUA, e.NUMERO].filter(Boolean).join(', ');
       const linha2 = [e.BAIRRO, e.CIDADE].filter(Boolean).join(' – ');
-      return `<div style="flex:1; font-size:10px; line-height:1.55; ${idx===0 && empresas.length>1 ? 'border-right:1px solid #ddd; padding-right:14px; margin-right:14px;' : ''}">
+      return `<div style="flex:1; font-size:10.5px; line-height:1.55; ${idx===0 && empresas.length>1 ? 'border-right:1px solid #ddd; padding-right:14px; margin-right:14px;' : ''}">
         <b>${linha1}</b><br>${linha2}<br>📞 ${e.WHATSAPP||'—'}
       </div>`;
     }).join('');
@@ -575,13 +575,13 @@
     return `
       <div style="display:flex; align-items:flex-start; justify-content:space-between; padding-bottom:12px; flex-wrap:wrap; gap:14px;">
         <div style="display:flex; align-items:center; gap:10px;">
-          <img src="/sistema/assets/img/Logo.png" style="height:52px; width:auto; max-width:90px; object-fit:contain;" onerror="this.style.display='none'">
+          <img src="/sistema/assets/img/Logo.png" style="height:54px; width:auto; max-width:92px; object-fit:contain;" onerror="this.style.display='none'">
           <div>
-            <div style="font-size:19px; font-weight:800; color:#e2401c; letter-spacing:0.4px;">BSTYLE - Eletrônicos & Acessórios</div>
-            <div style="font-size:9.5px; color:#666;">📷 ${empresaPrincipal.INSTAGRAM || (empresaPrincipal.EMAIL||'')}</div>
+            <div style="font-size:20px; font-weight:800; color:#e2401c; letter-spacing:0.4px;">BSTYLE - Eletrônicos & Acessórios</div>
+            <div style="font-size:10px; color:#666;">📷 ${empresaPrincipal.INSTAGRAM || (empresaPrincipal.EMAIL||'')}</div>
           </div>
         </div>
-        <div style="display:flex; gap:0;">${lojasHtml || '<div style="font-size:10px; color:#999;">Cadastre suas lojas em Empresas.</div>'}</div>
+        <div style="display:flex; gap:0;">${lojasHtml || '<div style="font-size:10.5px; color:#999;">Cadastre suas lojas em Empresas.</div>'}</div>
       </div>
       <div style="height:4px; background:linear-gradient(90deg,#e2401c,#f5a623);"></div>`;
   }
@@ -601,21 +601,21 @@
     const problemas = Array.isArray(c.CHECKLIST_PROBLEMAS) ? c.CHECKLIST_PROBLEMAS : [];
     const senhaHtml = mostrarSenha && c.SENHA_TIPO && c.SENHA_VALOR ? ` &nbsp; <b>Senha do aparelho:</b> ${formatarSenhaExibicao(c)}` : '';
     return `
-    <div style="width:720px; margin:0 auto; padding:24px 32px; font-family:'Segoe UI',Arial,sans-serif; color:#1a1a1a; box-sizing:border-box; font-size:11px;">
+    <div style="width:720px; margin:0 auto; padding:26px 34px; font-family:'Segoe UI',Arial,sans-serif; color:#1a1a1a; box-sizing:border-box; font-size:13px;">
       ${cabecalhoHtmlPadrao()}
 
-      <h1 style="text-align:center; font-size:18px; margin:12px 0 4px; font-weight:800;">Termo de Compra de Aparelho Usado</h1>
+      <h1 style="text-align:center; font-size:21px; margin:12px 0 4px; font-weight:800;">Termo de Compra de Aparelho Usado</h1>
       <div style="height:2px; background:#e2401c; margin-bottom:5px;"></div>
-      <div style="text-align:right; font-size:9px; color:#999; margin-bottom:9px;">${via} · Nº ${c.NUMERO_COMPRA}</div>
+      <div style="text-align:right; font-size:9.5px; color:#999; margin-bottom:10px;">${via} · Nº ${c.NUMERO_COMPRA}</div>
 
-      <h3 style="font-size:11.5px; margin:9px 0 4px;">1. IDENTIFICAÇÃO DO VENDEDOR</h3>
-      <div style="font-size:11px; line-height:1.55;">
+      <h3 style="font-size:13px; margin:11px 0 4px;">1. IDENTIFICAÇÃO DO VENDEDOR</h3>
+      <div style="font-size:12.5px; line-height:1.55;">
         <b>Nome:</b> ${c.VENDEDOR_NOME||''} &nbsp; <b>CPF:</b> ${c.VENDEDOR_CPF||''}${c.VENDEDOR_RG ? ' &nbsp; <b>RG:</b> ' + c.VENDEDOR_RG : ''}<br>
         <b>Telefone:</b> ${c.VENDEDOR_TELEFONE||''}${c.VENDEDOR_ENDERECO ? '<br><b>Endereço:</b> ' + c.VENDEDOR_ENDERECO : ''}
       </div>
 
-      <h3 style="font-size:11.5px; margin:10px 0 4px;">2. DESCRIÇÃO DO APARELHO</h3>
-      <div style="font-size:11px; line-height:1.55;">
+      <h3 style="font-size:13px; margin:12px 0 4px;">2. DESCRIÇÃO DO APARELHO</h3>
+      <div style="font-size:12.5px; line-height:1.55;">
         <b>Marca/Modelo:</b> ${c.MARCA||''} ${c.MODELO||''} &nbsp; <b>Cor/Memória:</b> ${[c.COR, c.MEMORIA?c.MEMORIA+'GB':''].filter(Boolean).join(' / ')||'—'}<br>
         ${c.IMEI ? `<b>IMEI:</b> ${c.IMEI}` : ''}${c.NUMERO_SERIE ? ` &nbsp; <b>Número de Série:</b> ${c.NUMERO_SERIE}` : ''}<br>
         ${c.BATERIA_PERCENTUAL ? `<b>Saúde da bateria:</b> ${c.BATERIA_PERCENTUAL}% &nbsp; ` : ''}<b>Acessórios inclusos:</b> ${c.ACESSORIOS_INCLUSOS || 'Nenhum'}<br>
@@ -624,20 +624,20 @@
         ${c.ESTADO_APARELHO ? `<br><b>Observações:</b> ${c.ESTADO_APARELHO}` : ''}
       </div>
 
-      <h3 style="font-size:11.5px; margin:10px 0 4px;">3. DADOS DA COMPRA</h3>
-      <div style="font-size:11px; line-height:1.55;">
+      <h3 style="font-size:13px; margin:12px 0 4px;">3. DADOS DA COMPRA</h3>
+      <div style="font-size:12.5px; line-height:1.55;">
         <b>Data:</b> ${dataHoraBR(c.DATA)} &nbsp; <b>Valor pago:</b> ${moeda(c.VALOR_PAGO)} &nbsp; <b>Forma de pagamento:</b> ${c.FORMA_PAGAMENTO||''}<br>
         <b>Loja responsável:</b> ${nomeEmpresa(c.EMPRESA_ID)}
       </div>
 
-      <h3 style="font-size:11.5px; margin:10px 0 4px;">4. DECLARAÇÃO DO VENDEDOR</h3>
-      <div style="font-size:9.5px; line-height:1.4;">
-        ${DECLARACOES_VENDEDOR.map((texto, i) => `<p style="margin:0 0 3px;"><b>${i+1}.</b> ${texto}</p>`).join('')}
+      <h3 style="font-size:13px; margin:12px 0 4px;">4. DECLARAÇÃO DO VENDEDOR</h3>
+      <div style="font-size:10.5px; line-height:1.45;">
+        ${DECLARACOES_VENDEDOR.map((texto, i) => `<p style="margin:0 0 3.5px;"><b>${i+1}.</b> ${texto}</p>`).join('')}
       </div>
 
-      <div style="margin-top:20px; font-size:11px;">Assinatura do Vendedor: ___________________________</div>
-      <div style="font-size:10px; color:#666; margin-top:3px;">Data: ${dataHoraBR(c.DATA)}</div>
-      <div style="margin-top:14px; font-size:11px;">Assinatura do Responsável pela Loja: ___________________________</div>
+      <div style="margin-top:20px; font-size:12.5px;">Assinatura do Vendedor: ___________________________</div>
+      <div style="font-size:11px; color:#666; margin-top:3px;">Data: ${dataHoraBR(c.DATA)}</div>
+      <div style="margin-top:15px; font-size:12.5px;">Assinatura do Responsável pela Loja: ___________________________</div>
     </div>`;
   }
 
@@ -648,7 +648,8 @@
     const alturaMaximaPx = alturaMaximaMm * 3.7795; // mm -> px a 96dpi
     const alturaAtual = conteudo.scrollHeight;
     if (alturaAtual > alturaMaximaPx) {
-      const escala = alturaMaximaPx / alturaAtual;
+      const escalaMinima = 0.85; // nunca deixa o texto ficar pequeno demais pra ler — se não couber nem assim, deixa estourar pra 2ª página
+      const escala = Math.max(escalaMinima, alturaMaximaPx / alturaAtual);
       conteudo.style.transform = 'scale(' + escala.toFixed(4) + ')';
       conteudo.style.transformOrigin = 'top center';
       const wrap = conteudo.parentElement;
@@ -711,6 +712,50 @@
   });
 
   // ---------- Salvar PDF ----------
+  /** Tamanhos "confortáveis" de base pra impressão do termo em PDF; escalados pra baixo só se necessário pra caber em 1 página. */
+  function tamanhosPdf(escala){
+    return {
+      titulo: 17*escala, rotulo: 9*escala, secao: 12*escala, secaoGap: 6.3*escala,
+      linha: 10.3*escala, linhaGap: 5.5*escala, paragrafo: 9.8*escala, paragrafoLine: 4.4*escala, paragrafoExtra: 2.4*escala,
+      declaracao: 9.2*escala, declaracaoLine: 3.9*escala, declaracaoGap: 1.6*escala,
+      secaoExtra: 2*escala, secaoExtra2: 1.5*escala,
+      assinatura: 10.3*escala, assinaturaData: 9*escala, assinaturaGap1: 8*escala, assinaturaGap2: 10*escala
+    };
+  }
+
+  /** Mede (sem desenhar) a altura total que uma via ocuparia com essa escala, pra decidir se cabe numa página A4. */
+  function medirAlturaViaPdf(docMedicao, c, mostrarSenha, escala){
+    const s = tamanhosPdf(escala);
+    const problemas = Array.isArray(c.CHECKLIST_PROBLEMAS) ? c.CHECKLIST_PROBLEMAS : [];
+    let y = 45 + 8 + 8 + 7; // altura aproximada do cabeçalho da loja + título + linha + rótulo da via
+    const linha = () => { y += s.linhaGap; };
+    const secao = () => { y += s.secaoGap; };
+    const paragrafo = (texto) => { docMedicao.setFontSize(s.paragrafo); const t = docMedicao.splitTextToSize(texto, 170); y += t.length*s.paragrafoLine + s.paragrafoExtra; };
+
+    secao(); linha(); linha(); if (c.VENDEDOR_RG) linha(); linha(); if (c.VENDEDOR_ENDERECO) linha();
+    y += s.secaoExtra;
+
+    secao(); linha(); linha();
+    if (c.IMEI) linha(); if (c.NUMERO_SERIE) linha(); if (c.BATERIA_PERCENTUAL) linha();
+    linha(); linha(); linha();
+    if (mostrarSenha && c.SENHA_TIPO && c.SENHA_VALOR) linha();
+    if (c.ESTADO_APARELHO) paragrafo('Observações: ' + c.ESTADO_APARELHO);
+    y += s.secaoExtra2;
+
+    secao(); linha(); linha(); linha(); linha();
+    y += s.secaoExtra;
+
+    secao();
+    docMedicao.setFontSize(s.declaracao);
+    DECLARACOES_VENDEDOR.forEach((texto, i) => {
+      const t = docMedicao.splitTextToSize((i+1) + '. ' + texto, 170);
+      y += t.length*s.declaracaoLine + s.declaracaoGap;
+    });
+
+    y += s.assinaturaGap1 + 5 + s.assinaturaGap2 + 5;
+    return y;
+  }
+
   document.getElementById('btnGerarPdf').addEventListener('click', async () => {
     try {
       const salvo = await salvarOuAtualizar();
@@ -720,30 +765,37 @@
       const doc = new jsPDF({ unit: 'mm', format: 'a4' });
       const corDestaque = [226, 64, 28];
       const problemas = Array.isArray(c.CHECKLIST_PROBLEMAS) ? c.CHECKLIST_PROBLEMAS : [];
+      const LIMITE_PAGINA = 280;
 
       for (let idx = 0; idx < 2; idx++) {
         const rotulo = idx === 0 ? '1ª VIA — LOJA' : '2ª VIA — VENDEDOR';
+        const mostrarSenha = idx === 0;
         if (idx > 0) doc.addPage();
+
+        // Mede com o tamanho confortável (escala 1) e só reduz se realmente não couber numa página.
+        const alturaEstimada = medirAlturaViaPdf(doc, c, mostrarSenha, 1);
+        const escala = alturaEstimada > LIMITE_PAGINA ? Math.max(0.78, LIMITE_PAGINA / alturaEstimada) : 1;
+        const s = tamanhosPdf(escala);
 
         let y = await desenharCabecalhoLoja(doc, empresas);
 
-        doc.setFontSize(15); doc.setFont(undefined,'bold'); doc.setTextColor(20);
+        doc.setFontSize(s.titulo); doc.setFont(undefined,'bold'); doc.setTextColor(20);
         doc.text('Termo de Compra de Aparelho Usado', 105, y+4, { align:'center' }); y += 8;
         doc.setDrawColor(...corDestaque); doc.setLineWidth(0.6); doc.line(20, y, 190, y); y += 8;
 
-        doc.setFontSize(8.5); doc.setFont(undefined,'normal'); doc.setTextColor(140);
+        doc.setFontSize(s.rotulo); doc.setFont(undefined,'normal'); doc.setTextColor(140);
         doc.text(rotulo + ' · Nº ' + c.NUMERO_COMPRA, 190, y, { align: 'right' }); y += 7;
 
-        const secao = (titulo) => { doc.setFontSize(10.5); doc.setFont(undefined,'bold'); doc.setTextColor(20); doc.text(titulo, 20, y); y += 5.5; };
-        const linha = (label, valor) => { doc.setFontSize(9.5); doc.setFont(undefined,'bold'); doc.text(label, 20, y); const w = doc.getTextWidth(label); doc.setFont(undefined,'normal'); doc.text(String(valor||''), 20+w+3, y); y += 5; };
-        const paragrafo = (texto) => { doc.setFontSize(9); doc.setFont(undefined,'normal'); const t = doc.splitTextToSize(texto, 170); doc.text(t, 20, y); y += t.length*4.2 + 2.5; };
+        const secao = (titulo) => { doc.setFontSize(s.secao); doc.setFont(undefined,'bold'); doc.setTextColor(20); doc.text(titulo, 20, y); y += s.secaoGap; };
+        const linha = (label, valor) => { doc.setFontSize(s.linha); doc.setFont(undefined,'bold'); doc.text(label, 20, y); const w = doc.getTextWidth(label); doc.setFont(undefined,'normal'); doc.text(String(valor||''), 20+w+3, y); y += s.linhaGap; };
+        const paragrafo = (texto) => { doc.setFontSize(s.paragrafo); doc.setFont(undefined,'normal'); const t = doc.splitTextToSize(texto, 170); doc.text(t, 20, y); y += t.length*s.paragrafoLine + s.paragrafoExtra; };
 
         secao('1. IDENTIFICAÇÃO DO VENDEDOR');
         linha('Nome:', c.VENDEDOR_NOME); linha('CPF:', c.VENDEDOR_CPF);
         if (c.VENDEDOR_RG) linha('RG:', c.VENDEDOR_RG);
         linha('Telefone:', c.VENDEDOR_TELEFONE);
         if (c.VENDEDOR_ENDERECO) linha('Endereço:', c.VENDEDOR_ENDERECO);
-        y += 2;
+        y += s.secaoExtra;
 
         secao('2. DESCRIÇÃO DO APARELHO');
         linha('Marca/Modelo:', (c.MARCA||'') + ' ' + (c.MODELO||''));
@@ -755,28 +807,28 @@
         linha('Avarias identificadas:', problemas.length ? problemas.join(', ') : 'Nenhuma aparente');
         linha('Conta iCloud/Google removida:', c.FRP_REMOVIDO ? 'Sim' : 'Não');
         // Senha do aparelho — só na via da loja, o técnico precisa pra acessar o aparelho.
-        if (idx === 0 && c.SENHA_TIPO && c.SENHA_VALOR) linha('Senha do aparelho:', formatarSenhaExibicao(c));
+        if (mostrarSenha && c.SENHA_TIPO && c.SENHA_VALOR) linha('Senha do aparelho:', formatarSenhaExibicao(c));
         if (c.ESTADO_APARELHO) paragrafo('Observações: ' + c.ESTADO_APARELHO);
-        y += 1.5;
+        y += s.secaoExtra2;
 
         secao('3. DADOS DA COMPRA');
         linha('Data da compra:', dataHoraBR(c.DATA)); linha('Valor pago:', moeda(c.VALOR_PAGO));
         linha('Forma de pagamento:', c.FORMA_PAGAMENTO); linha('Loja responsável:', nomeEmpresa(c.EMPRESA_ID));
-        y += 2;
+        y += s.secaoExtra;
 
         secao('4. DECLARAÇÃO DO VENDEDOR');
-        doc.setFontSize(8.3); doc.setFont(undefined,'normal');
+        doc.setFontSize(s.declaracao); doc.setFont(undefined,'normal');
         DECLARACOES_VENDEDOR.forEach((texto, i) => {
           const t = doc.splitTextToSize((i+1) + '. ' + texto, 170);
-          doc.text(t, 20, y); y += t.length*3.7 + 1.4;
+          doc.text(t, 20, y); y += t.length*s.declaracaoLine + s.declaracaoGap;
         });
 
-        y += 8;
-        if (y > 260) { doc.addPage(); y = 20; }
-        doc.setFontSize(9.5); doc.setFont(undefined,'normal');
+        y += s.assinaturaGap1;
+        if (y > 285) { doc.addPage(); y = 20; } // segurança extra — só deve acontecer em casos muito fora do comum
+        doc.setFontSize(s.assinatura); doc.setFont(undefined,'normal');
         doc.text('Assinatura do Vendedor: ___________________________', 20, y); y += 5;
-        doc.setFontSize(8.5); doc.setTextColor(100); doc.text('Data: ' + dataHoraBR(c.DATA), 20, y); doc.setTextColor(20); y += 10;
-        doc.setFontSize(9.5);
+        doc.setFontSize(s.assinaturaData); doc.setTextColor(100); doc.text('Data: ' + dataHoraBR(c.DATA), 20, y); doc.setTextColor(20); y += s.assinaturaGap2;
+        doc.setFontSize(s.assinatura);
         doc.text('Assinatura do Responsável pela Loja: ___________________________', 20, y);
       }
 

@@ -284,7 +284,10 @@
       <td>${moeda(c.VALOR_PAGO)}</td>
       <td>${nomeEmpresa(c.EMPRESA_ID)}</td>
       <td>${c.PDF_GERADO ? '<span class="badge ok">Gerado</span>' : '<span class="badge warn">Não gerado</span>'}</td>
-      <td><button class="btn" style="padding:6px 10px; font-size:11.5px;" onclick="window.__abrirCompra('${c.ID}')">Abrir</button></td>
+      <td style="display:flex; gap:6px;">
+        <button class="btn" style="padding:6px 10px; font-size:11.5px;" onclick="window.__abrirCompra('${c.ID}')">Editar</button>
+        <button class="btn" style="padding:6px 10px; font-size:11.5px; color:var(--red);" onclick="window.__excluirCompraUsado('${c.ID}')">Excluir</button>
+      </td>
     </tr>`).join(''));
   }
 
@@ -425,6 +428,17 @@
 
   document.getElementById('fecharModal').addEventListener('click', () => modal.classList.remove('open'));
   document.getElementById('btnCancelar').addEventListener('click', () => modal.classList.remove('open'));
+
+  // ---------- Excluir ----------
+  window.__excluirCompraUsado = async (id) => {
+    if (!confirm('Excluir esta compra? Essa ação não pode ser desfeita. O aparelho já gerado em Celulares não será removido do estoque junto.')) return;
+    try {
+      if (!(await checarPermissao('COMPRA_USADO','EXCLUIR'))){ mostrarToast('Sem permissão.', 'erro'); return; }
+      await dbDelete('COMPRAS_USADO', id);
+      mostrarToast('Compra excluída.');
+      carregar();
+    } catch (e) { mostrarToast('Erro: ' + e.message, 'erro'); }
+  };
 
   function checklistMarcado(){
     return [...document.querySelectorAll('#checklistSaude input:checked')].map(el => el.value);

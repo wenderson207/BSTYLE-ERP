@@ -574,6 +574,7 @@
             TIPO: 'PRODUTO_USADO',
             COR_CAPACIDADE: ehCelular ? [produto.COR, produto.MEMORIA ? produto.MEMORIA+'GB' : ''].filter(Boolean).join(' / ') : '',
             ESTADO_APARELHO: ehCelular ? (produto.ESTADO_APARELHO || 'Aparelho testado com o cliente.') : 'Aparelho em perfeitas condições e testes realizados com o cliente.',
+            IMEI: ehCelular ? (produto.IMEI || '') : '', NUMERO_SERIE: ehCelular ? (produto.NUMERO_SERIE || '') : '',
             VALOR_PAGO: item.QUANTIDADE * item.PRECO_UNITARIO, FORMA_PAGAMENTO: formaPagamento,
             DATA_EMISSAO: new Date().toISOString(), STATUS: 'Ativa'
           });

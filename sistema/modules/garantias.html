@@ -137,6 +137,10 @@
         <div class="ffield"><label>Marca/Modelo</label><input id="fAparelho" value="${garantiaAtual.PRODUTO_DESCRICAO||''}"></div>
         <div class="ffield"><label>Cor/Capacidade</label><input id="fCorCapacidade" value="${garantiaAtual.COR_CAPACIDADE||''}"></div>
       </div>
+      <div class="frow2">
+        <div class="ffield"><label>IMEI</label><input id="fImei" value="${garantiaAtual.IMEI||''}" placeholder="Preenchido do aparelho cadastrado"></div>
+        <div class="ffield"><label>Número de série</label><input id="fSerie" value="${garantiaAtual.NUMERO_SERIE||''}" placeholder="Preenchido do aparelho cadastrado"></div>
+      </div>
       <div class="ffield"><label>Estado do aparelho no ato da venda</label><textarea id="fEstadoAparelho">${garantiaAtual.ESTADO_APARELHO || 'Aparelho em perfeitas condições e testes realizados com o cliente.'}</textarea></div>
       <div class="section-title">3. Prazo e condições da venda</div>
       <div class="frow2">
@@ -167,6 +171,8 @@
     return {
       PRODUTO_DESCRICAO: document.getElementById('fAparelho').value.trim(),
       COR_CAPACIDADE: document.getElementById('fCorCapacidade').value.trim(),
+      IMEI: document.getElementById('fImei').value.trim(),
+      NUMERO_SERIE: document.getElementById('fSerie').value.trim(),
       ESTADO_APARELHO: document.getElementById('fEstadoAparelho').value.trim(),
       PRAZO_DIAS: Number(document.getElementById('fPrazo').value)||30,
       VALOR_PAGO: Number(document.getElementById('fValor').value)||0,
@@ -231,6 +237,8 @@
       <div style="font-size:12px; line-height:1.9;">
         <b>Marca/Modelo:</b> ${garantiaAtual.PRODUTO_DESCRICAO||''}<br>
         <b>Cor / Capacidade:</b> ${garantiaAtual.COR_CAPACIDADE||''}<br>
+        ${garantiaAtual.IMEI ? `<b>IMEI:</b> ${garantiaAtual.IMEI}<br>` : ''}
+        ${garantiaAtual.NUMERO_SERIE ? `<b>Número de Série:</b> ${garantiaAtual.NUMERO_SERIE}<br>` : ''}
         <b>Estado do aparelho no ato da venda:</b> ${garantiaAtual.ESTADO_APARELHO||''}
       </div>
 
@@ -442,6 +450,8 @@
 
           secao('2. DESCRIÇÃO DO PRODUTO');
           linha('Marca/Modelo:', garantiaAtual.PRODUTO_DESCRICAO); linha('Cor/Capacidade:', garantiaAtual.COR_CAPACIDADE);
+          if (garantiaAtual.IMEI) linha('IMEI:', garantiaAtual.IMEI);
+          if (garantiaAtual.NUMERO_SERIE) linha('Número de Série:', garantiaAtual.NUMERO_SERIE);
           linha('Estado na venda:', garantiaAtual.ESTADO_APARELHO); y += 3;
 
           secao('3. PRAZO DE GARANTIA');

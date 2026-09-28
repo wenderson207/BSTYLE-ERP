@@ -140,9 +140,12 @@
         </div>
       </div>
 
-      <div class="confirmacao-frp">
-        <input type="checkbox" id="fFrpRemovido">
-        <label for="fFrpRemovido">Confirmo que a conta iCloud/Google (bloqueio de fábrica) foi removida e o aparelho foi testado e liberado antes da compra.</label>
+      <div class="ffield">
+        <label>Conta iCloud/Google (bloqueio de fábrica) foi removida?</label>
+        <select id="fFrpRemovido">
+          <option value="sim">Sim, removida e aparelho testado</option>
+          <option value="nao">Não removida / não confirmado</option>
+        </select>
       </div>
 
       <div class="ffield"><label>Acessórios inclusos</label><input id="fAcessorios" placeholder="Ex.: carregador, caixa, fone…"></div>
@@ -163,6 +166,11 @@
     <div class="modal-foot">
       <button class="btn" id="btnCancelar">Fechar</button>
       <button class="btn" id="btnSalvar">Salvar</button>
+      <select id="selecaoViaImpressao" style="background:var(--bg-elevated); border:1px solid var(--hairline); color:var(--text-primary); padding:0 10px; border-radius:8px; font-size:12px;">
+        <option value="LOJA">1 via — Loja</option>
+        <option value="VENDEDOR">1 via — Vendedor</option>
+      </select>
+      <button class="btn" id="btnImprimir1Via">🖨️ Imprimir 1 via</button>
       <button class="btn" id="btnImprimir">🖨️ Imprimir termo (2 vias)</button>
       <button class="btn btn-primary" id="btnGerarPdf">⬇️ Salvar PDF</button>
     </div>
@@ -176,6 +184,7 @@
 
   function moeda(v){ return (Number(v)||0).toLocaleString('pt-BR', { style:'currency', currency:'BRL' }); }
   function dataBR(v){ return v ? parseDataLocal(v).toLocaleDateString('pt-BR') : '—'; }
+  function dataHoraBR(v){ return v ? parseDataLocal(v).toLocaleDateString('pt-BR') + ' ' + parseDataLocal(v).toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit' }) : '—'; }
   function nomeEmpresa(id){ const e = empresas.find(x => x.ID === id); return e ? (e.NOME || 'Loja') : '—'; }
   function porExtenso(n){
     const nums = {1:'um',5:'cinco',7:'sete',10:'dez',15:'quinze',20:'vinte',30:'trinta',45:'quarenta e cinco',60:'sessenta',90:'noventa',120:'cento e vinte',180:'cento e oitenta',365:'trezentos e sessenta e cinco'};
@@ -277,7 +286,7 @@
     if (!lista.length){ setHTML('linhas', `<tr class="empty-row"><td colspan="9">${itens.length ? 'Nenhuma compra encontrada com esses filtros.' : 'Nenhuma compra registrada ainda.'}</td></tr>`); return; }
     setHTML('linhas', lista.map(c => `<tr>
       <td class="mono">${c.NUMERO_COMPRA}</td>
-      <td>${dataBR(c.DATA)}</td>
+      <td>${dataHoraBR(c.DATA)}</td>
       <td>${c.VENDEDOR_NOME||'—'}</td>
       <td>${[c.MARCA, c.MODELO].filter(Boolean).join(' ')||'—'}</td>
       <td class="mono">${c.IMEI||'—'}</td>
@@ -355,7 +364,7 @@
     document.getElementById('fFormaPagamento').value = 'Dinheiro';
     document.getElementById('fGarantiaRevenda').value = 30;
     document.getElementById('fValorPago').value = '';
-    document.getElementById('fFrpRemovido').checked = false;
+    document.getElementById('fFrpRemovido').value = 'sim';
     document.querySelectorAll('#checklistSaude input').forEach(el => el.checked = false);
     document.getElementById('fSenhaPin').value = '';
     document.getElementById('fSenhaTexto').value = '';
@@ -389,7 +398,7 @@
     document.getElementById('fFormaPagamento').value = c.FORMA_PAGAMENTO || 'Dinheiro';
     document.getElementById('fPrecoVenda').value = c.PRECO_VENDA_SUGERIDO || '';
     document.getElementById('fGarantiaRevenda').value = c.GARANTIA_REVENDA_DIAS || 30;
-    document.getElementById('fFrpRemovido').checked = !!c.FRP_REMOVIDO;
+    document.getElementById('fFrpRemovido').value = c.FRP_REMOVIDO ? 'sim' : 'nao';
     const problemas = Array.isArray(c.CHECKLIST_PROBLEMAS) ? c.CHECKLIST_PROBLEMAS : [];
     document.querySelectorAll('#checklistSaude input').forEach(el => { el.checked = problemas.includes(el.value); });
 
@@ -472,7 +481,7 @@
       NUMERO_SERIE: document.getElementById('fSerie').value.trim(),
       BATERIA_PERCENTUAL: document.getElementById('fBateria').value,
       CHECKLIST_PROBLEMAS: checklistMarcado(),
-      FRP_REMOVIDO: document.getElementById('fFrpRemovido').checked,
+      FRP_REMOVIDO: document.getElementById('fFrpRemovido').value === 'sim',
       ACESSORIOS_INCLUSOS: document.getElementById('fAcessorios').value.trim(),
       ESTADO_APARELHO: document.getElementById('fEstadoAparelho').value.trim(),
       VALOR_PAGO: Number(document.getElementById('fValorPago').value) || 0,
@@ -488,7 +497,6 @@
     if (!dados.VENDEDOR_NOME || !dados.VENDEDOR_CPF || !dados.VENDEDOR_TELEFONE){ mostrarToast('Informe nome, CPF e telefone de quem está vendendo.', 'erro'); return false; }
     if (!dados.MARCA || !dados.MODELO){ mostrarToast('Informe marca e modelo do aparelho.', 'erro'); return false; }
     if (!dados.VALOR_PAGO){ mostrarToast('Informe o valor pago pelo aparelho.', 'erro'); return false; }
-    if (!dados.FRP_REMOVIDO){ mostrarToast('Confirme que a conta iCloud/Google foi removida e o aparelho foi testado antes de salvar.', 'erro'); return false; }
     return true;
   }
 
@@ -612,13 +620,13 @@
         ${c.IMEI ? `<b>IMEI:</b> ${c.IMEI}` : ''}${c.NUMERO_SERIE ? ` &nbsp; <b>Número de Série:</b> ${c.NUMERO_SERIE}` : ''}<br>
         ${c.BATERIA_PERCENTUAL ? `<b>Saúde da bateria:</b> ${c.BATERIA_PERCENTUAL}% &nbsp; ` : ''}<b>Acessórios inclusos:</b> ${c.ACESSORIOS_INCLUSOS || 'Nenhum'}<br>
         <b>Avarias identificadas:</b> ${problemas.length ? problemas.join(', ') : 'Nenhuma avaria aparente identificada.'}<br>
-        <b>Conta iCloud/Google removida e aparelho testado:</b> ${c.FRP_REMOVIDO ? 'Sim' : 'Não confirmado'}${senhaHtml}
+        <b>Conta iCloud/Google removida e aparelho testado:</b> ${c.FRP_REMOVIDO ? 'Sim' : 'Não'}${senhaHtml}
         ${c.ESTADO_APARELHO ? `<br><b>Observações:</b> ${c.ESTADO_APARELHO}` : ''}
       </div>
 
       <h3 style="font-size:11.5px; margin:10px 0 4px;">3. DADOS DA COMPRA</h3>
       <div style="font-size:11px; line-height:1.55;">
-        <b>Data:</b> ${dataBR(c.DATA)} &nbsp; <b>Valor pago:</b> ${moeda(c.VALOR_PAGO)} &nbsp; <b>Forma de pagamento:</b> ${c.FORMA_PAGAMENTO||''}<br>
+        <b>Data:</b> ${dataHoraBR(c.DATA)} &nbsp; <b>Valor pago:</b> ${moeda(c.VALOR_PAGO)} &nbsp; <b>Forma de pagamento:</b> ${c.FORMA_PAGAMENTO||''}<br>
         <b>Loja responsável:</b> ${nomeEmpresa(c.EMPRESA_ID)}
       </div>
 
@@ -628,7 +636,7 @@
       </div>
 
       <div style="margin-top:20px; font-size:11px;">Assinatura do Vendedor: ___________________________</div>
-      <div style="font-size:10px; color:#666; margin-top:3px;">Data: ${dataBR(c.DATA)}</div>
+      <div style="font-size:10px; color:#666; margin-top:3px;">Data: ${dataHoraBR(c.DATA)}</div>
       <div style="margin-top:14px; font-size:11px;">Assinatura do Responsável pela Loja: ___________________________</div>
     </div>`;
   }
@@ -682,6 +690,26 @@
     } catch (e) { mostrarToast('Erro: ' + e.message, 'erro'); }
   });
 
+  document.getElementById('btnImprimir1Via').addEventListener('click', async () => {
+    try {
+      const salvo = await salvarOuAtualizar();
+      if (!salvo) return;
+      const via = document.getElementById('selecaoViaImpressao').value; // LOJA ou VENDEDOR
+      const rotulo = via === 'LOJA' ? '1ª VIA — LOJA' : '2ª VIA — VENDEDOR';
+      const mostrarSenha = via === 'LOJA';
+      const janela = window.open('', '_blank');
+      janela.document.write(`<html><head><title>${salvo.NUMERO_COMPRA}</title>
+        <style>@page { size: A4; margin: 10mm; } body{ margin:0; } .paginaWrap{ width:100%; }</style>
+        </head><body>
+        <div class="paginaWrap"><div class="paginaConteudo">${montarHtmlTermoCompra(rotulo, mostrarSenha)}</div></div>
+      </body></html>`);
+      janela.document.close(); janela.focus();
+      imprimirUmaPaginaQuandoPronto(janela);
+      modal.classList.remove('open');
+      renderKpis(); renderLinhas();
+    } catch (e) { mostrarToast('Erro: ' + e.message, 'erro'); }
+  });
+
   // ---------- Salvar PDF ----------
   document.getElementById('btnGerarPdf').addEventListener('click', async () => {
     try {
@@ -725,14 +753,14 @@
         if (c.BATERIA_PERCENTUAL) linha('Saúde da bateria:', c.BATERIA_PERCENTUAL + '%');
         linha('Acessórios inclusos:', c.ACESSORIOS_INCLUSOS || 'Nenhum');
         linha('Avarias identificadas:', problemas.length ? problemas.join(', ') : 'Nenhuma aparente');
-        linha('Conta iCloud/Google removida:', c.FRP_REMOVIDO ? 'Sim' : 'Não confirmado');
+        linha('Conta iCloud/Google removida:', c.FRP_REMOVIDO ? 'Sim' : 'Não');
         // Senha do aparelho — só na via da loja, o técnico precisa pra acessar o aparelho.
         if (idx === 0 && c.SENHA_TIPO && c.SENHA_VALOR) linha('Senha do aparelho:', formatarSenhaExibicao(c));
         if (c.ESTADO_APARELHO) paragrafo('Observações: ' + c.ESTADO_APARELHO);
         y += 1.5;
 
         secao('3. DADOS DA COMPRA');
-        linha('Data da compra:', dataBR(c.DATA)); linha('Valor pago:', moeda(c.VALOR_PAGO));
+        linha('Data da compra:', dataHoraBR(c.DATA)); linha('Valor pago:', moeda(c.VALOR_PAGO));
         linha('Forma de pagamento:', c.FORMA_PAGAMENTO); linha('Loja responsável:', nomeEmpresa(c.EMPRESA_ID));
         y += 2;
 
@@ -747,7 +775,7 @@
         if (y > 260) { doc.addPage(); y = 20; }
         doc.setFontSize(9.5); doc.setFont(undefined,'normal');
         doc.text('Assinatura do Vendedor: ___________________________', 20, y); y += 5;
-        doc.setFontSize(8.5); doc.setTextColor(100); doc.text('Data: ' + dataBR(c.DATA), 20, y); doc.setTextColor(20); y += 10;
+        doc.setFontSize(8.5); doc.setTextColor(100); doc.text('Data: ' + dataHoraBR(c.DATA), 20, y); doc.setTextColor(20); y += 10;
         doc.setFontSize(9.5);
         doc.text('Assinatura do Responsável pela Loja: ___________________________', 20, y);
       }

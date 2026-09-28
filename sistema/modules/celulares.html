@@ -706,6 +706,7 @@
           NUMERO_GARANTIA: gerarId('GAR'), PRAZO_DIAS: aparelho.GARANTIA_PADRAO_DIAS || 90, TIPO: 'PRODUTO_USADO',
           COR_CAPACIDADE: [aparelho.COR, aparelho.MEMORIA ? aparelho.MEMORIA+'GB' : ''].filter(Boolean).join(' / '),
           ESTADO_APARELHO: aparelho.ESTADO_APARELHO || 'Aparelho testado com o cliente.',
+          IMEI: aparelho.IMEI || '', NUMERO_SERIE: aparelho.NUMERO_SERIE || '',
           VALOR_PAGO: item.PRECO_UNITARIO, FORMA_PAGAMENTO: formaPagamento,
           DATA_EMISSAO: new Date().toISOString(), STATUS: 'Ativa'
         });

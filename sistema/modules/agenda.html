@@ -34,6 +34,7 @@
 <div class="ag-filtros">
   <input id="agBusca" type="search" placeholder="Buscar por cliente, OS, modelo ou defeito...">
   <select id="agStatus"><option value="">Todos os status</option></select>
+  <button class="btn" id="agImprimir" type="button">🖨️ Imprimir lista</button>
 </div>
 <div class="ag-resumo" id="agResumo"></div>
 <div class="agenda-lista" id="agendaLista"></div>
@@ -84,12 +85,14 @@
       document.querySelectorAll('#notifGrid .clicavel').forEach(el => el.onclick = () => { filtro = el.dataset.f; desenharCartoes(); desenharLista(); });
     }
 
+    let itensAtuais = [];
     function desenharLista(){
       const termo = busca.value.trim().toLowerCase();
       const st = selStatus.value;
       let itens = lista(filtro).filter(o => !st || o.STATUS === st);
       if (termo) itens = itens.filter(o => [o.NUMERO_OS, nomeCliente(o.CLIENTE_ID, clientes), o.MARCA, o.MODELO, o.DEFEITO_INFORMADO].join(' ').toLowerCase().includes(termo));
       itens = itens.slice().sort((a,b) => (a.PRAZO ? dia(a).getTime() : Infinity) - (b.PRAZO ? dia(b).getTime() : Infinity));
+      itensAtuais = itens;
       document.getElementById('agResumo').textContent = itens.length + ' aparelho(s) — ' + grupos[filtro].rotulo;
 
       setHTML('agendaLista', itens.length ? itens.map(o => {
@@ -112,6 +115,49 @@
       </div>`;
       }).join('') : '<div style="padding:40px; text-align:center; color:var(--text-tertiary);">Nenhum aparelho neste filtro.</div>');
     }
+
+    function imprimirLista(){
+      if (!itensAtuais.length){ mostrarToast('Nada para imprimir neste filtro.', 'erro'); return; }
+      const esc = t => String(t==null?'':t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      const agora = new Date();
+      const linhas = itensAtuais.map(o => {
+        const cli = clientes.find(x => x.ID === o.CLIENTE_ID);
+        const prazo = o.PRAZO ? parseDataLocal(o.PRAZO).toLocaleDateString('pt-BR') : '—';
+        return `<tr>
+          <td class="chk"><span class="box"></span></td>
+          <td><b>${esc(o.NUMERO_OS)}</b><br><small>${esc(prazo)}</small></td>
+          <td>${esc(cli?cli.NOME:'—')}<br><small>${esc(cli&&cli.TELEFONE||'')}</small></td>
+          <td>${esc((o.MARCA||'')+' '+(o.MODELO||''))}</td>
+          <td>${esc(o.DEFEITO_INFORMADO||'')}</td>
+          <td>${esc(o.STATUS||'')}</td>
+          <td class="obs"></td>
+        </tr>`;
+      }).join('');
+      const w = window.open('', '_blank');
+      if (!w){ mostrarToast('Libere pop-ups para imprimir.', 'erro'); return; }
+      w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Agenda - ${esc(grupos[filtro].rotulo)}</title>
+      <style>
+        @page{ size:A4 landscape; margin:10mm; }
+        body{ font-family:Arial,sans-serif; color:#111; font-size:12px; }
+        h1{ font-size:18px; margin:0 0 2px; } .sub{ color:#555; margin-bottom:10px; }
+        table{ width:100%; border-collapse:collapse; }
+        th,td{ border:1px solid #888; padding:6px 7px; vertical-align:top; }
+        th{ background:#eee; text-align:left; font-size:11px; }
+        tr{ page-break-inside:avoid; }
+        small{ color:#555; }
+        td.chk{ width:34px; text-align:center; vertical-align:middle; }
+        .box{ display:inline-block; width:20px; height:20px; border:2px solid #111; }
+        td.obs{ width:22%; }
+      </style></head><body>
+      <h1>BStyle — Aparelhos: ${esc(grupos[filtro].rotulo)}</h1>
+      <div class="sub">Impresso em ${agora.toLocaleDateString('pt-BR')} às ${agora.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})} · ${itensAtuais.length} aparelho(s)</div>
+      <table><thead><tr><th>Feito</th><th>OS / Previsão</th><th>Cliente</th><th>Aparelho</th><th>Defeito</th><th>Status</th><th>Observações</th></tr></thead>
+      <tbody>${linhas}</tbody></table>
+      <script>window.onload=function(){ setTimeout(function(){ window.print(); }, 300); };<\/script>
+      </body></html>`);
+      w.document.close();
+    }
+    document.getElementById('agImprimir').onclick = imprimirLista;
 
     busca.oninput = desenharLista; selStatus.onchange = desenharLista;
     desenharCartoes(); desenharLista();

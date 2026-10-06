@@ -401,6 +401,17 @@
     });
   }
 
+  /** Lê as partes de um pagamento combinado. No banco elas ficam como texto em FORMAS_PAGAMENTO_JSON. */
+  function formasDaVenda(v){
+    if (Array.isArray(v.FORMAS_PAGAMENTO) && v.FORMAS_PAGAMENTO.length) return v.FORMAS_PAGAMENTO;
+    try { const a = JSON.parse(v.FORMAS_PAGAMENTO_JSON || '[]'); return Array.isArray(a) ? a : []; } catch(e) { return []; }
+  }
+  /** Texto da coluna Pagamento no histórico: nas combinadas, mostra quanto foi em cada forma. */
+  function pagamentoNaLista(v){
+    const partes = v.FORMA_PAGAMENTO === 'Combinado' ? formasDaVenda(v) : [];
+    if (!partes.length) return v.FORMA_PAGAMENTO || '—';
+    return 'Combinado' + partes.map(f => `<div style="font-size:11.5px; color:var(--text-secondary); white-space:nowrap;">${f.forma}: ${moeda(f.valor)}</div>`).join('');
+  }
   // ---------- Pagamento / troco ----------
   document.getElementById('formaPagamento').addEventListener('change', e => {
     document.getElementById('parcelasWrap').style.display = (e.target.value === 'Parcelado' || e.target.value === 'Cartão de Crédito') ? 'block' : 'none';
@@ -503,7 +514,7 @@
     // Não deixa vender sem o caixa do dia estar aberto — é o jeito de garantir que
     // ninguém esquece de abrir o caixa antes de começar a trabalhar.
     try {
-      const idDiaCaixa = lojaDaVenda + '_' + new Date().toISOString().substring(0,10);
+      const idDiaCaixa = lojaDaVenda + '_' + new Date(Date.now() - new Date().getTimezoneOffset()*60000).toISOString().substring(0,10);
       const caixaDeHoje = await dbGetById('CAIXA', idDiaCaixa);
       if (!caixaDeHoje || caixaDeHoje.STATUS !== 'Aberto') {
         mostrarToast('O caixa de hoje ainda não foi aberto — vai na aba "Caixa Diário" e abre antes de vender.', 'erro');
@@ -658,7 +669,7 @@
     if (!lista.length){ setHTML('linhasHistorico', '<tr class="empty-row"><td colspan="8">Nenhuma venda ainda.</td></tr>'); return; }
     setHTML('linhasHistorico', lista.map(v => `<tr>
       <td>${dataHoraBR(v.DATA)}</td><td>${nomeClienteHist(v.CLIENTE_ID)}</td><td>${nomeVendedorHist(v.USUARIO_ID)}</td><td>${nomeLojaHist(v.EMPRESA_ID)}</td>
-      <td>${v.FORMA_PAGAMENTO||'—'}</td><td>${moeda(v.VALOR_TOTAL)}</td>
+      <td>${pagamentoNaLista(v)}</td><td>${moeda(v.VALOR_TOTAL)}</td>
       <td><span class="badge ${v.STATUS==='Cancelada'?'neutral':'ok'}">${v.STATUS}</span></td>
       <td style="white-space:nowrap;">
         <div class="acoes-historico">
@@ -702,7 +713,9 @@
       </table>
       <div class="summary-row"><span>Desconto</span><span>${moeda(venda.DESCONTO||0)}</span></div>
       <div class="summary-row total"><span>Total pago</span><span>${moeda(venda.VALOR_TOTAL)}</span></div>
-      <div class="summary-row"><span>Forma de pagamento</span><span>${venda.FORMA_PAGAMENTO}</span></div>
+      ${(venda.FORMA_PAGAMENTO === 'Combinado' && formasDaVenda(venda).length)
+        ? `<div class="summary-row"><span>Forma de pagamento</span><span>Combinado</span></div>` + formasDaVenda(venda).map(f => `<div class="summary-row" style="padding-left:14px; font-size:13px;"><span>${f.forma}${f.forma==='Cartão de Crédito' && f.parcelas>1 ? ' ('+f.parcelas+'x)' : ''}</span><span>${moeda(f.valor)}</span></div>`).join('')
+        : `<div class="summary-row"><span>Forma de pagamento</span><span>${venda.FORMA_PAGAMENTO}</span></div>`}
       ${venda.OBSERVACOES ? `<div style="margin-top:14px; padding-top:12px; border-top:1px solid var(--hairline);"><div style="font-size:11px; color:var(--text-tertiary); margin-bottom:4px;">OBSERVAÇÃO</div><div style="font-size:12.5px; white-space:pre-wrap;">${venda.OBSERVACOES}</div></div>` : ''}
     `);
   };
@@ -907,8 +920,8 @@
       ? `<div style="background:#fff; border-radius:10px; padding:6px 9px; flex-shrink:0; display:flex; align-items:center; box-shadow:0 2px 6px rgba(0,0,0,0.15);"><img src="${logoDataUrl}" style="height:34px; width:auto; object-fit:contain; display:block;"></div>`
       : `<div style="width:46px; height:46px; background:#fff; border-radius:10px; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:20px; color:#e2401c; flex-shrink:0; box-shadow:0 2px 6px rgba(0,0,0,0.15);">B</div>`;
     const subtotal = itens.reduce((s,i)=>s+i.QUANTIDADE*i.PRECO_UNITARIO,0);
-    const linhasPagamento = (venda.FORMA_PAGAMENTO === 'Combinado' && venda.FORMAS_PAGAMENTO && venda.FORMAS_PAGAMENTO.length)
-      ? venda.FORMAS_PAGAMENTO.map(f => `${f.forma}: ${moeda(f.valor)}` + (f.forma==='Cartão de Crédito' && f.parcelas>1 ? ` (${f.parcelas}x)` : '')).join(' · ')
+    const linhasPagamento = (venda.FORMA_PAGAMENTO === 'Combinado' && formasDaVenda(venda).length)
+      ? formasDaVenda(venda).map(f => `${f.forma}: ${moeda(f.valor)}` + (f.forma==='Cartão de Crédito' && f.parcelas>1 ? ` (${f.parcelas}x)` : '')).join(' · ')
       : venda.FORMA_PAGAMENTO;
     const vendedor = typeof nomeVendedorHist === 'function' ? nomeVendedorHist(venda.USUARIO_ID) : '—';
 
@@ -1025,8 +1038,8 @@
     const empresa = empresasCarregadas.find(e => e.ID === venda.EMPRESA_ID) || empresasCarregadas[0] || {};
     const endereco = [empresa.RUA, empresa.NUMERO].filter(Boolean).join(', ') + (empresa.BAIRRO ? ' - ' + empresa.BAIRRO : '');
     const subtotal = itens.reduce((s,i)=>s+i.QUANTIDADE*i.PRECO_UNITARIO,0);
-    const linhasPagamento = (venda.FORMA_PAGAMENTO === 'Combinado' && venda.FORMAS_PAGAMENTO && venda.FORMAS_PAGAMENTO.length)
-      ? venda.FORMAS_PAGAMENTO.map(f => f.forma + ': ' + moeda(f.valor)).join('<br>')
+    const linhasPagamento = (venda.FORMA_PAGAMENTO === 'Combinado' && formasDaVenda(venda).length)
+      ? formasDaVenda(venda).map(f => f.forma + ': ' + moeda(f.valor)).join('<br>')
       : venda.FORMA_PAGAMENTO;
     const linha = '- - - - - - - - - - - - - - - -';
     const linkInstagram = empresa.INSTAGRAM ? 'https://instagram.com/' + empresa.INSTAGRAM : '';

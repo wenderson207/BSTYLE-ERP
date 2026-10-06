@@ -96,6 +96,11 @@
   .cal-dia.fora-mes{ opacity:0.3; }
   .cal-dia.hoje{ border-color:var(--mint); }
   .cal-dia .num{ color:var(--text-secondary); font-family:var(--font-mono); }
+  .cal-dia .os-chip.pronto{ background:rgba(76,141,255,0.18); color:#4C8DFF; }
+  .cal-dia .os-chip.atrasada{ background:rgba(255,92,92,0.18); color:#FF5C5C; }
+  .cal-dia .os-chip.entregue{ background:rgba(136,145,163,0.12); color:var(--text-tertiary); text-decoration:line-through; }
+  .cal-legenda{ display:flex; flex-wrap:wrap; gap:14px; align-items:center; font-size:11.5px; color:var(--text-secondary); margin-bottom:12px; }
+  .cal-legenda .pt{ display:inline-block; width:10px; height:10px; border-radius:3px; margin-right:5px; vertical-align:-1px; }
   .cal-dia .os-chip{ background:rgba(47,225,168,0.15); color:var(--mint); border-radius:4px; padding:2px 5px; font-size:9.5px; margin-top:4px; display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .filtros-assist{ display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; margin:16px 0; }
   .filtros-assist .grupo{ display:flex; flex-direction:column; gap:4px; }
@@ -138,6 +143,13 @@
       <button class="btn" id="btnMesAnterior">‹</button>
       <h3 id="calTitulo">—</h3>
       <button class="btn" id="btnMesSeguinte">›</button>
+    </div>
+    <div class="cal-legenda">
+      <span><i class="pt" style="background:#2FE1A8;"></i>Em andamento</span>
+      <span><i class="pt" style="background:#4C8DFF;"></i>Pronto p/ retirar</span>
+      <span><i class="pt" style="background:#FF5C5C;"></i>Atrasado</span>
+      <span><i class="pt" style="background:#8891A3;"></i>Entregue</span>
+      <label style="margin-left:auto; cursor:pointer;"><input type="checkbox" id="calOcultarEntregues"> Ocultar entregues</label>
     </div>
     <div class="cal-grid" id="calGrid"></div>
   </div>
@@ -698,6 +710,21 @@
     });
   }
 
+  let ocultarEntregues = false;
+  const ORDEM_STATUS_CAL = ['Pronto','Em reparo','Aguardando peça','Em diagnóstico','Aberta','Com Defeito - Devolução','Entregue'];
+  /** Não entregues primeiro (Pronto no topo), entregues no fim; empate pelo número da OS. */
+  function compararOSCalendario(a, b){
+    const ia = ORDEM_STATUS_CAL.indexOf(a.STATUS), ib = ORDEM_STATUS_CAL.indexOf(b.STATUS);
+    const pa = ia < 0 ? 50 : ia, pb = ib < 0 ? 50 : ib;
+    return pa - pb || String(a.NUMERO_OS).localeCompare(String(b.NUMERO_OS));
+  }
+  function classeChipOS(o, dia){
+    if (o.STATUS === 'Entregue') return 'entregue';
+    const h = new Date(); h.setHours(0,0,0,0);
+    if (dia < h) return 'atrasada';
+    if (o.STATUS === 'Pronto') return 'pronto';
+    return '';
+  }
   function renderCalendario(){
     const ano = mesCalendario.getFullYear(), mes = mesCalendario.getMonth();
     document.getElementById('calTitulo').textContent = mesCalendario.toLocaleDateString('pt-BR', { month:'long', year:'numeric' });
@@ -714,12 +741,15 @@
       const dia = new Date(inicioGrid); dia.setDate(dia.getDate() + i);
       const foraMes = dia.getMonth() !== mes;
       const ehHoje = dia.toDateString() === hojeStr;
-      const osDoDia = ordens.filter(o => o.PRAZO && parseDataLocal(o.PRAZO).toDateString() === dia.toDateString());
+      const osDoDia = ordens.filter(o => o.PRAZO && o.STATUS !== 'Excluído' && parseDataLocal(o.PRAZO).toDateString() === dia.toDateString() && !(ocultarEntregues && o.STATUS === 'Entregue'))
+        .sort(compararOSCalendario);
+      const pendentesDia = osDoDia.filter(o => o.STATUS !== 'Entregue').length;
+      const maxChips = 4;
 
       html += `<div class="cal-dia ${foraMes?'fora-mes':''} ${ehHoje?'hoje':''}" onclick='window.__verDiaCalendario(${JSON.stringify(osDoDia.map(o=>o.ID))})'>
-        <div class="num">${dia.getDate()}</div>
-        ${osDoDia.slice(0,3).map(o => `<span class="os-chip">${o.NUMERO_OS}</span>`).join('')}
-        ${osDoDia.length > 3 ? '<span style="font-size:9.5px; color:var(--text-tertiary);">+' + (osDoDia.length-3) + '</span>' : ''}
+        <div class="num" style="display:flex; justify-content:space-between;"><span>${dia.getDate()}</span>${osDoDia.length ? `<span style="font-size:9.5px; color:${pendentesDia?'var(--text-secondary)':'var(--mint)'};">${pendentesDia ? pendentesDia+' a entregar' : '✓ tudo entregue'}</span>` : ''}</div>
+        ${osDoDia.slice(0,maxChips).map(o => `<span class="os-chip ${classeChipOS(o, dia)}" title="${o.STATUS||''}">${o.NUMERO_OS}</span>`).join('')}
+        ${osDoDia.length > maxChips ? '<span style="font-size:9.5px; color:var(--text-tertiary);">+' + (osDoDia.length-maxChips) + '</span>' : ''}
       </div>`;
     }
     setHTML('calGrid', html);
@@ -728,11 +758,12 @@
   window.__verDiaCalendario = (idsOS) => {
     if (!idsOS.length) return;
     if (idsOS.length === 1) { window.__abrirOS(idsOS[0]); return; }
-    const escolha = prompt('OS com entrega neste dia:\n' + idsOS.map((id,i) => (i+1)+') '+ordens.find(o=>o.ID===id).NUMERO_OS).join('\n') + '\n\nDigite o número pra abrir:');
+    const escolha = prompt('OS com entrega neste dia:\n' + idsOS.map((id,i) => { const o = ordens.find(x=>x.ID===id); return (i+1)+') '+o.NUMERO_OS+' — '+o.STATUS; }).join('\n') + '\n\nDigite o número pra abrir:');
     const idx = Number(escolha) - 1;
     if (idsOS[idx]) window.__abrirOS(idsOS[idx]);
   };
 
+  document.getElementById('calOcultarEntregues').addEventListener('change', e => { ocultarEntregues = e.target.checked; renderCalendario(); });
   document.getElementById('btnMesAnterior').addEventListener('click', () => { mesCalendario.setMonth(mesCalendario.getMonth()-1); renderCalendario(); });
   document.getElementById('btnMesSeguinte').addEventListener('click', () => { mesCalendario.setMonth(mesCalendario.getMonth()+1); renderCalendario(); });
 

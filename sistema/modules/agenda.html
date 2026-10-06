@@ -16,14 +16,26 @@
   .agenda-item .info{ flex:1; }
   .garantia-item{ display:flex; align-items:center; gap:14px; padding:14px 18px; border-bottom:1px solid var(--hairline); }
   .garantia-item:last-child{ border-bottom:none; }
+  .notif-card.clicavel{ cursor:pointer; transition:transform .1s, box-shadow .1s; user-select:none; }
+  .notif-card.clicavel:hover{ transform:translateY(-1px); }
+  .notif-card.ativo{ box-shadow:0 0 0 2px var(--mint); }
+  .ag-filtros{ display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin-bottom:12px; }
+  .ag-filtros input,.ag-filtros select{ background:var(--bg-surface); border:1px solid var(--hairline); color:inherit; border-radius:8px; padding:8px 12px; font-size:13px; }
+  .ag-filtros input{ flex:1; min-width:200px; }
+  .ag-resumo{ font-size:12px; color:var(--text-tertiary); margin:0 0 8px; }
   .section-subtitulo{ font-family:var(--font-display); font-size:15px; margin:26px 0 12px; }
 </style>
 
 <div class="toolbar"><div><h1 style="font-family:var(--font-display); font-size:22px; margin:0 0 4px;">Agenda</h1>
-<p style="color:var(--text-secondary); font-size:13px; margin:0;">Aparelhos com entrega planejada — organizados por urgência.</p></div></div>
+<p style="color:var(--text-secondary); font-size:13px; margin:0;">Aparelhos com entrega planejada — clique num cartão para filtrar.</p></div></div>
 
 <div class="notif-grid" id="notifGrid"></div>
 
+<div class="ag-filtros">
+  <input id="agBusca" type="search" placeholder="Buscar por cliente, OS, modelo ou defeito...">
+  <select id="agStatus"><option value="">Todos os status</option></select>
+</div>
+<div class="ag-resumo" id="agResumo"></div>
 <div class="agenda-lista" id="agendaLista"></div>
 
 <h3 class="section-subtitulo">⏳ Garantias perto de vencer (oportunidade de contato)</h3>
@@ -37,36 +49,72 @@
     if (!(await checarPermissao('AGENDA','VISUALIZAR'))){ setHTML('agendaLista', 'Sem permissão.'); return; }
 
     const [ordens, clientes] = await Promise.all([dbGetAll('ASSISTENCIAS'), dbGetAll('CLIENTES')]);
-    const pendentes = ordens.filter(o => o.STATUS !== 'Entregue' && o.PRAZO);
+    const abertas = ordens.filter(o => o.STATUS !== 'Entregue' && o.STATUS !== 'Excluído');
+    const pendentes = abertas.filter(o => o.PRAZO);
+    const semPrevisao = abertas.filter(o => !o.PRAZO);
 
     const hoje = new Date(); hoje.setHours(0,0,0,0);
-    const atrasados = pendentes.filter(o => parseDataLocal(o.PRAZO) < hoje);
-    const hojeEntrega = pendentes.filter(o => parseDataLocal(o.PRAZO).toDateString() === new Date().toDateString());
     const amanha = new Date(hoje); amanha.setDate(amanha.getDate()+1);
-    const proximos7 = pendentes.filter(o => { const p = parseDataLocal(o.PRAZO); return p >= amanha && p <= new Date(hoje.getTime()+7*86400000); });
+    const fim7 = new Date(hoje); fim7.setDate(fim7.getDate()+7);
+    const dia = o => { const d = parseDataLocal(o.PRAZO); d.setHours(0,0,0,0); return d; };
 
-    setHTML('notifGrid', `
-      <div class="notif-card urgente"><div class="num">${atrasados.length}</div><div class="lbl">Atrasados — já deveriam ter sido entregues</div></div>
-      <div class="notif-card atencao"><div class="num">${hojeEntrega.length}</div><div class="lbl">Pra entregar hoje</div></div>
-      <div class="notif-card"><div class="num">${proximos7.length}</div><div class="lbl">Nos próximos 7 dias</div></div>
-      <div class="notif-card"><div class="num">${pendentes.length}</div><div class="lbl">Total de aparelhos em aberto com prazo</div></div>
-    `);
+    const grupos = {
+      atrasados: { rotulo:'Atrasados — já deveriam ter sido entregues', cls:'urgente', fn:o => dia(o) < hoje },
+      hoje:      { rotulo:'Pra entregar hoje', cls:'atencao', fn:o => dia(o).getTime() === hoje.getTime() },
+      amanha:    { rotulo:'Amanhã', cls:'', fn:o => dia(o).getTime() === amanha.getTime() },
+      prox7:     { rotulo:'Nos próximos 7 dias', cls:'', fn:o => dia(o) >= amanha && dia(o) <= fim7 },
+      todos:     { rotulo:'Todos com previsão', cls:'', fn:o => true },
+      sem:       { rotulo:'Sem previsão de entrega', cls:'', fn:o => false }
+    };
+    const lista = k => k === 'sem' ? semPrevisao : pendentes.filter(grupos[k].fn);
 
-    const ordenados = pendentes.slice().sort((a,b) => parseDataLocal(a.PRAZO) - parseDataLocal(b.PRAZO));
+    // abre já em "Hoje"; se não houver nada hoje, mostra atrasados ou todos
+    let filtro = lista('hoje').length ? 'hoje' : (lista('atrasados').length ? 'atrasados' : 'todos');
 
-    setHTML('agendaLista', ordenados.length ? ordenados.map(o => {
-      const dataEntrega = parseDataLocal(o.PRAZO);
-      const atrasado = dataEntrega < hoje;
-      return `<div class="agenda-item ${atrasado?'atrasado':''}">
-        <div class="data-badge"><div class="dia">${String(dataEntrega.getDate()).padStart(2,'0')}</div><div class="mes">${dataEntrega.toLocaleDateString('pt-BR',{month:'short'})}</div></div>
+    const selStatus = document.getElementById('agStatus');
+    [...new Set(abertas.map(o => o.STATUS).filter(Boolean))].sort().forEach(st => {
+      const op = document.createElement('option'); op.value = st; op.textContent = st; selStatus.appendChild(op);
+    });
+    const busca = document.getElementById('agBusca');
+
+    function desenharCartoes(){
+      setHTML('notifGrid', Object.keys(grupos).map(k =>
+        `<div class="notif-card clicavel ${grupos[k].cls} ${k===filtro?'ativo':''}" data-f="${k}"><div class="num">${lista(k).length}</div><div class="lbl">${grupos[k].rotulo}</div></div>`
+      ).join(''));
+      document.querySelectorAll('#notifGrid .clicavel').forEach(el => el.onclick = () => { filtro = el.dataset.f; desenharCartoes(); desenharLista(); });
+    }
+
+    function desenharLista(){
+      const termo = busca.value.trim().toLowerCase();
+      const st = selStatus.value;
+      let itens = lista(filtro).filter(o => !st || o.STATUS === st);
+      if (termo) itens = itens.filter(o => [o.NUMERO_OS, nomeCliente(o.CLIENTE_ID, clientes), o.MARCA, o.MODELO, o.DEFEITO_INFORMADO].join(' ').toLowerCase().includes(termo));
+      itens = itens.slice().sort((a,b) => (a.PRAZO ? dia(a).getTime() : Infinity) - (b.PRAZO ? dia(b).getTime() : Infinity));
+      document.getElementById('agResumo').textContent = itens.length + ' aparelho(s) — ' + grupos[filtro].rotulo;
+
+      setHTML('agendaLista', itens.length ? itens.map(o => {
+        const temPrazo = !!o.PRAZO;
+        const d = temPrazo ? dia(o) : null;
+        const atrasado = temPrazo && d < hoje;
+        const cli = clientes.find(x => x.ID === o.CLIENTE_ID);
+        const tel = String((cli && cli.TELEFONE) || '').replace(/\D/g,'');
+        const numZap = tel ? (tel.length<=11 ? '55'+tel : tel) : '';
+        const msg = encodeURIComponent(`Olá, ${cli?cli.NOME:''}! Aqui é da BStyle. Sobre o seu ${o.MARCA||''} ${o.MODELO||'aparelho'} (OS ${o.NUMERO_OS}): `);
+        return `<div class="agenda-item ${atrasado?'atrasado':''}">
+        <div class="data-badge"><div class="dia">${temPrazo?String(d.getDate()).padStart(2,'0'):'--'}</div><div class="mes">${temPrazo?d.toLocaleDateString('pt-BR',{month:'short'}):'s/ data'}</div></div>
         <div class="info">
           <div class="num-os">${o.NUMERO_OS}</div>
-          <div><b>${nomeCliente(o.CLIENTE_ID, clientes)}</b> — ${o.MARCA||''} ${o.MODELO||''}</div>
+          <div><b>${cli?cli.NOME:'—'}</b> — ${o.MARCA||''} ${o.MODELO||''}</div>
           <div style="color:var(--text-tertiary); font-size:11.5px;">${o.DEFEITO_INFORMADO||''}</div>
         </div>
+        ${numZap ? `<a class="btn" style="padding:6px 10px; font-size:11.5px; text-decoration:none;" href="https://wa.me/${numZap}?text=${msg}" target="_blank">💬 WhatsApp</a>` : ''}
         <span class="badge ${atrasado?'danger':'info'}" style="display:inline-flex; padding:3px 9px; border-radius:20px; font-size:11px; font-weight:600; font-family:var(--font-mono); background:${atrasado?'rgba(255,92,92,0.12)':'rgba(76,141,255,0.12)'}; color:${atrasado?'#FF5C5C':'#4C8DFF'};">${o.STATUS}</span>
       </div>`;
-    }).join('') : '<div style="padding:40px; text-align:center; color:var(--text-tertiary);">Nenhum aparelho com entrega planejada.</div>');
+      }).join('') : '<div style="padding:40px; text-align:center; color:var(--text-tertiary);">Nenhum aparelho neste filtro.</div>');
+    }
+
+    busca.oninput = desenharLista; selStatus.onchange = desenharLista;
+    desenharCartoes(); desenharLista();
 
   } catch (e) { mostrarToast('Erro: ' + e.message, 'erro'); }
 

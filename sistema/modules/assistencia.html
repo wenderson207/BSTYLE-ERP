@@ -100,6 +100,9 @@
   .cal-dia .os-chip.atrasada{ background:rgba(255,92,92,0.18); color:#FF5C5C; }
   .cal-dia .os-chip.entregue{ background:rgba(136,145,163,0.12); color:var(--text-tertiary); text-decoration:line-through; }
   .cal-legenda{ display:flex; flex-wrap:wrap; gap:14px; align-items:center; font-size:11.5px; color:var(--text-secondary); margin-bottom:12px; }
+  .cal-filtro{ background:var(--bg-elevated); border:1px solid var(--hairline); color:var(--text-secondary); border-radius:20px; padding:6px 13px; font-size:12px; cursor:pointer; }
+  .cal-filtro:hover{ border-color:var(--text-tertiary); }
+  .cal-filtro.ativo{ border-color:var(--mint); color:var(--text-primary); box-shadow:0 0 0 1px var(--mint); }
   .cal-legenda .pt{ display:inline-block; width:10px; height:10px; border-radius:3px; margin-right:5px; vertical-align:-1px; }
   .cal-dia .os-chip{ background:rgba(47,225,168,0.15); color:var(--mint); border-radius:4px; padding:2px 5px; font-size:9.5px; margin-top:4px; display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .filtros-assist{ display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; margin:16px 0; }
@@ -145,11 +148,11 @@
       <button class="btn" id="btnMesSeguinte">›</button>
     </div>
     <div class="cal-legenda">
-      <span><i class="pt" style="background:#2FE1A8;"></i>Em andamento</span>
-      <span><i class="pt" style="background:#4C8DFF;"></i>Pronto p/ retirar</span>
-      <span><i class="pt" style="background:#FF5C5C;"></i>Atrasado</span>
-      <span><i class="pt" style="background:#8891A3;"></i>Entregue</span>
-      <label style="margin-left:auto; cursor:pointer;"><input type="checkbox" id="calOcultarEntregues"> Ocultar entregues</label>
+      <button type="button" class="cal-filtro ativo" data-f="">Todos</button>
+      <button type="button" class="cal-filtro" data-f="andamento"><i class="pt" style="background:#2FE1A8;"></i>Em andamento</button>
+      <button type="button" class="cal-filtro" data-f="pronto"><i class="pt" style="background:#4C8DFF;"></i>Pronto p/ retirar</button>
+      <button type="button" class="cal-filtro" data-f="atrasada"><i class="pt" style="background:#FF5C5C;"></i>Atrasado</button>
+      <button type="button" class="cal-filtro" data-f="entregue"><i class="pt" style="background:#8891A3;"></i>Entregue</button>
     </div>
     <div class="cal-grid" id="calGrid"></div>
   </div>
@@ -710,7 +713,7 @@
     });
   }
 
-  let ocultarEntregues = false;
+  let filtroCal = '';
   const ORDEM_STATUS_CAL = ['Pronto','Em reparo','Aguardando peça','Em diagnóstico','Aberta','Com Defeito - Devolução','Entregue'];
   /** Não entregues primeiro (Pronto no topo), entregues no fim; empate pelo número da OS. */
   function compararOSCalendario(a, b){
@@ -741,7 +744,7 @@
       const dia = new Date(inicioGrid); dia.setDate(dia.getDate() + i);
       const foraMes = dia.getMonth() !== mes;
       const ehHoje = dia.toDateString() === hojeStr;
-      const osDoDia = ordens.filter(o => o.PRAZO && o.STATUS !== 'Excluído' && parseDataLocal(o.PRAZO).toDateString() === dia.toDateString() && !(ocultarEntregues && o.STATUS === 'Entregue'))
+      const osDoDia = ordens.filter(o => o.PRAZO && o.STATUS !== 'Excluído' && parseDataLocal(o.PRAZO).toDateString() === dia.toDateString() && (!filtroCal || (classeChipOS(o, dia) || 'andamento') === filtroCal))
         .sort(compararOSCalendario);
       const pendentesDia = osDoDia.filter(o => o.STATUS !== 'Entregue').length;
       const maxChips = 4;
@@ -763,7 +766,11 @@
     if (idsOS[idx]) window.__abrirOS(idsOS[idx]);
   };
 
-  document.getElementById('calOcultarEntregues').addEventListener('change', e => { ocultarEntregues = e.target.checked; renderCalendario(); });
+  document.querySelectorAll('.cal-filtro').forEach(btn => btn.addEventListener('click', () => {
+    filtroCal = btn.dataset.f;
+    document.querySelectorAll('.cal-filtro').forEach(b => b.classList.toggle('ativo', b === btn));
+    renderCalendario();
+  }));
   document.getElementById('btnMesAnterior').addEventListener('click', () => { mesCalendario.setMonth(mesCalendario.getMonth()-1); renderCalendario(); });
   document.getElementById('btnMesSeguinte').addEventListener('click', () => { mesCalendario.setMonth(mesCalendario.getMonth()+1); renderCalendario(); });
 

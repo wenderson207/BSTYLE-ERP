@@ -21,7 +21,7 @@
   let empresas = [];
   function nomeLoja(id){ if (!id) return 'Compartilhado'; const e = empresas.find(x=>x.ID===id); return e?e.NOME:'—'; }
 
-  function chaveDoDiaCaixa(lojaId){ return (lojaId||'sem-loja') + '_' + new Date().toISOString().substring(0,10); }
+  function chaveDoDiaCaixa(lojaId){ return (lojaId||'sem-loja') + '_' + new Date(Date.now() - new Date().getTimezoneOffset()*60000).toISOString().substring(0,10); }
 
   async function carregarCaixa(){
     const el = document.getElementById('caixaConteudo');
@@ -52,19 +52,39 @@
 
       const vendasHoje = (await dbGetAll('VENDAS')).filter(v => v.EMPRESA_ID === lojaId && v.STATUS === 'Concluída' && new Date(v.DATA).toDateString() === new Date().toDateString());
 
-      // Detalha por forma de pagamento de verdade (Dinheiro, PIX, Débito, Crédito) —
-      // vendas "Combinada" são quebradas nas partes de FORMAS_PAGAMENTO, senão ficariam
-      // escondidas numa categoria só.
-      const porForma = { 'Dinheiro':0, 'PIX':0, 'Cartão de Débito':0, 'Cartão de Crédito':0 };
-      vendasHoje.forEach(v => {
-        if (v.FORMA_PAGAMENTO === 'Combinado' && Array.isArray(v.FORMAS_PAGAMENTO)) {
-          v.FORMAS_PAGAMENTO.forEach(f => { porForma[f.forma] = (porForma[f.forma]||0) + Number(f.valor||0); });
-        } else {
-          porForma[v.FORMA_PAGAMENTO] = (porForma[v.FORMA_PAGAMENTO]||0) + Number(v.VALOR_TOTAL||0);
+      // Soma cada venda na forma de pagamento certa. Vendas "Combinado" são quebradas nas
+      // partes (ficam gravadas como texto em FORMAS_PAGAMENTO_JSON). O que não encaixar em
+      // nenhuma das formas conhecidas vai para "Outros" — assim nada some e a conferência
+      // no final mostra qualquer diferença.
+      const porForma = { 'Dinheiro':0, 'PIX':0, 'Cartão de Débito':0, 'Cartão de Crédito':0, 'Parcelado':0, 'Outros':0 };
+      const r2 = n => Math.round(n*100)/100;
+      function partesDaVenda(v){
+        let partes = [];
+        if (v.FORMA_PAGAMENTO === 'Combinado') {
+          if (Array.isArray(v.FORMAS_PAGAMENTO)) partes = v.FORMAS_PAGAMENTO;
+          else { try { partes = JSON.parse(v.FORMAS_PAGAMENTO_JSON || '[]'); } catch(e) { partes = []; } }
+          partes = partes.map(f => ({ forma: f.forma, valor: Number(f.valor||0) }));
+          const sobra = r2(Number(v.VALOR_TOTAL||0) - partes.reduce((s,f)=>s+f.valor,0));
+          if (Math.abs(sobra) >= 0.01) partes.push({ forma: 'Outros', valor: sobra });
+          return partes;
         }
+        return [{ forma: v.FORMA_PAGAMENTO, valor: Number(v.VALOR_TOTAL||0) }];
+      }
+      vendasHoje.forEach(v => {
+        partesDaVenda(v).forEach(f => {
+          const chave = Object.prototype.hasOwnProperty.call(porForma, f.forma) ? f.forma : 'Outros';
+          porForma[chave] = r2(porForma[chave] + f.valor);
+        });
       });
       const dinheiroHoje = porForma['Dinheiro'];
-      const totalVendidoHoje = vendasHoje.reduce((s,v)=>s+Number(v.VALOR_TOTAL||0),0);
+      const totalVendidoHoje = r2(vendasHoje.reduce((s,v)=>s+Number(v.VALOR_TOTAL||0),0));
+      const somaFormasHoje = r2(Object.values(porForma).reduce((s,n)=>s+n,0));
+      const difConferencia = r2(totalVendidoHoje - somaFormasHoje);
+      const conferenciaHtml = Math.abs(difConferencia) < 0.01
+        ? `<div style="margin:-6px 0 18px; font-size:12.5px; color:var(--mint);">\u2713 Conferência: a soma das formas de pagamento (${moeda(somaFormasHoje)}) bate com o total vendido.</div>`
+        : `<div style="margin:-6px 0 18px; font-size:12.5px; color:var(--red);">Atenção: soma das formas (${moeda(somaFormasHoje)}) difere do total vendido (${moeda(totalVendidoHoje)}) em ${moeda(Math.abs(difConferencia))}.</div>`;
+      const extrasHtml = ['Parcelado','Outros'].filter(k => porForma[k] !== 0).map(k =>
+        `<div class="kpi"><div class="lbl">${k==='Outros'?'\u26A0\uFE0F Outros / sem detalhe':'\u{1F4B3} Parcelado'}</div><div class="val">${moeda(porForma[k])}</div></div>`).join('');
 
       // Gastos do dia marcados como "saiu do caixa" (aba Compras e Gastos) reduzem o
       // que deveria sobrar de dinheiro físico no caixa.
@@ -83,7 +103,9 @@
           <div class="kpi"><div class="lbl">\u{1F4A0} PIX</div><div class="val">${moeda(porForma['PIX'])}</div></div>
           <div class="kpi"><div class="lbl">\u{1F4B3} Débito</div><div class="val">${moeda(porForma['Cartão de Débito'])}</div></div>
           <div class="kpi"><div class="lbl">\u{1F4B3} Crédito</div><div class="val">${moeda(porForma['Cartão de Crédito'])}</div></div>
+          ${extrasHtml}
         </div>
+        ${conferenciaHtml}
         <div class="frow2" style="max-width:400px;">
           <div class="ffield"><label>Valor contado ao fechar (R$)</label><input id="valorContado" type="number" step="0.01"></div>
         </div>
@@ -119,6 +141,8 @@
           + `${EMOJI_RESUMO.pix} PIX: ${moeda(porForma['PIX'])}\n`
           + `${EMOJI_RESUMO.cartao} Débito: ${moeda(porForma['Cartão de Débito'])}\n`
           + `${EMOJI_RESUMO.cartao} Crédito: ${moeda(porForma['Cartão de Crédito'])}\n`
+          + (porForma['Parcelado'] ? `${EMOJI_RESUMO.cartao} Parcelado: ${moeda(porForma['Parcelado'])}\n` : '')
+          + (porForma['Outros'] ? `Outros: ${moeda(porForma['Outros'])}\n` : '')
           + `${linha}\n*Total vendido: ${moeda(totalVendidoHoje)}*\n`
           + `Esperado em caixa (dinheiro): ${moeda(esperadoEmCaixa)}`;
         if (diferenca !== undefined && !isNaN(diferenca)) {
@@ -160,6 +184,8 @@
           { rotulo: 'Cartão de Débito', valor: porForma['Cartão de Débito'], cor: '#f5a623', icone: E.cartao },
           { rotulo: 'Cartão de Crédito', valor: porForma['Cartão de Crédito'], cor: '#a970ff', icone: E.cartao }
         ];
+        if (porForma['Parcelado']) linhasForma.push({ rotulo: 'Parcelado', valor: porForma['Parcelado'], cor: '#e2401c', icone: E.cartao });
+        if (porForma['Outros']) linhasForma.push({ rotulo: 'Outros', valor: porForma['Outros'], cor: '#999999', icone: E.cartao });
         const statusInfo = diferenca === undefined || isNaN(diferenca) ? null
           : diferenca === 0 ? { texto: E.certo + ' Caixa bateu certinho!', cor: '#2fe1a8' }
           : diferenca > 0 ? { texto: E.azul + ' Sobrou ' + moeda(diferenca) + ' no caixa.', cor: '#4c8dff' }

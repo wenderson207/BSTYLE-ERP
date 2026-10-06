@@ -560,7 +560,7 @@
 
   /** Monta o link de acompanhamento pra mandar pro cliente. */
   function linkAcompanhamento(os){
-    return window.location.origin + window.location.pathname.replace(/[^/]*$/, '') + 'consulta.html?id=' + os.ID + '&codigo=' + (os.CODIGO_ACOMPANHAMENTO||'');
+    return window.location.origin + '/sistema/consulta.html?id=' + os.ID + '&codigo=' + (os.CODIGO_ACOMPANHAMENTO||'');
   }
 
   /** Abre o WhatsApp do cliente com uma mensagem pronta sobre o status atual da OS. */

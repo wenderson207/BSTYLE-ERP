@@ -23,6 +23,8 @@
   .ag-filtros input,.ag-filtros select{ background:var(--bg-surface); border:1px solid var(--hairline); color:inherit; border-radius:8px; padding:8px 12px; font-size:13px; }
   .ag-filtros input{ flex:1; min-width:200px; }
   .ag-resumo{ font-size:12px; color:var(--text-tertiary); margin:0 0 8px; }
+  .cal-fil{ background:var(--bg-surface); border:1px solid var(--hairline); color:var(--text-secondary); border-radius:20px; padding:6px 13px; font-size:12px; cursor:pointer; }
+  .cal-fil.ativo{ border-color:var(--mint); color:var(--text-primary); box-shadow:0 0 0 1px var(--mint); }
   .section-subtitulo{ font-family:var(--font-display); font-size:15px; margin:26px 0 12px; }
 </style>
 
@@ -38,6 +40,15 @@
 </div>
 <div class="ag-resumo" id="agResumo"></div>
 <div class="agenda-lista" id="agendaLista"></div>
+
+<h3 class="section-subtitulo">💰 Entregues e ainda não pagos <span id="cobTotal" style="font-weight:400; font-size:12.5px; color:var(--text-secondary);"></span></h3>
+<div class="ag-filtros" id="cobFiltros">
+  <button type="button" class="cal-fil ativo" data-c="todos">Todos</button>
+  <button type="button" class="cal-fil" data-c="cobrar">Cobrar hoje / atrasados</button>
+  <button type="button" class="cal-fil" data-c="futuro">Cobrança futura</button>
+  <button type="button" class="cal-fil" data-c="sem">Sem data de cobrança</button>
+</div>
+<div class="agenda-lista" id="listaCobrancas"></div>
 
 <h3 class="section-subtitulo">⏳ Garantias perto de vencer (oportunidade de contato)</h3>
 <div class="agenda-lista" id="listaGarantiasVencendo"></div>
@@ -161,6 +172,54 @@
 
     busca.oninput = desenharLista; selStatus.onchange = desenharLista;
     desenharCartoes(); desenharLista();
+
+    // ---------- Entregues e ainda não pagos ----------
+    const pagoOS = o => { try { return JSON.parse(o.PAGAMENTOS_OS || '[]').reduce((s,p)=>s+Number(p.valor||0),0); } catch(e){ return 0; } };
+    const devendo = ordens
+      .filter(o => o.STATUS === 'Entregue' && (Number(o.VALOR_SERVICO||0) - pagoOS(o)) > 0.009)
+      .map(o => ({ o, saldo: Number(o.VALOR_SERVICO||0) - pagoOS(o), cob: o.DATA_COBRANCA ? dia({ PRAZO: o.DATA_COBRANCA }) : null }));
+    const grupoCob = x => !x.cob ? 'sem' : (x.cob <= hoje ? 'cobrar' : 'futuro');
+    let filtroCob = 'todos';
+    const fmtMoeda = n => (Number(n)||0).toLocaleString('pt-BR', { style:'currency', currency:'BRL' });
+
+    function desenharCobrancas(){
+      const lista = devendo.filter(x => filtroCob === 'todos' || grupoCob(x) === filtroCob)
+        .sort((a,b) => (a.cob ? a.cob.getTime() : Infinity) - (b.cob ? b.cob.getTime() : Infinity));
+      const somaTodos = devendo.reduce((s,x)=>s+x.saldo,0);
+      document.getElementById('cobTotal').textContent = devendo.length ? `— ${devendo.length} aparelho(s), ${fmtMoeda(somaTodos)} a receber` : '';
+      document.querySelectorAll('#cobFiltros .cal-fil').forEach(b => {
+        const c = b.dataset.c; const n = c === 'todos' ? devendo.length : devendo.filter(x => grupoCob(x) === c).length;
+        b.textContent = b.textContent.replace(/ \(\d+\)$/, '') + ' (' + n + ')';
+      });
+      setHTML('listaCobrancas', lista.length ? lista.map(x => {
+        const o = x.o, cli = clientes.find(c => c.ID === o.CLIENTE_ID);
+        const dias = x.cob ? Math.round((x.cob - hoje) / 86400000) : null;
+        let rotulo, cor, bg;
+        if (dias === null) { rotulo = 'sem data de cobrança'; cor = '#8891A3'; bg = 'rgba(136,145,163,0.14)'; }
+        else if (dias < 0) { rotulo = 'cobrança atrasada ' + Math.abs(dias) + 'd'; cor = '#FF5C5C'; bg = 'rgba(255,92,92,0.12)'; }
+        else if (dias === 0) { rotulo = 'cobrar hoje'; cor = '#F5A623'; bg = 'rgba(245,166,35,0.14)'; }
+        else { rotulo = 'cobrar em ' + dias + 'd'; cor = '#4C8DFF'; bg = 'rgba(76,141,255,0.12)'; }
+        const tel = String((cli && cli.TELEFONE) || '').replace(/\D/g,'');
+        const numZap = tel ? (tel.length<=11 ? '55'+tel : tel) : '';
+        const msg = encodeURIComponent(`Olá, ${cli?cli.NOME:''}! Aqui é da BStyle. Passando para lembrar do pagamento pendente do serviço no seu ${o.MARCA||''} ${o.MODELO||'aparelho'} (OS ${o.NUMERO_OS}), no valor de ${fmtMoeda(x.saldo)}. Quando puder, nos avise por aqui!`);
+        return `<div class="agenda-item ${dias!==null && dias<0 ? 'atrasado':''}">
+          <div class="data-badge"><div class="dia">${x.cob ? String(x.cob.getDate()).padStart(2,'0') : '--'}</div><div class="mes">${x.cob ? x.cob.toLocaleDateString('pt-BR',{month:'short'}) : 's/ data'}</div></div>
+          <div class="info">
+            <div class="num-os">${o.NUMERO_OS}</div>
+            <div><b>${cli?cli.NOME:'—'}</b> — ${o.MARCA||''} ${o.MODELO||''}</div>
+            <div style="color:var(--text-tertiary); font-size:11.5px;">Falta pagar ${fmtMoeda(x.saldo)}${o.DATA_ENTREGA_REAL ? ' · entregue em ' + new Date(o.DATA_ENTREGA_REAL).toLocaleDateString('pt-BR') : ''}</div>
+          </div>
+          ${numZap ? `<a class="btn" style="padding:6px 10px; font-size:11.5px; text-decoration:none;" href="https://wa.me/${numZap}?text=${msg}" target="_blank">💬 Cobrar</a>` : ''}
+          <span style="display:inline-flex; padding:3px 9px; border-radius:20px; font-size:11px; font-weight:600; font-family:var(--font-mono); background:${bg}; color:${cor};">${rotulo}</span>
+        </div>`;
+      }).join('') : '<div style="padding:30px; text-align:center; color:var(--text-tertiary);">Nenhum aparelho entregue com pagamento pendente neste filtro.</div>');
+    }
+    document.querySelectorAll('#cobFiltros .cal-fil').forEach(b => b.onclick = () => {
+      filtroCob = b.dataset.c;
+      document.querySelectorAll('#cobFiltros .cal-fil').forEach(x => x.classList.toggle('ativo', x === b));
+      desenharCobrancas();
+    });
+    desenharCobrancas();
 
   } catch (e) { mostrarToast('Erro: ' + e.message, 'erro'); }
 

@@ -96,6 +96,7 @@
   .cal-dia.fora-mes{ opacity:0.3; }
   .cal-dia.hoje{ border-color:var(--mint); }
   .cal-dia .num{ color:var(--text-secondary); font-family:var(--font-mono); }
+  .cal-dia .os-chip .os-nome{ display:block; font-size:9px; opacity:0.85; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .cal-dia .os-chip.pronto{ background:rgba(76,141,255,0.18); color:#4C8DFF; }
   .cal-dia .os-chip.atrasada{ background:rgba(255,92,92,0.18); color:#FF5C5C; }
   .cal-dia .os-chip.entregue{ background:rgba(136,145,163,0.12); color:var(--text-tertiary); text-decoration:line-through; }
@@ -751,7 +752,7 @@
 
       html += `<div class="cal-dia ${foraMes?'fora-mes':''} ${ehHoje?'hoje':''}" onclick='window.__verDiaCalendario(${JSON.stringify(osDoDia.map(o=>o.ID))})'>
         <div class="num" style="display:flex; justify-content:space-between;"><span>${dia.getDate()}</span>${osDoDia.length ? `<span style="font-size:9.5px; color:${pendentesDia?'var(--text-secondary)':'var(--mint)'};">${pendentesDia ? pendentesDia+' a entregar' : '✓ tudo entregue'}</span>` : ''}</div>
-        ${osDoDia.slice(0,maxChips).map(o => `<span class="os-chip ${classeChipOS(o, dia)}" title="${o.STATUS||''}">${o.NUMERO_OS}</span>`).join('')}
+        ${osDoDia.slice(0,maxChips).map(o => `<span class="os-chip ${classeChipOS(o, dia)}" title="${o.NUMERO_OS} — ${nomeCliente(o.CLIENTE_ID)} — ${o.STATUS||''}">${o.NUMERO_OS}<span class="os-nome">${nomeCliente(o.CLIENTE_ID)}</span></span>`).join('')}
         ${osDoDia.length > maxChips ? '<span style="font-size:9.5px; color:var(--text-tertiary);">+' + (osDoDia.length-maxChips) + '</span>' : ''}
       </div>`;
     }
@@ -1034,7 +1035,8 @@
         <div class="ffield"><label>Técnico responsável</label><input id="vTecnico" value="${osAtual.TECNICO_RESPONSAVEL||''}"></div>
       </div>
       <div class="section-title">💰 Status do pagamento</div>
-      <div id="areaPagamentoOS" style="background:var(--bg-elevated); border:1px solid var(--hairline); border-radius:10px; padding:14px 16px; margin-bottom:16px;"></div>
+      <div id="areaPagamentoOS" style="background:var(--bg-elevated); border:1px solid var(--hairline); border-radius:10px; padding:14px 16px; margin-bottom:10px;"></div>
+      <div class="ffield" style="max-width:280px; margin-bottom:16px;"><label>Data de cobrança do cliente</label><input id="vDataCobranca" type="date" value="${osAtual.DATA_COBRANCA||''}"><div style="font-size:11px; color:var(--text-tertiary); margin-top:4px;">Quando você vai cobrar. Se a OS já foi entregue e não está paga, ela aparece na Agenda nessa data.</div></div>
 
       <div class="section-title">📜 Histórico de alterações</div>
       <div id="listaHistoricoAlteracoes" style="margin-bottom:16px;"></div>
@@ -1179,7 +1181,7 @@
       }
 
       const dados = {
-        STATUS: novoStatus, PRAZO: document.getElementById('vPrazo').value,
+        STATUS: novoStatus, PRAZO: document.getElementById('vPrazo').value, DATA_COBRANCA: document.getElementById('vDataCobranca').value,
         OBSERVACAO_DEVOLUCAO: novoStatus === 'Com Defeito - Devolução' ? obsDevolucao : (osAtual.OBSERVACAO_DEVOLUCAO || ''),
         MARCA: document.getElementById('vMarca').value.trim(), MODELO: document.getElementById('vModelo').value.trim(),
         IMEI: document.getElementById('vImei').value.trim(), DEFEITO_INFORMADO: document.getElementById('vDefeito').value.trim(),

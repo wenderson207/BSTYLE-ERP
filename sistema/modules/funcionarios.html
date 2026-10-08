@@ -126,6 +126,8 @@
       <td><span class="badge ${f.STATUS==='Ativo'?'ok':'neutral'}">${f.STATUS}</span></td>
       <td style="display:flex; gap:6px;">
         <button class="btn" style="padding:6px 10px; font-size:11.5px;" onclick="window.__editar('${f.ID}')">Editar</button>
+        <button class="btn" style="padding:6px 10px; font-size:11.5px;" onclick="window.__alternarStatus('${f.ID}')">${f.STATUS==='Ativo' ? 'Inativar' : 'Ativar'}</button>
+        <button class="btn" style="padding:6px 10px; font-size:11.5px; color:var(--red);" onclick="window.__excluirFuncionario('${f.ID}')">Excluir</button>
       </td></tr>`).join(''));
   }
 
@@ -135,7 +137,7 @@
       perfis = await dbGetAll('PERFIS');
       empresas = await dbGetAll('EMPRESAS');
       itens = await dbGetAll('USUARIOS');
-      renderLinhas(itens);
+      renderLinhas(itens.filter(f => f.STATUS !== 'Excluído'));
 
       const opcoesPerfil = '<option value="">Selecione…</option>' + perfis.map(p => `<option value="${p.ID}">${p.NOME}</option>`).join('');
       const opcoesEmpresa = '<option value="">Todas as lojas</option>' + empresas.map(e => `<option value="${e.ID}">${e.NOME}</option>`).join('');
@@ -183,6 +185,36 @@
       mostrarToast('Erro: ' + (e.code === 'auth/email-already-in-use' ? 'Já existe uma conta com esse email.' : e.message), 'erro');
     }
   });
+
+  // ---------- Inativar / Ativar / Excluir ----------
+  function ehEuMesmo(id){ return typeof usuarioAtual !== 'undefined' && usuarioAtual && usuarioAtual.ID === id; }
+  async function mudarStatusFuncionario(id, novoStatus, msgOk){
+    try {
+      if (!(await checarPermissao('FUNCIONARIOS','EDITAR'))){ mostrarToast('Sem permissão.', 'erro'); return; }
+      await dbUpdate('USUARIOS', id, { STATUS: novoStatus });
+      mostrarToast(msgOk);
+      carregar();
+    } catch (e) {
+      const negado = /permission/i.test(e.message || '');
+      mostrarToast(negado ? 'O Firebase recusou: só quem tem perfil Administrador pode alterar funcionários.' : 'Erro: ' + e.message, 'erro');
+    }
+  }
+  window.__alternarStatus = (id) => {
+    const f = itens.find(x => x.ID === id); if (!f) return;
+    if (f.STATUS === 'Ativo') {
+      if (ehEuMesmo(id)){ mostrarToast('Você não pode inativar o próprio usuário.', 'erro'); return; }
+      if (!confirm('Inativar ' + f.NOME + '? Ele não vai conseguir entrar no sistema (você pode reativar depois).')) return;
+      mudarStatusFuncionario(id, 'Inativo', f.NOME + ' foi inativado.');
+    } else {
+      mudarStatusFuncionario(id, 'Ativo', f.NOME + ' foi reativado.');
+    }
+  };
+  window.__excluirFuncionario = (id) => {
+    const f = itens.find(x => x.ID === id); if (!f) return;
+    if (ehEuMesmo(id)){ mostrarToast('Você não pode excluir o próprio usuário.', 'erro'); return; }
+    if (!confirm('Excluir ' + f.NOME + '? Ele some desta lista e não consegue mais entrar. As vendas e registros feitos por ele continuam com o nome dele no histórico.')) return;
+    mudarStatusFuncionario(id, 'Excluído', f.NOME + ' foi excluído.');
+  };
 
   // ---------- Editar ----------
   const modalEditar = document.getElementById('modalEditar');

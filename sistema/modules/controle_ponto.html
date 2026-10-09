@@ -69,6 +69,11 @@
   </div>
 </div>
 
+<div id="avisoDuplicados" style="display:none; background:rgba(245,166,35,0.10); border:1px solid rgba(245,166,35,0.4); border-radius:10px; padding:12px 16px; margin-bottom:16px; font-size:13px; align-items:center; gap:12px; flex-wrap:wrap;">
+  <span id="textoDuplicados" style="flex:1; min-width:220px;"></span>
+  <button class="btn btn-primary" id="btnUnificar" style="padding:7px 14px; font-size:12px;">Unificar linhas do mesmo dia</button>
+</div>
+
 <div class="kpi-grid" style="margin-bottom:20px;">
   <div class="kpi"><div class="lbl">Dias com presença</div><div class="val" id="kpiDias">—</div></div>
   <div class="kpi"><div class="lbl">Total de horas</div><div class="val" id="kpiHoras">—</div></div>
@@ -113,7 +118,7 @@
         <div class="aviso-modal" id="avisoHorarios"></div>
         <div id="previaHoras" style="font-size:12.5px; color:var(--mint); font-weight:600; margin-bottom:14px;"></div>
       </div>
-      <div class="ffield"><label>Observações</label><textarea id="fObs" style="min-height:60px;" placeholder="Opcional."></textarea></div>
+      <div class="ffield" id="wrapObs"><label>Observações</label><textarea id="fObs" style="min-height:60px;" placeholder="Opcional."></textarea></div>
     </div>
     <div class="modal-foot"><button class="btn" id="btnCancelar">Cancelar</button><button class="btn btn-primary" id="btnSalvar">Salvar</button></div>
   </div>
@@ -232,6 +237,7 @@
 
       aplicarFiltros();
       renderAjustes();
+      renderAvisoDuplicados();
     } catch (e) { mostrarToast('Erro: ' + e.message, 'erro'); }
   }
 
@@ -252,6 +258,37 @@
   document.getElementById('btnLimparFiltroPonto').addEventListener('click', () => {
     document.getElementById('filtroFuncionario').value = ''; document.getElementById('filtroDe').value = ''; document.getElementById('filtroAte').value = '';
     aplicarFiltros();
+  });
+
+  // ---------- Linhas duplicadas do mesmo dia (registros antigos) — só administrador ----------
+  function gruposDuplicados(){
+    const mapa = {};
+    registros.forEach(r => { const k = r.FUNCIONARIO_ID + '|' + r.DATA; (mapa[k] = mapa[k] || []).push(r); });
+    return Object.values(mapa).filter(g => g.length > 1);
+  }
+  function renderAvisoDuplicados(){
+    const grupos = souAdmin ? gruposDuplicados() : [];
+    const el = document.getElementById('avisoDuplicados');
+    el.style.display = grupos.length ? 'flex' : 'none';
+    if (grupos.length) document.getElementById('textoDuplicados').textContent = '⚠️ Existem ' + grupos.length + ' dia(s) com mais de uma linha de ponto para a mesma pessoa. Unifique para ficar uma linha por dia.';
+  }
+  document.getElementById('btnUnificar').addEventListener('click', async () => {
+    const grupos = gruposDuplicados();
+    if (!grupos.length || !confirm('Unificar ' + grupos.length + ' dia(s)? Fica uma linha por dia, com o primeiro horário preenchido de cada campo; as linhas extras são removidas.')) return;
+    try {
+      for (const g of grupos) {
+        const ordenados = g.slice().sort((a,b) => String(a.DATA_HORA_REGISTRO||'').localeCompare(String(b.DATA_HORA_REGISTRO||'')));
+        const manter = ordenados.find(r => (r.STATUS||'PRESENCA') !== 'PRESENCA') || ordenados[0];
+        const unido = {};
+        CAMPOS.forEach(c => { unido[c] = (ordenados.find(r => r[c]) || {})[c] || ''; });
+        const obs = [...new Set(ordenados.map(r => r.OBSERVACOES).filter(Boolean))].join(' | ');
+        const horas = (manter.STATUS||'PRESENCA') === 'PRESENCA' ? calcularHoras(unido.HORA_ENTRADA, unido.HORA_SAIDA, unido.HORA_INICIO_ALMOCO, unido.HORA_FIM_ALMOCO) : 0;
+        await dbUpdate('PONTO_REGISTROS', manter.ID, Object.assign({}, unido, { HORAS_TRABALHADAS: horas, OBSERVACOES: obs }));
+        for (const extra of ordenados.filter(r => r.ID !== manter.ID)) await dbDelete('PONTO_REGISTROS', extra.ID);
+      }
+      mostrarToast('Linhas unificadas.');
+      carregar();
+    } catch (e) { mostrarToast('Erro: ' + e.message, 'erro'); }
   });
 
   function renderKpis(){
@@ -285,6 +322,7 @@
   // ---------- Registrar ponto ----------
   const modal = document.getElementById('modal');
   let statusSelecionado = 'PRESENCA';
+  let proximoCampoBatida = null;
 
   function selecionarStatus(status){
     statusSelecionado = status;
@@ -317,31 +355,34 @@
     selecionarStatus(registroAtual ? (registroAtual.STATUS || 'PRESENCA') : 'PRESENCA');
 
     // Próximo horário vazio da sequência recebe a hora atual (só se for hoje e for um registro de presença)
-    if (data === hojeLocal() && statusSelecionado === 'PRESENCA') {
-      const proximo = CAMPOS.find(c => !document.getElementById(IDS_HORA[c]).value);
-      if (proximo) document.getElementById(IDS_HORA[proximo]).value = horaAgora();
-    }
+    const proximo = CAMPOS.find(c => !document.getElementById(IDS_HORA[c]).value);
+    if (data === hojeLocal() && statusSelecionado === 'PRESENCA' && proximo) document.getElementById(IDS_HORA[proximo]).value = horaAgora();
+    proximoCampoBatida = (data === hojeLocal() && statusSelecionado === 'PRESENCA') ? (proximo || null) : null;
 
-    // Funcionário comum: não muda nome, data nem o que já foi batido — só completa os horários seguintes.
+    // Funcionário comum NÃO edita o ponto: todos os campos ficam travados e o sistema só carimba o próximo
+    // horário com a hora atual. Qualquer correção é por "Solicitar ajuste de batida".
     document.getElementById('fFuncionario').disabled = !souAdmin;
     document.getElementById('fData').disabled = !souAdmin;
     document.getElementById('wrapStatus').style.display = souAdmin ? 'block' : 'none';
-    Object.keys(IDS_HORA).forEach(c => {
-      const jaBatido = registroAtual && registroAtual[c];
-      document.getElementById(IDS_HORA[c]).disabled = !souAdmin && !!jaBatido;
-    });
+    document.getElementById('wrapObs').style.display = souAdmin ? 'block' : 'none';
+    Object.keys(IDS_HORA).forEach(c => { document.getElementById(IDS_HORA[c]).disabled = !souAdmin; });
     document.getElementById('avisoHorarios').textContent = souAdmin
       ? 'Nenhum horário pode ser maior que a hora atual (para o dia de hoje).'
-      : 'Os horários já batidos não podem ser alterados aqui — para corrigir, use "Solicitar ajuste de batida". Nenhum horário pode passar da hora atual.';
+      : (proximoCampoBatida
+          ? 'Será registrado: ' + ROTULO_CAMPO[proximoCampoBatida] + ' às ' + horaAgora() + '. Os demais horários do dia não podem ser editados — para corrigir, use "Solicitar ajuste de batida".'
+          : 'Seu ponto de hoje já está completo. Para corrigir algum horário, use "Solicitar ajuste de batida".');
     limitarHoraMaxima();
     atualizarPreviaHoras();
-    document.getElementById('modalTitulo').textContent = registroAtual ? 'Ponto de ' + dataBR(data) : 'Registrar ponto';
+    document.getElementById('modalTitulo').textContent = souAdmin ? (registroAtual ? 'Ponto de ' + dataBR(data) : 'Registrar ponto') : (proximoCampoBatida ? 'Registrar: ' + ROTULO_CAMPO[proximoCampoBatida] : 'Ponto de hoje');
+    document.getElementById('btnSalvar').textContent = souAdmin ? 'Salvar' : (proximoCampoBatida ? 'Registrar ' + ROTULO_CAMPO[proximoCampoBatida].toLowerCase() : 'Salvar');
+    document.getElementById('btnSalvar').style.display = (!souAdmin && !proximoCampoBatida) ? 'none' : 'inline-flex';
   }
 
   document.getElementById('btnNovo').addEventListener('click', () => {
     const funcId = souAdmin ? (document.getElementById('filtroFuncionario').value || usuarioAtual.ID) : usuarioAtual.ID;
     if (souAdmin && !funcionarios.some(f => f.ID === funcId)) { mostrarToast('Funcionário não encontrado.', 'erro'); return; }
     carregarNoModal(funcId, hojeLocal());
+    if (!souAdmin && !proximoCampoBatida) { mostrarToast('Seu ponto de hoje já está completo. Para corrigir, use "Solicitar ajuste de batida".', 'erro'); return; }
     modal.classList.add('open');
   });
   document.getElementById('fFuncionario').addEventListener('change', () => { if (souAdmin) carregarNoModal(document.getElementById('fFuncionario').value, document.getElementById('fData').value || hojeLocal()); });
@@ -351,6 +392,7 @@
 
   window.__editarPonto = (id) => {
     const r = registros.find(x => x.ID === id); if (!r) return;
+    if (!souAdmin) { mostrarToast('Só o administrador edita o ponto. Use "Solicitar ajuste".', 'erro'); return; }
     carregarNoModal(r.FUNCIONARIO_ID, r.DATA);
     modal.classList.add('open');
   };
@@ -373,14 +415,27 @@
     const obs = document.getElementById('fObs').value.trim();
 
     try {
-      if (!(await checarPermissao('CONTROLE_PONTO', registroAtual ? 'EDITAR' : 'CADASTRAR'))){ mostrarToast('Sem permissão.', 'erro'); return; }
-      if (registroAtual) {
-        const parcial = souAdmin
-          ? { STATUS: status, HORAS_TRABALHADAS: horas, OBSERVACOES: obs, ...t }
-          : { HORAS_TRABALHADAS: horas, OBSERVACOES: obs, HORA_INICIO_ALMOCO: t.HORA_INICIO_ALMOCO, HORA_FIM_ALMOCO: t.HORA_FIM_ALMOCO, HORA_SAIDA: t.HORA_SAIDA };
-        await dbUpdate('PONTO_REGISTROS', registroAtual.ID, parcial);
+      if (!souAdmin && !proximoCampoBatida) { mostrarToast('Nada a registrar.', 'erro'); return; }
+      // Antes de criar, confere no banco (não só na tela) se já existe a linha desse dia — sempre uma só por pessoa/dia.
+      let existente = registroAtual;
+      if (!existente) {
+        const snap = await db.collection('PONTO_REGISTROS').where('FUNCIONARIO_ID', '==', funcionarioId).where('DATA', '==', data).get();
+        if (!snap.empty) existente = Object.assign({ ID: snap.docs[0].id }, snap.docs[0].data());
+      }
+      if (!(await checarPermissao('CONTROLE_PONTO', existente ? 'EDITAR' : 'CADASTRAR'))){ mostrarToast('Sem permissão.', 'erro'); return; }
+      if (existente) {
+        let parcial;
+        if (souAdmin) parcial = { STATUS: status, HORAS_TRABALHADAS: horas, OBSERVACOES: obs, ...t };
+        else {
+          // Funcionário: só carimba o próximo horário vazio — nunca sobrescreve uma batida existente
+          if (existente[proximoCampoBatida]) { mostrarToast('Esse horário já foi registrado. Atualize a tela.', 'erro'); carregar(); return; }
+          const merged = Object.assign({}, existente, { [proximoCampoBatida]: t[proximoCampoBatida] });
+          parcial = { [proximoCampoBatida]: t[proximoCampoBatida], HORAS_TRABALHADAS: calcularHoras(merged.HORA_ENTRADA, merged.HORA_SAIDA, merged.HORA_INICIO_ALMOCO, merged.HORA_FIM_ALMOCO) };
+        }
+        await dbUpdate('PONTO_REGISTROS', existente.ID, parcial);
       } else {
-        await dbInsert('PONTO_REGISTROS', { FUNCIONARIO_ID: funcionarioId, DATA: data, STATUS: status, ...t, HORAS_TRABALHADAS: horas, OBSERVACOES: obs, USUARIO_REGISTRO_ID: usuarioAtual.ID, DATA_HORA_REGISTRO: new Date().toISOString() });
+        // ID fixo (funcionário + dia): impede por construção que existam duas linhas do mesmo dia
+        await dbInsert('PONTO_REGISTROS', { ID: 'PT_' + funcionarioId + '_' + data, FUNCIONARIO_ID: funcionarioId, DATA: data, STATUS: status, ...t, HORAS_TRABALHADAS: horas, OBSERVACOES: obs, USUARIO_REGISTRO_ID: usuarioAtual.ID, DATA_HORA_REGISTRO: new Date().toISOString() });
       }
       mostrarToast('Ponto salvo.');
       modal.classList.remove('open');

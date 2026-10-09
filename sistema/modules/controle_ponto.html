@@ -27,20 +27,46 @@
   .badge-status.FOLGA{ background:rgba(76,141,255,0.12); color:var(--blue); }
   .badge-status.FALTA{ background:rgba(255,92,92,0.12); color:var(--red); }
   .badge-status.ABONO{ background:rgba(245,166,35,0.12); color:var(--amber); }
+  .barra-agora{ display:flex; flex-wrap:wrap; gap:18px; align-items:center; background:var(--bg-surface); border:1px solid var(--hairline); border-radius:12px; padding:12px 18px; margin-bottom:18px; font-size:13px; }
+  .barra-agora b{ color:var(--text-primary); }
+  .barra-agora .relogio{ font-family:var(--font-mono); font-size:20px; color:var(--mint); font-weight:700; }
+  .secao-titulo{ font-family:var(--font-display); font-size:15px; margin:26px 0 10px; }
+  .box-ajustes{ background:var(--bg-surface); border:1px solid var(--hairline); border-radius:12px; overflow:hidden; }
+  .ajuste-item{ display:flex; align-items:center; gap:14px; padding:12px 18px; border-bottom:1px solid var(--hairline); flex-wrap:wrap; }
+  .ajuste-item:last-child{ border-bottom:none; }
+  .ajuste-item .corpo{ flex:1; min-width:240px; font-size:12.5px; }
+  .ajuste-item .antes-depois{ font-family:var(--font-mono); font-size:11.5px; color:var(--text-secondary); margin-top:3px; }
+  .tag-aj{ display:inline-block; padding:2px 8px; border-radius:20px; font-size:10.5px; font-weight:600; }
+  .tag-aj.Pendente{ background:rgba(245,166,35,0.14); color:var(--amber); }
+  .tag-aj.Aprovado{ background:rgba(47,225,168,0.12); color:var(--mint); }
+  .tag-aj.Recusado{ background:rgba(255,92,92,0.12); color:var(--red); }
+  .aviso-modal{ font-size:11.5px; color:var(--text-tertiary); margin:-6px 0 12px; }
+  input:disabled, select:disabled{ opacity:0.6; cursor:not-allowed; }
 </style>
 
 <div class="toolbar">
   <div><h1 style="font-family:var(--font-display); font-size:22px; margin:0 0 4px;">Controle de Ponto</h1>
-  <p style="color:var(--text-secondary); font-size:13px; margin:0;">Registro manual de entrada, saída e almoço de cada funcionário — pra fechar a folha de pagamento.</p></div>
-  <button class="btn btn-primary" id="btnNovo">+ Registrar ponto</button>
+  <p id="subtituloPonto" style="color:var(--text-secondary); font-size:13px; margin:0;">Registre sua chegada, ida e volta do almoço e saída.</p></div>
+  <div style="display:flex; gap:10px; flex-wrap:wrap;">
+    <button class="btn" id="btnSolicitarAjuste">✎ Solicitar ajuste de batida</button>
+    <button class="btn btn-primary" id="btnNovo">+ Registrar ponto</button>
+  </div>
 </div>
 
-<div class="filtros">
-  <div class="grupo"><span>Funcionário</span><select id="filtroFuncionario"><option value="">Todos</option></select></div>
-  <div class="grupo"><span>De</span><input type="date" id="filtroDe"></div>
-  <div class="grupo"><span>Até</span><input type="date" id="filtroAte"></div>
-  <button class="btn" id="btnLimparFiltroPonto" style="padding:8px 12px;">Limpar</button>
-  <button class="btn btn-primary" id="btnGerarPdfFuncionario" style="margin-left:auto;">⬇️ Gerar PDF do funcionário</button>
+<div class="barra-agora" id="relogioPonto">
+  <span>👤 <b id="agoraNome">—</b></span>
+  <span>📅 <b id="agoraData">—</b></span>
+  <span>🕒 <span class="relogio" id="agoraHora">--:--</span></span>
+</div>
+
+<div id="blocoAdminFiltros">
+  <div class="filtros">
+    <div class="grupo"><span>Funcionário</span><select id="filtroFuncionario"><option value="">Todos</option></select></div>
+    <div class="grupo"><span>De</span><input type="date" id="filtroDe"></div>
+    <div class="grupo"><span>Até</span><input type="date" id="filtroAte"></div>
+    <button class="btn" id="btnLimparFiltroPonto" style="padding:8px 12px;">Limpar</button>
+    <button class="btn btn-primary" id="btnGerarPdfFuncionario" style="margin-left:auto;">⬇️ Gerar PDF do funcionário</button>
+  </div>
 </div>
 
 <div class="kpi-grid" style="margin-bottom:20px;">
@@ -51,20 +77,24 @@
 </div>
 
 <table class="dt">
-  <thead><tr><th>Data</th><th>Funcionário</th><th>Status</th><th>Entrada</th><th>Início almoço</th><th>Fim almoço</th><th>Saída</th><th>Horas</th><th></th></tr></thead>
+  <thead><tr><th>Data</th><th>Funcionário</th><th>Status</th><th>Chegada</th><th>Saída p/ almoço</th><th>Volta do almoço</th><th>Saída</th><th>Horas</th><th></th></tr></thead>
   <tbody id="linhas"><tr class="empty-row"><td colspan="9">Carregando…</td></tr></tbody>
 </table>
 
+<h3 class="secao-titulo" id="tituloAjustes">Pedidos de ajuste de batida</h3>
+<div class="box-ajustes" id="listaAjustes"></div>
+
+<!-- Registrar / editar ponto -->
 <div class="modal-overlay" id="modal">
   <div class="modal-box">
     <div class="modal-head"><h3 id="modalTitulo" style="font-family:var(--font-display); margin:0;">Registrar ponto</h3><button class="modal-close" id="fecharModal">✕</button></div>
     <div class="modal-body">
       <input type="hidden" id="fId">
       <div class="frow2">
-        <div class="ffield"><label>Funcionário *</label><select id="fFuncionario"></select></div>
-        <div class="ffield"><label>Data *</label><input id="fData" type="date"></div>
+        <div class="ffield"><label>Funcionário</label><select id="fFuncionario"></select></div>
+        <div class="ffield"><label>Data</label><input id="fData" type="date"></div>
       </div>
-      <div class="ffield">
+      <div class="ffield" id="wrapStatus">
         <label>Status do dia</label>
         <div class="status-tabs" id="statusTabs">
           <button type="button" class="status-tab active" data-status="PRESENCA">✅ Presença</button>
@@ -74,37 +104,63 @@
         </div>
       </div>
       <div id="camposHorario">
-        <div class="frow4">
-          <div class="ffield"><label>Entrada</label><input id="fEntrada" type="time"></div>
-          <div class="ffield"><label>Início almoço</label><input id="fInicioAlmoco" type="time"></div>
-          <div class="ffield"><label>Fim almoço</label><input id="fFimAlmoco" type="time"></div>
-          <div class="ffield"><label>Saída</label><input id="fSaida" type="time"></div>
+        <div class="frow2">
+          <div class="ffield"><label>🟢 Chegada</label><input id="fEntrada" type="time"></div>
+          <div class="ffield"><label>🍽️ Saída para o almoço</label><input id="fInicioAlmoco" type="time"></div>
+          <div class="ffield"><label>↩️ Volta do almoço</label><input id="fFimAlmoco" type="time"></div>
+          <div class="ffield"><label>🏁 Saída (ir embora)</label><input id="fSaida" type="time"></div>
         </div>
+        <div class="aviso-modal" id="avisoHorarios"></div>
         <div id="previaHoras" style="font-size:12.5px; color:var(--mint); font-weight:600; margin-bottom:14px;"></div>
       </div>
-      <div class="ffield"><label>Observações</label><textarea id="fObs" style="min-height:60px;" placeholder="Ex.: folga combinada, atestado médico, falta justificada..."></textarea></div>
+      <div class="ffield"><label>Observações</label><textarea id="fObs" style="min-height:60px;" placeholder="Opcional."></textarea></div>
     </div>
     <div class="modal-foot"><button class="btn" id="btnCancelar">Cancelar</button><button class="btn btn-primary" id="btnSalvar">Salvar</button></div>
   </div>
 </div>
 
+<!-- Solicitar ajuste de batida (funcionário) -->
+<div class="modal-overlay" id="modalAjuste">
+  <div class="modal-box">
+    <div class="modal-head"><h3 style="font-family:var(--font-display); margin:0;">Solicitar ajuste de batida</h3><button class="modal-close" id="fecharModalAjuste">✕</button></div>
+    <div class="modal-body">
+      <div class="ffield"><label>Dia a ajustar</label><input id="aData" type="date"></div>
+      <div class="aviso-modal" id="aAtual">—</div>
+      <div class="frow2">
+        <div class="ffield"><label>🟢 Chegada</label><input id="aEntrada" type="time"></div>
+        <div class="ffield"><label>🍽️ Saída para o almoço</label><input id="aInicio" type="time"></div>
+        <div class="ffield"><label>↩️ Volta do almoço</label><input id="aFim" type="time"></div>
+        <div class="ffield"><label>🏁 Saída (ir embora)</label><input id="aSaida" type="time"></div>
+      </div>
+      <div class="ffield"><label>Observação (obrigatória) — explique o motivo</label><textarea id="aObs" style="min-height:70px;" placeholder="Ex.: esqueci de bater a saída, saí às 18:05."></textarea></div>
+      <div class="aviso-modal">O administrador vai aprovar ou recusar. Se aprovado, o horário do dia é corrigido.</div>
+    </div>
+    <div class="modal-foot"><button class="btn" id="btnCancelarAjuste">Cancelar</button><button class="btn btn-primary" id="btnEnviarAjuste">Enviar pedido</button></div>
+  </div>
+</div>
+
 <script>
 (async function(){
-  let registros = [], registrosFiltrados = [], funcionarios = [], empresas = [];
-  let registroAtual = null;
+  let registros = [], registrosFiltrados = [], funcionarios = [], empresas = [], ajustes = [];
+  let registroAtual = null, souAdmin = false;
 
-  function moeda(v){ return (Number(v)||0).toLocaleString('pt-BR', { style:'currency', currency:'BRL' }); }
   function dataBR(v){ return v ? new Date(v+'T00:00:00').toLocaleDateString('pt-BR') : '—'; }
   function nomeFuncionario(id){ const f = funcionarios.find(x=>x.ID===id); return f?f.NOME:'—'; }
   const STATUS_LABEL = { PRESENCA:'✅ Presença', FOLGA:'🌴 Folga', FALTA:'❌ Falta', ABONO:'📄 Abono' };
   function horaOuTraco(v){ return v || '—'; }
+  const CAMPOS = ['HORA_ENTRADA','HORA_INICIO_ALMOCO','HORA_FIM_ALMOCO','HORA_SAIDA'];
+  const ROTULO_CAMPO = { HORA_ENTRADA:'Chegada', HORA_INICIO_ALMOCO:'Saída p/ almoço', HORA_FIM_ALMOCO:'Volta do almoço', HORA_SAIDA:'Saída' };
 
-  /** Calcula horas trabalhadas: (saída - entrada) menos o intervalo de almoço, se informado. */
+  // Data/hora SEMPRE no fuso do aparelho (Brasília) — não em UTC.
+  const p2 = n => String(n).padStart(2,'0');
+  function hojeLocal(){ const d = new Date(); return d.getFullYear()+'-'+p2(d.getMonth()+1)+'-'+p2(d.getDate()); }
+  function horaAgora(){ const d = new Date(); return p2(d.getHours())+':'+p2(d.getMinutes()); }
+  const paraMin = hhmm => { const [h,m] = hhmm.split(':').map(Number); return h*60+m; };
+
   function calcularHoras(entrada, saida, inicioAlmoco, fimAlmoco){
     if (!entrada || !saida) return 0;
-    const paraMinutos = (hhmm) => { const [h,m] = hhmm.split(':').map(Number); return h*60+m; };
-    let minutos = paraMinutos(saida) - paraMinutos(entrada);
-    if (inicioAlmoco && fimAlmoco) minutos -= (paraMinutos(fimAlmoco) - paraMinutos(inicioAlmoco));
+    let minutos = paraMin(saida) - paraMin(entrada);
+    if (inicioAlmoco && fimAlmoco) minutos -= (paraMin(fimAlmoco) - paraMin(inicioAlmoco));
     return Math.max(0, minutos / 60);
   }
   function formatarHoras(h){
@@ -113,22 +169,74 @@
     return horas + 'h' + String(minutos).padStart(2,'0');
   }
 
+  /** Confere ordem lógica e que nenhum horário passa da hora atual. Devolve texto de erro ou ''. */
+  function validarHorarios(data, t){
+    const lista = [['Chegada', t.HORA_ENTRADA], ['Saída para o almoço', t.HORA_INICIO_ALMOCO], ['Volta do almoço', t.HORA_FIM_ALMOCO], ['Saída', t.HORA_SAIDA]];
+    if (data > hojeLocal()) return 'Não dá pra registrar ponto de uma data futura.';
+    const agora = horaAgora();
+    for (const [nome, v] of lista) {
+      if (v && data === hojeLocal() && v > agora) return nome + ' (' + v + ') não pode ser maior que a hora atual (' + agora + ').';
+    }
+    const preenchidos = lista.filter(x => x[1]);
+    if (preenchidos.length && !t.HORA_ENTRADA) return 'Informe a chegada primeiro.';
+    for (let i = 1; i < preenchidos.length; i++) {
+      if (paraMin(preenchidos[i][1]) < paraMin(preenchidos[i-1][1])) return preenchidos[i][0] + ' não pode ser antes de ' + preenchidos[i-1][0].toLowerCase() + '.';
+    }
+    if (t.HORA_SAIDA && t.HORA_INICIO_ALMOCO && !t.HORA_FIM_ALMOCO) return 'Informe a volta do almoço antes da saída.';
+    if (t.HORA_FIM_ALMOCO && !t.HORA_INICIO_ALMOCO) return 'Informe a saída para o almoço antes da volta.';
+    return '';
+  }
+
+  // ---------- Cabeçalho "quem / quando" ----------
+  function atualizarRelogio(){
+    const el = document.getElementById('agoraHora');
+    if (!el) { clearInterval(window.__relogioPontoTimer); return; }
+    const d = new Date();
+    el.textContent = p2(d.getHours())+':'+p2(d.getMinutes())+':'+p2(d.getSeconds());
+    document.getElementById('agoraData').textContent = d.toLocaleDateString('pt-BR', { weekday:'long', day:'2-digit', month:'long', year:'numeric' });
+  }
+  clearInterval(window.__relogioPontoTimer);
+  window.__relogioPontoTimer = setInterval(atualizarRelogio, 1000);
+  atualizarRelogio();
+  document.getElementById('agoraNome').textContent = usuarioAtual ? usuarioAtual.NOME : '—';
+
+  // ---------- Carregar ----------
   async function carregar(){
     try {
-      if (!(await checarPermissao('CONTROLE_PONTO','VISUALIZAR'))){ setHTML('linhas', '<tr class="empty-row"><td colspan="8">Sem permissão.</td></tr>'); return; }
-      [registros, funcionarios, empresas] = await Promise.all([dbGetAll('PONTO_REGISTROS'), dbGetAll('USUARIOS'), dbGetAll('EMPRESAS')]);
-      funcionarios = funcionarios.filter(f => f.STATUS !== 'Excluído');
+      if (!(await checarPermissao('CONTROLE_PONTO','VISUALIZAR'))){ setHTML('linhas', '<tr class="empty-row"><td colspan="9">Sem permissão.</td></tr>'); return; }
+      souAdmin = await perfilEhAdministrador(usuarioAtual.PERFIL_ID);
+
+      // Administrador enxerga todo mundo; o funcionário só enxerga (e só consegue ler, pelas regras do Firebase) o próprio ponto.
+      if (souAdmin) {
+        [registros, funcionarios, empresas, ajustes] = await Promise.all([dbGetAll('PONTO_REGISTROS'), dbGetAll('USUARIOS'), dbGetAll('EMPRESAS'), dbGetAll('PONTO_AJUSTES')]);
+        funcionarios = funcionarios.filter(f => f.STATUS !== 'Excluído');
+      } else {
+        [registros, ajustes] = await Promise.all([
+          dbQuery('PONTO_REGISTROS', { FUNCIONARIO_ID: usuarioAtual.ID }),
+          dbQuery('PONTO_AJUSTES', { FUNCIONARIO_ID: usuarioAtual.ID })
+        ]);
+        funcionarios = [usuarioAtual];
+      }
+
+      document.getElementById('blocoAdminFiltros').style.display = souAdmin ? 'block' : 'none';
+      document.getElementById('subtituloPonto').textContent = souAdmin
+        ? 'Registro de ponto de todos os funcionários — gere o PDF, lance falta/folga/abono e aprove pedidos de ajuste.'
+        : 'Registre sua chegada, ida e volta do almoço e saída. Errou uma batida? Peça um ajuste.';
+      document.getElementById('btnSolicitarAjuste').style.display = souAdmin ? 'none' : 'inline-flex';
 
       const opcoesFuncionario = funcionarios.map(f => `<option value="${f.ID}">${f.NOME}</option>`).join('');
+      const filtroAtual = document.getElementById('filtroFuncionario').value;
       setHTML('filtroFuncionario', '<option value="">Todos</option>' + opcoesFuncionario);
+      document.getElementById('filtroFuncionario').value = filtroAtual;
       setHTML('fFuncionario', opcoesFuncionario);
 
       aplicarFiltros();
+      renderAjustes();
     } catch (e) { mostrarToast('Erro: ' + e.message, 'erro'); }
   }
 
   function aplicarFiltros(){
-    const funcId = document.getElementById('filtroFuncionario').value;
+    const funcId = souAdmin ? document.getElementById('filtroFuncionario').value : usuarioAtual.ID;
     const de = document.getElementById('filtroDe').value;
     const ate = document.getElementById('filtroAte').value;
     registrosFiltrados = registros.filter(r => {
@@ -149,14 +257,11 @@
   function renderKpis(){
     const presencas = registrosFiltrados.filter(r => (r.STATUS||'PRESENCA') === 'PRESENCA');
     const totalHoras = presencas.reduce((s,r) => s + Number(r.HORAS_TRABALHADAS||0), 0);
-    const qtdFaltas = registrosFiltrados.filter(r => r.STATUS === 'FALTA').length;
-    const qtdFolgas = registrosFiltrados.filter(r => r.STATUS === 'FOLGA').length;
-    const qtdAbonos = registrosFiltrados.filter(r => r.STATUS === 'ABONO').length;
-
+    const qtd = st => registrosFiltrados.filter(r => r.STATUS === st).length;
     document.getElementById('kpiDias').textContent = presencas.length;
     document.getElementById('kpiHoras').textContent = formatarHoras(totalHoras);
     document.getElementById('kpiMedia').textContent = presencas.length ? formatarHoras(totalHoras / presencas.length) : '—';
-    document.getElementById('kpiOutros').textContent = qtdFaltas + ' / ' + qtdFolgas + ' / ' + qtdAbonos;
+    document.getElementById('kpiOutros').textContent = qtd('FALTA') + ' / ' + qtd('FOLGA') + ' / ' + qtd('ABONO');
   }
 
   function renderLinhas(){
@@ -164,28 +269,29 @@
     setHTML('linhas', registrosFiltrados.map(r => {
       const status = r.STATUS || 'PRESENCA';
       const ehPresenca = status === 'PRESENCA';
+      const botoes = souAdmin
+        ? `<button class="btn" style="padding:6px 10px; font-size:11.5px;" onclick="window.__editarPonto('${r.ID}')">Editar</button>
+           <button class="btn" style="padding:6px 10px; font-size:11.5px; color:var(--red);" onclick="window.__excluirPonto('${r.ID}')">Excluir</button>`
+        : (ehPresenca ? `<button class="btn" style="padding:6px 10px; font-size:11.5px;" onclick="window.__ajusteDoDia('${r.DATA}')">Solicitar ajuste</button>` : '');
       return `<tr>
-      <td>${dataBR(r.DATA)}</td><td>${nomeFuncionario(r.FUNCIONARIO_ID)}</td>
+      <td>${dataBR(r.DATA)}${r.AJUSTADO ? ' <span title="Horário corrigido após pedido de ajuste aprovado" style="color:var(--amber);">✎</span>' : ''}</td><td>${nomeFuncionario(r.FUNCIONARIO_ID)}</td>
       <td><span class="badge-status ${status}">${STATUS_LABEL[status]}</span></td>
       <td>${ehPresenca ? horaOuTraco(r.HORA_ENTRADA) : '—'}</td><td>${ehPresenca ? horaOuTraco(r.HORA_INICIO_ALMOCO) : '—'}</td><td>${ehPresenca ? horaOuTraco(r.HORA_FIM_ALMOCO) : '—'}</td><td>${ehPresenca ? horaOuTraco(r.HORA_SAIDA) : '—'}</td>
       <td><b>${ehPresenca ? formatarHoras(r.HORAS_TRABALHADAS||0) : '—'}</b></td>
-      <td style="display:flex; gap:6px;">
-        <button class="btn" style="padding:6px 10px; font-size:11.5px;" onclick="window.__editarPonto('${r.ID}')">Editar</button>
-        <button class="btn" style="padding:6px 10px; font-size:11.5px; color:var(--red);" onclick="window.__excluirPonto('${r.ID}')">Excluir</button>
-      </td></tr>`;
+      <td style="display:flex; gap:6px; flex-wrap:wrap;">${botoes}</td></tr>`;
     }).join(''));
   }
 
-  // ---------- Modal ----------
+  // ---------- Registrar ponto ----------
   const modal = document.getElementById('modal');
   let statusSelecionado = 'PRESENCA';
 
   function selecionarStatus(status){
     statusSelecionado = status;
-    document.querySelectorAll('.status-tab').forEach(b => b.classList.toggle('active', b.dataset.status === status));
+    document.querySelectorAll('#statusTabs .status-tab').forEach(b => b.classList.toggle('active', b.dataset.status === status));
     document.getElementById('camposHorario').style.display = status === 'PRESENCA' ? 'block' : 'none';
   }
-  document.querySelectorAll('.status-tab').forEach(btn => btn.addEventListener('click', () => selecionarStatus(btn.dataset.status)));
+  document.querySelectorAll('#statusTabs .status-tab').forEach(btn => btn.addEventListener('click', () => { if (souAdmin) selecionarStatus(btn.dataset.status); }));
 
   function atualizarPreviaHoras(){
     const h = calcularHoras(document.getElementById('fEntrada').value, document.getElementById('fSaida').value, document.getElementById('fInicioAlmoco').value, document.getElementById('fFimAlmoco').value);
@@ -193,62 +299,88 @@
   }
   ['fEntrada','fSaida','fInicioAlmoco','fFimAlmoco'].forEach(id => document.getElementById(id).addEventListener('input', atualizarPreviaHoras));
 
+  const IDS_HORA = { HORA_ENTRADA:'fEntrada', HORA_INICIO_ALMOCO:'fInicioAlmoco', HORA_FIM_ALMOCO:'fFimAlmoco', HORA_SAIDA:'fSaida' };
+
+  function limitarHoraMaxima(){
+    const ehHoje = document.getElementById('fData').value === hojeLocal();
+    Object.values(IDS_HORA).forEach(id => { const el = document.getElementById(id); if (ehHoje) el.max = horaAgora(); else el.removeAttribute('max'); });
+  }
+
+  /** Preenche o modal com o registro do funcionário/data, se existir; senão, em branco. Sugere a hora atual no próximo horário vazio. */
+  function carregarNoModal(funcId, data){
+    registroAtual = registros.find(r => r.FUNCIONARIO_ID === funcId && r.DATA === data) || null;
+    document.getElementById('fId').value = registroAtual ? registroAtual.ID : '';
+    document.getElementById('fFuncionario').value = funcId;
+    document.getElementById('fData').value = data;
+    Object.keys(IDS_HORA).forEach(c => { document.getElementById(IDS_HORA[c]).value = registroAtual ? (registroAtual[c] || '') : ''; });
+    document.getElementById('fObs').value = registroAtual ? (registroAtual.OBSERVACOES || '') : '';
+    selecionarStatus(registroAtual ? (registroAtual.STATUS || 'PRESENCA') : 'PRESENCA');
+
+    // Próximo horário vazio da sequência recebe a hora atual (só se for hoje e for um registro de presença)
+    if (data === hojeLocal() && statusSelecionado === 'PRESENCA') {
+      const proximo = CAMPOS.find(c => !document.getElementById(IDS_HORA[c]).value);
+      if (proximo) document.getElementById(IDS_HORA[proximo]).value = horaAgora();
+    }
+
+    // Funcionário comum: não muda nome, data nem o que já foi batido — só completa os horários seguintes.
+    document.getElementById('fFuncionario').disabled = !souAdmin;
+    document.getElementById('fData').disabled = !souAdmin;
+    document.getElementById('wrapStatus').style.display = souAdmin ? 'block' : 'none';
+    Object.keys(IDS_HORA).forEach(c => {
+      const jaBatido = registroAtual && registroAtual[c];
+      document.getElementById(IDS_HORA[c]).disabled = !souAdmin && !!jaBatido;
+    });
+    document.getElementById('avisoHorarios').textContent = souAdmin
+      ? 'Nenhum horário pode ser maior que a hora atual (para o dia de hoje).'
+      : 'Os horários já batidos não podem ser alterados aqui — para corrigir, use "Solicitar ajuste de batida". Nenhum horário pode passar da hora atual.';
+    limitarHoraMaxima();
+    atualizarPreviaHoras();
+    document.getElementById('modalTitulo').textContent = registroAtual ? 'Ponto de ' + dataBR(data) : 'Registrar ponto';
+  }
+
   document.getElementById('btnNovo').addEventListener('click', () => {
-    registroAtual = null;
-    document.getElementById('modalTitulo').textContent = 'Registrar ponto';
-    document.getElementById('fId').value = '';
-    document.getElementById('fFuncionario').value = document.getElementById('filtroFuncionario').value || (funcionarios[0] && funcionarios[0].ID) || '';
-    document.getElementById('fData').value = new Date().toISOString().substring(0,10);
-    ['fEntrada','fInicioAlmoco','fFimAlmoco','fSaida','fObs'].forEach(id => document.getElementById(id).value = '');
-    document.getElementById('previaHoras').textContent = '';
-    selecionarStatus('PRESENCA');
+    const funcId = souAdmin ? (document.getElementById('filtroFuncionario').value || usuarioAtual.ID) : usuarioAtual.ID;
+    if (souAdmin && !funcionarios.some(f => f.ID === funcId)) { mostrarToast('Funcionário não encontrado.', 'erro'); return; }
+    carregarNoModal(funcId, hojeLocal());
     modal.classList.add('open');
   });
+  document.getElementById('fFuncionario').addEventListener('change', () => { if (souAdmin) carregarNoModal(document.getElementById('fFuncionario').value, document.getElementById('fData').value || hojeLocal()); });
+  document.getElementById('fData').addEventListener('change', () => { if (souAdmin) carregarNoModal(document.getElementById('fFuncionario').value, document.getElementById('fData').value || hojeLocal()); });
   document.getElementById('fecharModal').addEventListener('click', () => modal.classList.remove('open'));
   document.getElementById('btnCancelar').addEventListener('click', () => modal.classList.remove('open'));
 
   window.__editarPonto = (id) => {
-    registroAtual = registros.find(r => r.ID === id);
-    if (!registroAtual) return;
-    document.getElementById('modalTitulo').textContent = 'Editar ponto — ' + dataBR(registroAtual.DATA);
-    document.getElementById('fId').value = registroAtual.ID;
-    document.getElementById('fFuncionario').value = registroAtual.FUNCIONARIO_ID;
-    document.getElementById('fData').value = registroAtual.DATA;
-    document.getElementById('fEntrada').value = registroAtual.HORA_ENTRADA || '';
-    document.getElementById('fInicioAlmoco').value = registroAtual.HORA_INICIO_ALMOCO || '';
-    document.getElementById('fFimAlmoco').value = registroAtual.HORA_FIM_ALMOCO || '';
-    document.getElementById('fSaida').value = registroAtual.HORA_SAIDA || '';
-    document.getElementById('fObs').value = registroAtual.OBSERVACOES || '';
-    selecionarStatus(registroAtual.STATUS || 'PRESENCA');
-    atualizarPreviaHoras();
+    const r = registros.find(x => x.ID === id); if (!r) return;
+    carregarNoModal(r.FUNCIONARIO_ID, r.DATA);
     modal.classList.add('open');
   };
 
   document.getElementById('btnSalvar').addEventListener('click', async () => {
-    const funcionarioId = document.getElementById('fFuncionario').value;
-    const data = document.getElementById('fData').value;
+    const funcionarioId = souAdmin ? document.getElementById('fFuncionario').value : usuarioAtual.ID;
+    const data = souAdmin ? document.getElementById('fData').value : hojeLocal();
     if (!funcionarioId || !data){ mostrarToast('Escolha o funcionário e a data.', 'erro'); return; }
+    const status = souAdmin ? statusSelecionado : 'PRESENCA';
+    const ehPresenca = status === 'PRESENCA';
 
-    const ehPresenca = statusSelecionado === 'PRESENCA';
-    const entrada = ehPresenca ? document.getElementById('fEntrada').value : '';
-    const saida = ehPresenca ? document.getElementById('fSaida').value : '';
-    const inicioAlmoco = ehPresenca ? document.getElementById('fInicioAlmoco').value : '';
-    const fimAlmoco = ehPresenca ? document.getElementById('fFimAlmoco').value : '';
-    const horas = ehPresenca ? calcularHoras(entrada, saida, inicioAlmoco, fimAlmoco) : 0;
-
-    const dados = {
-      FUNCIONARIO_ID: funcionarioId, DATA: data, STATUS: statusSelecionado,
-      HORA_ENTRADA: entrada, HORA_SAIDA: saida, HORA_INICIO_ALMOCO: inicioAlmoco, HORA_FIM_ALMOCO: fimAlmoco,
-      HORAS_TRABALHADAS: horas, OBSERVACOES: document.getElementById('fObs').value.trim()
-    };
+    const t = {};
+    Object.keys(IDS_HORA).forEach(c => { t[c] = ehPresenca ? document.getElementById(IDS_HORA[c]).value : ''; });
+    if (ehPresenca) {
+      if (!t.HORA_ENTRADA && !registroAtual) { mostrarToast('Informe a chegada.', 'erro'); return; }
+      const erro = validarHorarios(data, t);
+      if (erro) { mostrarToast(erro, 'erro'); return; }
+    } else if (data > hojeLocal()) { mostrarToast('Não dá pra lançar falta/folga/abono em data futura.', 'erro'); return; }
+    const horas = ehPresenca ? calcularHoras(t.HORA_ENTRADA, t.HORA_SAIDA, t.HORA_INICIO_ALMOCO, t.HORA_FIM_ALMOCO) : 0;
+    const obs = document.getElementById('fObs').value.trim();
 
     try {
+      if (!(await checarPermissao('CONTROLE_PONTO', registroAtual ? 'EDITAR' : 'CADASTRAR'))){ mostrarToast('Sem permissão.', 'erro'); return; }
       if (registroAtual) {
-        if (!(await checarPermissao('CONTROLE_PONTO','EDITAR'))){ mostrarToast('Sem permissão.', 'erro'); return; }
-        await dbUpdate('PONTO_REGISTROS', registroAtual.ID, dados);
+        const parcial = souAdmin
+          ? { STATUS: status, HORAS_TRABALHADAS: horas, OBSERVACOES: obs, ...t }
+          : { HORAS_TRABALHADAS: horas, OBSERVACOES: obs, HORA_INICIO_ALMOCO: t.HORA_INICIO_ALMOCO, HORA_FIM_ALMOCO: t.HORA_FIM_ALMOCO, HORA_SAIDA: t.HORA_SAIDA };
+        await dbUpdate('PONTO_REGISTROS', registroAtual.ID, parcial);
       } else {
-        if (!(await checarPermissao('CONTROLE_PONTO','CADASTRAR'))){ mostrarToast('Sem permissão.', 'erro'); return; }
-        await dbInsert('PONTO_REGISTROS', Object.assign({ USUARIO_REGISTRO_ID: usuarioAtual.ID }, dados));
+        await dbInsert('PONTO_REGISTROS', { FUNCIONARIO_ID: funcionarioId, DATA: data, STATUS: status, ...t, HORAS_TRABALHADAS: horas, OBSERVACOES: obs, USUARIO_REGISTRO_ID: usuarioAtual.ID, DATA_HORA_REGISTRO: new Date().toISOString() });
       }
       mostrarToast('Ponto salvo.');
       modal.classList.remove('open');
@@ -257,17 +389,119 @@
   });
 
   window.__excluirPonto = async (id) => {
+    if (!souAdmin) { mostrarToast('Só o administrador pode excluir.', 'erro'); return; }
     if (!confirm('Excluir esse registro de ponto?')) return;
     try {
-      if (!(await checarPermissao('CONTROLE_PONTO','EXCLUIR'))){ mostrarToast('Sem permissão.', 'erro'); return; }
       await dbDelete('PONTO_REGISTROS', id);
       mostrarToast('Registro excluído.');
       carregar();
     } catch (e) { mostrarToast('Erro: ' + e.message, 'erro'); }
   };
 
-  // ---------- Gerar PDF do funcionário (resumo pra folha de pagamento) ----------
+  // ---------- Pedido de ajuste de batida (funcionário) ----------
+  const modalAjuste = document.getElementById('modalAjuste');
+  const IDS_AJ = { HORA_ENTRADA:'aEntrada', HORA_INICIO_ALMOCO:'aInicio', HORA_FIM_ALMOCO:'aFim', HORA_SAIDA:'aSaida' };
+
+  function carregarDiaNoAjuste(data){
+    const r = registros.find(x => x.FUNCIONARIO_ID === usuarioAtual.ID && x.DATA === data);
+    Object.keys(IDS_AJ).forEach(c => { document.getElementById(IDS_AJ[c]).value = r ? (r[c] || '') : ''; });
+    document.getElementById('aAtual').textContent = r
+      ? 'Registrado hoje: ' + CAMPOS.map(c => ROTULO_CAMPO[c] + ' ' + (r[c] || '—')).join(' · ')
+      : 'Não há ponto registrado nesse dia — preencha os horários corretos.';
+    Object.values(IDS_AJ).forEach(id => { const el = document.getElementById(id); if (data === hojeLocal()) el.max = horaAgora(); else el.removeAttribute('max'); });
+    modalAjuste.dataset.registro = r ? r.ID : '';
+  }
+  function abrirAjuste(data){
+    document.getElementById('aData').max = hojeLocal();
+    document.getElementById('aData').value = data;
+    document.getElementById('aObs').value = '';
+    carregarDiaNoAjuste(data);
+    modalAjuste.classList.add('open');
+  }
+  window.__ajusteDoDia = (data) => abrirAjuste(data);
+  document.getElementById('btnSolicitarAjuste').addEventListener('click', () => abrirAjuste(hojeLocal()));
+  document.getElementById('aData').addEventListener('change', e => { if (e.target.value) carregarDiaNoAjuste(e.target.value); });
+  document.getElementById('fecharModalAjuste').addEventListener('click', () => modalAjuste.classList.remove('open'));
+  document.getElementById('btnCancelarAjuste').addEventListener('click', () => modalAjuste.classList.remove('open'));
+
+  document.getElementById('btnEnviarAjuste').addEventListener('click', async () => {
+    const data = document.getElementById('aData').value;
+    const obs = document.getElementById('aObs').value.trim();
+    if (!data) { mostrarToast('Escolha o dia.', 'erro'); return; }
+    if (!obs) { mostrarToast('Escreva a observação explicando o ajuste.', 'erro'); return; }
+    const novo = {}; Object.keys(IDS_AJ).forEach(c => { novo[c] = document.getElementById(IDS_AJ[c]).value; });
+    const erro = validarHorarios(data, novo);
+    if (erro) { mostrarToast(erro, 'erro'); return; }
+    const r = registros.find(x => x.FUNCIONARIO_ID === usuarioAtual.ID && x.DATA === data);
+    const igual = r && CAMPOS.every(c => (r[c]||'') === (novo[c]||''));
+    if (igual || (!r && !novo.HORA_ENTRADA)) { mostrarToast('Altere pelo menos um horário.', 'erro'); return; }
+    if (ajustes.some(a => a.DATA === data && a.STATUS === 'Pendente')) { mostrarToast('Você já tem um pedido pendente para esse dia.', 'erro'); return; }
+    try {
+      if (!(await checarPermissao('CONTROLE_PONTO','CADASTRAR'))){ mostrarToast('Sem permissão.', 'erro'); return; }
+      await dbInsert('PONTO_AJUSTES', {
+        FUNCIONARIO_ID: usuarioAtual.ID, DATA: data, REGISTRO_ID: r ? r.ID : '', STATUS: 'Pendente', OBSERVACAO: obs,
+        ANTES: JSON.stringify(r ? Object.fromEntries(CAMPOS.map(c => [c, r[c]||''])) : {}),
+        NOVO: JSON.stringify(novo), DATA_SOLICITACAO: new Date().toISOString()
+      });
+      mostrarToast('Pedido enviado ao administrador.');
+      modalAjuste.classList.remove('open');
+      carregar();
+    } catch (e) { mostrarToast('Erro: ' + e.message, 'erro'); }
+  });
+
+  function resumoHorarios(obj){
+    return CAMPOS.map(c => (obj && obj[c]) ? obj[c] : '--:--').join(' · ');
+  }
+  function renderAjustes(){
+    const lista = ajustes.slice().sort((a,b) => (a.STATUS==='Pendente'?0:1) - (b.STATUS==='Pendente'?0:1) || String(b.DATA_SOLICITACAO).localeCompare(String(a.DATA_SOLICITACAO)));
+    const pendentes = lista.filter(a => a.STATUS === 'Pendente').length;
+    document.getElementById('tituloAjustes').textContent = (souAdmin ? 'Pedidos de ajuste de batida' : 'Meus pedidos de ajuste') + (pendentes ? ' — ' + pendentes + ' pendente(s)' : '');
+    if (!lista.length) { setHTML('listaAjustes', '<div style="padding:26px; text-align:center; color:var(--text-tertiary); font-size:13px;">Nenhum pedido de ajuste.</div>'); return; }
+    setHTML('listaAjustes', lista.slice(0, 30).map(a => {
+      let antes = {}, novo = {};
+      try { antes = JSON.parse(a.ANTES || '{}'); novo = JSON.parse(a.NOVO || '{}'); } catch(e) {}
+      const acoes = (souAdmin && a.STATUS === 'Pendente')
+        ? `<button class="btn btn-primary" style="padding:6px 12px; font-size:11.5px;" onclick="window.__decidirAjuste('${a.ID}', true)">Aprovar</button>
+           <button class="btn" style="padding:6px 12px; font-size:11.5px; color:var(--red);" onclick="window.__decidirAjuste('${a.ID}', false)">Recusar</button>` : '';
+      return `<div class="ajuste-item">
+        <div class="corpo">
+          <div><b>${souAdmin ? nomeFuncionario(a.FUNCIONARIO_ID) + ' — ' : ''}${dataBR(a.DATA)}</b> <span class="tag-aj ${a.STATUS}">${a.STATUS}</span></div>
+          <div class="antes-depois">Chegada · Almoço · Volta · Saída<br>Antes: ${resumoHorarios(antes)}<br>Pedido: ${resumoHorarios(novo)}</div>
+          <div style="margin-top:4px; color:var(--text-secondary);">“${(a.OBSERVACAO||'').replace(/</g,'&lt;')}”</div>
+          ${a.RESPOSTA_ADMIN ? `<div style="margin-top:3px; color:var(--text-tertiary);">Resposta do admin: ${a.RESPOSTA_ADMIN.replace(/</g,'&lt;')}</div>` : ''}
+        </div>
+        <div style="display:flex; gap:8px;">${acoes}</div>
+      </div>`;
+    }).join(''));
+  }
+
+  window.__decidirAjuste = async (id, aprovar) => {
+    if (!souAdmin) { mostrarToast('Só o administrador decide os pedidos.', 'erro'); return; }
+    const a = ajustes.find(x => x.ID === id); if (!a || a.STATUS !== 'Pendente') return;
+    let resposta = '';
+    if (!aprovar) {
+      const motivo = prompt('Motivo da recusa (opcional):');
+      if (motivo === null) return;
+      resposta = motivo.trim();
+    } else if (!confirm('Aprovar e corrigir o horário de ' + nomeFuncionario(a.FUNCIONARIO_ID) + ' em ' + dataBR(a.DATA) + '?')) return;
+    try {
+      if (aprovar) {
+        const novo = JSON.parse(a.NOVO || '{}');
+        const reg = registros.find(r => r.FUNCIONARIO_ID === a.FUNCIONARIO_ID && r.DATA === a.DATA);
+        const horas = calcularHoras(novo.HORA_ENTRADA, novo.HORA_SAIDA, novo.HORA_INICIO_ALMOCO, novo.HORA_FIM_ALMOCO);
+        const campos = { HORA_ENTRADA: novo.HORA_ENTRADA||'', HORA_INICIO_ALMOCO: novo.HORA_INICIO_ALMOCO||'', HORA_FIM_ALMOCO: novo.HORA_FIM_ALMOCO||'', HORA_SAIDA: novo.HORA_SAIDA||'', HORAS_TRABALHADAS: horas, STATUS: 'PRESENCA', AJUSTADO: true, AJUSTE_ID: a.ID };
+        if (reg) await dbUpdate('PONTO_REGISTROS', reg.ID, campos);
+        else await dbInsert('PONTO_REGISTROS', Object.assign({ FUNCIONARIO_ID: a.FUNCIONARIO_ID, DATA: a.DATA, OBSERVACOES: '', USUARIO_REGISTRO_ID: usuarioAtual.ID, DATA_HORA_REGISTRO: new Date().toISOString() }, campos));
+      }
+      await dbUpdate('PONTO_AJUSTES', a.ID, { STATUS: aprovar ? 'Aprovado' : 'Recusado', RESPOSTA_ADMIN: resposta, DECIDIDO_POR: usuarioAtual.ID, DATA_DECISAO: new Date().toISOString() });
+      mostrarToast(aprovar ? 'Ajuste aprovado — horário corrigido.' : 'Pedido recusado.');
+      carregar();
+    } catch (e) { mostrarToast('Erro: ' + e.message, 'erro'); }
+  };
+
+  // ---------- Gerar PDF do funcionário (só administrador) ----------
   document.getElementById('btnGerarPdfFuncionario').addEventListener('click', async () => {
+    if (!souAdmin) { mostrarToast('Só o administrador pode gerar o PDF.', 'erro'); return; }
     const funcId = document.getElementById('filtroFuncionario').value;
     if (!funcId){ mostrarToast('Escolha um funcionário no filtro acima antes de gerar o PDF.', 'erro'); return; }
     const funcionario = funcionarios.find(f => f.ID === funcId);
@@ -287,7 +521,7 @@
       doc.text('Período: ' + (de?dataBR(de):'início') + ' até ' + (ate?dataBR(ate):'hoje'), 20, y); y += 8;
 
       doc.setDrawColor(220); doc.setFontSize(9); doc.setFont(undefined,'bold'); doc.setTextColor(20);
-      doc.text('Data', 20, y); doc.text('Status', 45, y); doc.text('Entrada', 70, y); doc.text('Almoço', 95, y); doc.text('Saída', 125, y); doc.text('Horas', 150, y); doc.text('Obs.', 170, y);
+      doc.text('Data', 20, y); doc.text('Status', 45, y); doc.text('Chegada', 70, y); doc.text('Almoço', 95, y); doc.text('Saída', 125, y); doc.text('Horas', 150, y); doc.text('Obs.', 170, y);
       y += 2; doc.line(20, y, 190, y); y += 5;
 
       const STATUS_TEXTO_PDF = { PRESENCA:'Presença', FOLGA:'Folga', FALTA:'Falta', ABONO:'Abono' };

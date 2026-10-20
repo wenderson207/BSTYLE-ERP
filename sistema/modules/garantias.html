@@ -142,6 +142,7 @@
         <div class="ffield"><label>Número de série</label><input id="fSerie" value="${garantiaAtual.NUMERO_SERIE||''}" placeholder="Preenchido do aparelho cadastrado"></div>
       </div>
       <div class="ffield"><label>Estado do aparelho no ato da venda</label><textarea id="fEstadoAparelho">${garantiaAtual.ESTADO_APARELHO || 'Aparelho em perfeitas condições e testes realizados com o cliente.'}</textarea></div>
+      <div class="ffield"><label>Observações (saem no termo, só se preenchidas)</label><textarea id="fObs" placeholder="Ex.: Aparelho vendido porque o cliente deu outro aparelho na troca.">${garantiaAtual.OBSERVACOES_TERMO||''}</textarea></div>
       <div class="section-title">3. Prazo e condições da venda</div>
       <div class="frow2">
         <div class="ffield"><label>Prazo (dias)</label><input id="fPrazo" type="number" value="${garantiaAtual.PRAZO_DIAS||30}"></div>
@@ -176,7 +177,8 @@
       ESTADO_APARELHO: document.getElementById('fEstadoAparelho').value.trim(),
       PRAZO_DIAS: Number(document.getElementById('fPrazo').value)||30,
       VALOR_PAGO: Number(document.getElementById('fValor').value)||0,
-      FORMA_PAGAMENTO: document.getElementById('fFormaPagamento').value.trim()
+      FORMA_PAGAMENTO: document.getElementById('fFormaPagamento').value.trim(),
+      OBSERVACOES_TERMO: document.getElementById('fObs').value.trim()
     };
   }
 
@@ -263,6 +265,7 @@
       <h3 style="font-size:12.5px; margin:16px 0 6px;">6. CONDIÇÕES GERAIS</h3>
       <p style="font-size:12px; font-weight:600; line-height:1.7; margin:0;">O consumidor declara ter recebido o aparelho em perfeito estado de funcionamento, ciente de que se trata de produto usado, podendo apresentar sinais naturais de uso.</p>
 
+      ${garantiaAtual.OBSERVACOES_TERMO ? `<p style="font-size:12px; line-height:1.6; margin:12px 0 0;"><b>Observações:</b> ${String(garantiaAtual.OBSERVACOES_TERMO).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/\n/g,'<br>')}</p>` : ''}
       <div style="margin-top:16px; font-size:12px; line-height:2;">
         <b>Data da Venda:</b> ${dataBR(garantiaAtual.DATA_EMISSAO)}<br>
         <b>Valor Pago:</b> ${moeda(garantiaAtual.VALOR_PAGO)}<br>
@@ -469,6 +472,7 @@
           secao('6. CONDIÇÕES GERAIS');
           paragrafo('O consumidor declara ter recebido o aparelho em perfeito estado de funcionamento, ciente de que se trata de produto usado, podendo apresentar sinais naturais de uso.', true);
 
+          if (garantiaAtual.OBSERVACOES_TERMO) paragrafo('Observações: ' + garantiaAtual.OBSERVACOES_TERMO);
           linha('Data da Venda:', dataBR(garantiaAtual.DATA_EMISSAO)); linha('Valor Pago:', moeda(garantiaAtual.VALOR_PAGO)); linha('Forma de Pagamento:', garantiaAtual.FORMA_PAGAMENTO);
           y += 16;
           if (y > 250) { doc.addPage(); y = 20; }

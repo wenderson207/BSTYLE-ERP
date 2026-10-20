@@ -101,6 +101,7 @@
         <div id="trocoInfoVenda" style="margin-top:8px; font-size:12.5px; font-family:var(--font-mono);"></div>
       </div>
       <div class="ffield"><label>Desconto (R$)</label><input id="descontoVenda" type="number" step="0.01" value="0"></div>
+      <div class="ffield"><label>Observação (sai no termo de garantia, só se preenchida)</label><textarea id="observacaoVenda" rows="2" placeholder="Ex.: Aparelho vendido porque o cliente deu outro aparelho na troca."></textarea></div>
 
       <div class="summary-row"><span>Subtotal</span><span id="resSubtotalVenda">R$ 0,00</span></div>
       <div class="summary-row"><span>Desconto</span><span id="resDescontoVenda">R$ 0,00</span></div>
@@ -605,6 +606,7 @@
         <h3 style="font-size:12.5px; margin:16px 0 6px;">6. CONDIÇÕES GERAIS</h3>
         <p style="font-size:12px; font-weight:600; line-height:1.7;">O consumidor declara ter recebido o aparelho em perfeito estado de funcionamento, ciente de que se trata de produto usado, podendo apresentar sinais naturais de uso.</p>
 
+        ${g.OBSERVACOES_TERMO ? `<p style="font-size:12px; line-height:1.6; margin-top:12px;"><b>Observações:</b> ${String(g.OBSERVACOES_TERMO).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/\n/g,'<br>')}</p>` : ''}
         <div style="margin-top:16px; font-size:12px; line-height:2;">
           <b>Data da Venda:</b> ${dataBRCel(g.DATA_EMISSAO)}<br><b>Valor Pago:</b> ${moeda(g.VALOR_PAGO)}<br><b>Forma de Pagamento:</b> ${g.FORMA_PAGAMENTO||''}
         </div>
@@ -692,7 +694,7 @@
         CLIENTE_ID: clienteSelecionadoVenda.ID, USUARIO_ID: usuarioAtual.ID, EMPRESA_ID: empresaVendaId,
         DATA: new Date().toISOString(), VALOR_TOTAL: totalVenda, DESCONTO: desconto,
         FORMA_PAGAMENTO: formaPagamento, PARCELAS: (formaPagamento==='Parcelado'||formaPagamento==='Cartão de Crédito') ? Number(document.getElementById('parcelasVenda').value) : 1,
-        OBSERVACOES: observacaoTroco, STATUS: 'Concluída', ORIGEM: 'CELULARES'
+        OBSERVACOES: observacaoTroco, OBSERVACAO_TERMO: document.getElementById('observacaoVenda').value.trim(), STATUS: 'Concluída', ORIGEM: 'CELULARES'
       });
 
       for (const item of carrinhoVenda) {
@@ -708,6 +710,7 @@
           ESTADO_APARELHO: aparelho.ESTADO_APARELHO || 'Aparelho testado com o cliente.',
           IMEI: aparelho.IMEI || '', NUMERO_SERIE: aparelho.NUMERO_SERIE || '',
           VALOR_PAGO: item.PRECO_UNITARIO, FORMA_PAGAMENTO: formaPagamento,
+          OBSERVACOES_TERMO: document.getElementById('observacaoVenda').value.trim(),
           DATA_EMISSAO: new Date().toISOString(), STATUS: 'Ativa'
         });
         ultimaGarantiaGerada = garantiaGerada;
@@ -730,7 +733,7 @@
       carrinhoVenda = []; clienteSelecionadoVenda = null;
       document.getElementById('clienteSelecionadoWrap').style.display='none';
       document.getElementById('buscaClienteVenda').style.display='block';
-      document.getElementById('descontoVenda').value = 0; document.getElementById('valorRecebidoVenda').value='';
+      document.getElementById('descontoVenda').value = 0; document.getElementById('valorRecebidoVenda').value=''; document.getElementById('observacaoVenda').value='';
       document.getElementById('trocoInfoVenda').textContent='';
       renderCarrinhoVenda();
       carregar();
